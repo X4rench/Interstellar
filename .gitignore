@@ -1,0 +1,20 @@
+node_modules/
+.expo/
+dist/
+web-build/
+
+# Переменные окружения — никогда не коммить
+.env
+.env.local
+
+# EAS
+.eas/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.log

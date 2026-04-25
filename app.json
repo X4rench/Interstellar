@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "Интерстеллар",
+    "slug": "interstellar-chat",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+
+    "icon": "./assets/icon.png",
+
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
+
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.yourcompany.interstellar",
+      "buildNumber": "1"
+    },
+
+    "android": {
+      "package": "com.yourcompany.interstellar",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#000000"
+      },
+      "statusBarColor": "#000000",
+      "statusBarTranslucent": true
+    },
+
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+
+    "plugins": [
+      "expo-asset"
+    ],
+
+    "extra": {
+      "eas": {
+        "projectId": "ВСТАВЬ_СВОЙ_EAS_PROJECT_ID"
+      }
+    }
+  }
+}
