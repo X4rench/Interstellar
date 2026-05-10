@@ -7,47 +7,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Line } from 'react-native-svg';
 
-import { theme, cardBg } from '../theme';
-import {
-  BrainIcon, SpiralIcon, SwordIcon, AtomIcon,
-  HeadphonesIcon, LightningIcon, CrownIcon,
-  VinciIcon, ChiselIcon, QuillIcon, DnaIcon, AppleIcon, CoilIcon,
-  VictoryIcon, TopHatIcon, DialogueIcon, ScrollIcon, CaveIcon,
-  YinYangIcon, WheelIcon, TrebleIcon, PianoIcon, SnowflakeIcon,
-  RavenIcon, MaskIcon, HammerPhilIcon, FistIcon,
-  CosmosIcon, RocketIcon, ChipIcon, WinGridIcon, StockChartIcon,
-  KiteIcon, BearIcon, Star5Icon, CharkhaIcon, ChainsIcon,
-  DoveIcon, LaurelIcon, LanternIcon, AnchorIcon, SceptreIcon,
-  AxeIcon, ShieldCrossIcon, SabersIcon, TelescopeIcon, RomanovIcon,
-  HelmetIcon, LyreIcon, CandleIcon, WheatIcon, GuitarIcon, EyeMysticIcon, TableChemIcon,
-  FlaskIcon, GobletIcon, JokerCardIcon, WolfIcon, BladesIcon, NoteBookIcon, CakeIcon,
-  WingsIcon, TitanIcon, SaiyanIcon, StrawHatIcon, BoxingGloveIcon, SoccerBallIcon,
-  CigarIcon, RoseIcon, FedoraIcon, PencilIcon, WandIcon, LightsaberIcon, StaffIcon,
-  SharinganIcon, FlameIcon, ThreeSwordsIcon, LeafBandIcon, AutomailIcon,
-  CowboyHatIcon, BarcodeIcon, HiddenBladeIcon, VisorIcon,
-  BannerIcon, HordeIcon, SyringeIcon, CaneIcon,
-  ChidoriIcon, GauntletIcon, MuscleIcon, MorningStarIcon, PlugIcon,
-  SoapIcon, FeatherIcon, BowlerHatIcon, CoinFlipIcon, ChessIcon,
-  WarMapIcon, MandalaIcon, AnkhIcon, DualGunIcon, RingIcon,
-  MushroomIcon, ElderBloodIcon, SunflowerIcon, CarnationIcon, FangIcon,
-  KunaiIcon, AtFieldIcon, ThunderboltIcon, MoonSceptreIcon, BusterIcon,
-  TriforceIcon, BandanaIcon, MicrophoneIcon, ShadesIcon, WebIcon,
-  BatSymbolIcon, ChampagneIcon, HeaddressIcon, LotusIcon, PipeSmokeIcon,
-  InkwellIcon, BatonIcon, PastaIcon, JumpmanIcon, MouthguardIcon,
-  ScarfIcon, PowerupIcon, DragonslayerIcon, EyePatchIcon,
-  RebellionIcon, Compass2Icon, SpearIcon, GloveIcon,
-  RastaIcon, LipsIcon, NunchakuIcon, ZigzagIcon,
-  CartoucheIcon, SpartanIcon, CapIcon, PrismIcon,
-  BeakerIcon, QueenCrownIcon, RacketIcon, WorldCupIcon,
-  ManuscriptIcon, BirchIcon, MegaphoneIcon, GrandPianoIcon,
-  PeaceAtomIcon, BarbedWireIcon, FeatherPenIcon, TroikaIcon, AutumnLeafIcon,
-  SearchIcon, MessageIcon, StarIcon,
-} from '../icons';
+import { theme } from '../theme';
+import { SearchIcon, MessageIcon, StarIcon } from '../icons';
 import BottomNav from '../components/BottomNav';
+import { CharacterIcon } from '../components/CharacterIcon';
+import { getCharacterGradient } from '../utils/gradients';
 import { useApp } from '../context/AppContext';
 import { Character, CATEGORIES } from '../data/characters';
-
-type CardKey = keyof typeof cardBg;
 type SortKey = 'rating' | 'messages' | 'alpha' | 'new';
 
 const TABS = ['Все', ...CATEGORIES.slice(1)];
@@ -58,168 +24,6 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: 'alpha',    label: 'По алфавиту' },
   { key: 'new',      label: 'Сначала новые' },
 ];
-
-function CharacterIcon({ iconType, size }: { iconType: string; size: number }) {
-  switch (iconType) {
-    case 'brain':       return <BrainIcon size={size} />;
-    case 'spiral':      return <SpiralIcon size={size} />;
-    case 'sword':       return <SwordIcon size={size} />;
-    case 'atom':        return <AtomIcon size={size} />;
-    case 'headphones':  return <HeadphonesIcon size={size} />;
-    case 'lightning':   return <LightningIcon size={size} />;
-    case 'crown':       return <CrownIcon size={size} />;
-    case 'vinci':       return <VinciIcon size={size} />;
-    case 'chisel':      return <ChiselIcon size={size} />;
-    case 'quill':       return <QuillIcon size={size} />;
-    case 'dna':         return <DnaIcon size={size} />;
-    case 'apple':       return <AppleIcon size={size} />;
-    case 'coil':        return <CoilIcon size={size} />;
-    case 'victory':     return <VictoryIcon size={size} />;
-    case 'tophat':      return <TopHatIcon size={size} />;
-    case 'dialogue':    return <DialogueIcon size={size} />;
-    case 'scroll':      return <ScrollIcon size={size} />;
-    case 'cave':        return <CaveIcon size={size} />;
-    case 'yinyang':     return <YinYangIcon size={size} />;
-    case 'wheel':       return <WheelIcon size={size} />;
-    case 'treble':      return <TrebleIcon size={size} />;
-    case 'piano':       return <PianoIcon size={size} />;
-    case 'snowflake':   return <SnowflakeIcon size={size} />;
-    case 'raven':       return <RavenIcon size={size} />;
-    case 'mask':        return <MaskIcon size={size} />;
-    case 'hammerphil':  return <HammerPhilIcon size={size} />;
-    case 'fist':        return <FistIcon size={size} />;
-    case 'cosmos':      return <CosmosIcon size={size} />;
-    case 'rocket':      return <RocketIcon size={size} />;
-    case 'chip':        return <ChipIcon size={size} />;
-    case 'wingrid':     return <WinGridIcon size={size} />;
-    case 'stockchart':  return <StockChartIcon size={size} />;
-    case 'kite':        return <KiteIcon size={size} />;
-    case 'bear':        return <BearIcon size={size} />;
-    case 'star5':       return <Star5Icon size={size} />;
-    case 'charkha':     return <CharkhaIcon size={size} />;
-    case 'chains':      return <ChainsIcon size={size} />;
-    case 'dove':        return <DoveIcon size={size} />;
-    case 'laurel':      return <LaurelIcon size={size} />;
-    case 'lantern':     return <LanternIcon size={size} />;
-    case 'anchor':      return <AnchorIcon size={size} />;
-    case 'sceptre':     return <SceptreIcon size={size} />;
-    case 'axe':         return <AxeIcon size={size} />;
-    case 'shieldcross': return <ShieldCrossIcon size={size} />;
-    case 'sabers':      return <SabersIcon size={size} />;
-    case 'telescope':   return <TelescopeIcon size={size} />;
-    case 'romanov':     return <RomanovIcon size={size} />;
-    case 'helmet':      return <HelmetIcon size={size} />;
-    case 'lyre':        return <LyreIcon size={size} />;
-    case 'candle':      return <CandleIcon size={size} />;
-    case 'wheat':       return <WheatIcon size={size} />;
-    case 'guitar':      return <GuitarIcon size={size} />;
-    case 'eyemystic':   return <EyeMysticIcon size={size} />;
-    case 'tablechem':   return <TableChemIcon size={size} />;
-    case 'flask':       return <FlaskIcon size={size} />;
-    case 'goblet':      return <GobletIcon size={size} />;
-    case 'jokercard':   return <JokerCardIcon size={size} />;
-    case 'wolf':        return <WolfIcon size={size} />;
-    case 'blades':      return <BladesIcon size={size} />;
-    case 'notebook':    return <NoteBookIcon size={size} />;
-    case 'cake':        return <CakeIcon size={size} />;
-    case 'wings':       return <WingsIcon size={size} />;
-    case 'titan':       return <TitanIcon size={size} />;
-    case 'saiyan':      return <SaiyanIcon size={size} />;
-    case 'strawhat':    return <StrawHatIcon size={size} />;
-    case 'boxingglove': return <BoxingGloveIcon size={size} />;
-    case 'soccerball':  return <SoccerBallIcon size={size} />;
-    case 'cigar':       return <CigarIcon size={size} />;
-    case 'rose':        return <RoseIcon size={size} />;
-    case 'fedora':      return <FedoraIcon size={size} />;
-    case 'pencil':      return <PencilIcon size={size} />;
-    case 'wand':        return <WandIcon size={size} />;
-    case 'lightsaber':  return <LightsaberIcon size={size} />;
-    case 'staff':       return <StaffIcon size={size} />;
-    case 'sharingan':   return <SharinganIcon size={size} />;
-    case 'flame':       return <FlameIcon size={size} />;
-    case 'threeswords': return <ThreeSwordsIcon size={size} />;
-    case 'leafband':    return <LeafBandIcon size={size} />;
-    case 'automail':    return <AutomailIcon size={size} />;
-    case 'cowboyhat':   return <CowboyHatIcon size={size} />;
-    case 'barcode':     return <BarcodeIcon size={size} />;
-    case 'hiddenblade': return <HiddenBladeIcon size={size} />;
-    case 'visor':       return <VisorIcon size={size} />;
-    case 'banner':      return <BannerIcon size={size} />;
-    case 'horde':       return <HordeIcon size={size} />;
-    case 'syringe':     return <SyringeIcon size={size} />;
-    case 'cane':        return <CaneIcon size={size} />;
-    case 'chidori':     return <ChidoriIcon size={size} />;
-    case 'gauntlet':    return <GauntletIcon size={size} />;
-    case 'muscle':      return <MuscleIcon size={size} />;
-    case 'morningstar': return <MorningStarIcon size={size} />;
-    case 'plug':        return <PlugIcon size={size} />;
-    case 'soap':        return <SoapIcon size={size} />;
-    case 'feather':     return <FeatherIcon size={size} />;
-    case 'bowlerhat':   return <BowlerHatIcon size={size} />;
-    case 'coinflip':    return <CoinFlipIcon size={size} />;
-    case 'chess':       return <ChessIcon size={size} />;
-    case 'warmap':      return <WarMapIcon size={size} />;
-    case 'mandala':     return <MandalaIcon size={size} />;
-    case 'ankh':        return <AnkhIcon size={size} />;
-    case 'dualgun':     return <DualGunIcon size={size} />;
-    case 'ring':        return <RingIcon size={size} />;
-    case 'mushroom':    return <MushroomIcon size={size} />;
-    case 'elderblood':  return <ElderBloodIcon size={size} />;
-    case 'sunflower':   return <SunflowerIcon size={size} />;
-    case 'carnation':   return <CarnationIcon size={size} />;
-    case 'fang':        return <FangIcon size={size} />;
-    case 'kunai':       return <KunaiIcon size={size} />;
-    case 'atfield':     return <AtFieldIcon size={size} />;
-    case 'thunderbolt': return <ThunderboltIcon size={size} />;
-    case 'moonsceptre': return <MoonSceptreIcon size={size} />;
-    case 'buster':      return <BusterIcon size={size} />;
-    case 'triforce':    return <TriforceIcon size={size} />;
-    case 'bandana':     return <BandanaIcon size={size} />;
-    case 'microphone':  return <MicrophoneIcon size={size} />;
-    case 'shades':      return <ShadesIcon size={size} />;
-    case 'web':         return <WebIcon size={size} />;
-    case 'batsymbol':   return <BatSymbolIcon size={size} />;
-    case 'champagne':   return <ChampagneIcon size={size} />;
-    case 'headdress':   return <HeaddressIcon size={size} />;
-    case 'lotus':       return <LotusIcon size={size} />;
-    case 'pipesmoke':   return <PipeSmokeIcon size={size} />;
-    case 'inkwell':     return <InkwellIcon size={size} />;
-    case 'baton':       return <BatonIcon size={size} />;
-    case 'pasta':       return <PastaIcon size={size} />;
-    case 'jumpman':     return <JumpmanIcon size={size} />;
-    case 'mouthguard':  return <MouthguardIcon size={size} />;
-    case 'scarf':       return <ScarfIcon size={size} />;
-    case 'powerup':     return <PowerupIcon size={size} />;
-    case 'dragonslayer':return <DragonslayerIcon size={size} />;
-    case 'eyepatch':    return <EyePatchIcon size={size} />;
-    case 'rebellion':   return <RebellionIcon size={size} />;
-    case 'compass2':    return <Compass2Icon size={size} />;
-    case 'spear':       return <SpearIcon size={size} />;
-    case 'glove':       return <GloveIcon size={size} />;
-    case 'rasta':       return <RastaIcon size={size} />;
-    case 'lips':        return <LipsIcon size={size} />;
-    case 'nunchaku':    return <NunchakuIcon size={size} />;
-    case 'zigzag':      return <ZigzagIcon size={size} />;
-    case 'cartouche':   return <CartoucheIcon size={size} />;
-    case 'spartan':     return <SpartanIcon size={size} />;
-    case 'cap':         return <CapIcon size={size} />;
-    case 'prism':       return <PrismIcon size={size} />;
-    case 'beaker':      return <BeakerIcon size={size} />;
-    case 'queencrown':  return <QueenCrownIcon size={size} />;
-    case 'racket':      return <RacketIcon size={size} />;
-    case 'worldcup':    return <WorldCupIcon size={size} />;
-    case 'manuscript':  return <ManuscriptIcon size={size} />;
-    case 'birch':       return <BirchIcon size={size} />;
-    case 'megaphone':   return <MegaphoneIcon size={size} />;
-    case 'grandpiano':  return <GrandPianoIcon size={size} />;
-    case 'peaceatom':   return <PeaceAtomIcon size={size} />;
-    case 'barbedwire':  return <BarbedWireIcon size={size} />;
-    case 'featherpen':  return <FeatherPenIcon size={size} />;
-    case 'troika':      return <TroikaIcon size={size} />;
-    case 'autumnleaf':  return <AutumnLeafIcon size={size} />;
-    default:            return <BrainIcon size={size} />;
-  }
-}
 
 function FilterIcon({ color = '#606060', size = 16 }: { color?: string; size?: number }) {
   return (
@@ -328,11 +132,11 @@ export default function LibraryScreen() {
                 activeOpacity={0.85}
               >
                 <LinearGradient
-                  colors={cardBg[c.gradientKey as CardKey] ?? cardBg.freud}
+                  colors={getCharacterGradient(c) as [string, string]}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                   style={s.cardImg}
                 >
-                  <CharacterIcon iconType={c.iconType} size={52} />
+                  <CharacterIcon iconType={c.iconType} size={52} avatarUri={c.avatarUri} />
                   {c.isNSFW && (
                     <View style={s.nsfwBadge}>
                       <Text style={s.nsfwText}>18+</Text>
@@ -434,7 +238,7 @@ const s = StyleSheet.create({
     backgroundColor: theme.surface1, borderWidth: 1, borderColor: theme.border,
     borderRadius: 18, overflow: 'hidden',
   },
-  cardImg: { height: 150, width: '100%', alignItems: 'center', justifyContent: 'center' },
+  cardImg: { height: 150, width: '100%', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   nsfwBadge: {
     position: 'absolute', top: 8, left: 8,
     backgroundColor: 'rgba(220,50,50,0.85)',

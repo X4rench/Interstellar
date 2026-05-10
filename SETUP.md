@@ -5,24 +5,50 @@
 
 ---
 
-## Шаг 1 — URL бэкенда
+## Шаг 1 — Запустить бэкенд (прокси к polza.ai)
+
+Бэк лежит в папке `backend/` — это stateless-прокси к polza.ai, модель grok-4.1-fast.
+
+```bash
+cd backend
+cp .env .env
+# Открой backend/.env и вставь POLZA_API_KEY (https://polza.ai → API keys)
+npm install
+npm run dev
+```
+
+Бэк поднимается на `http://localhost:3001`. Проверка:
+```bash
+curl http://localhost:3001/health
+# {"ok":true,"model":"grok-4.1-fast"}
+```
+
+Подробнее — в [backend/README.md](backend/README.md).
+
+---
+
+## Шаг 2 — URL бэка для клиента
 
 **Файл:** создать `.env` в корне проекта (рядом с `package.json`)
 
 ```
-EXPO_PUBLIC_API_URL=https://api.yourserver.com/api/v1
+EXPO_PUBLIC_API_URL=http://localhost:3001/api/v1
 ```
 
-**Откуда брать:** это адрес твоего Node.js сервера. Если сервер запущен на VPS —
-вставляй домен или IP. Если локально для теста — `http://192.168.X.X:3001/api/v1`
-(IP своей машины в локальной сети, не `localhost` — телефон не найдёт localhost).
+**Если запускаешь приложение на физическом телефоне** через Expo Go —
+телефону `localhost` не виден. Подставь IP своей машины в локальной сети,
+например `http://192.168.1.5:3001/api/v1`. На той же машине должен быть открыт
+порт 3001 в файрволе.
+
+Production — деплой бэка на VPS / Render / Fly.io за HTTPS, и
+`EXPO_PUBLIC_API_URL=https://api.yourdomain.com/api/v1`.
 
 **Важно:** файл `.env` не коммитится в git (уже добавлен в `.gitignore`).
 Файл `.env.example` — шаблон, его можно коммитить.
 
 ---
 
-## Шаг 2 — Bundle Identifier и Package Name
+## Шаг 3 — Bundle Identifier и Package Name
 
 **Файл:** `app.json`
 
@@ -49,7 +75,7 @@ EXPO_PUBLIC_API_URL=https://api.yourserver.com/api/v1
 
 ---
 
-## Шаг 3 — EAS Project ID (для сборки через облако Expo)
+## Шаг 4 — EAS Project ID (для сборки через облако Expo)
 
 **Файл:** `app.json` → поле `extra.eas.projectId`
 
@@ -76,7 +102,7 @@ eas project:init
 
 ---
 
-## Шаг 4 — Иконки и сплэш-скрин
+## Шаг 5 — Иконки и сплэш-скрин
 
 **Папка:** `assets/` (уже создана, там есть README.txt с описанием)
 
@@ -101,7 +127,7 @@ eas project:init
 
 ---
 
-## Шаг 5 — Запуск и сборка
+## Шаг 6 — Запуск и сборка
 
 ### Локальная разработка
 ```bash
@@ -134,21 +160,22 @@ eas submit --platform ios
 
 ## Чеклист перед билдом
 
-- [ ] Создан файл `.env` с правильным `EXPO_PUBLIC_API_URL`
+- [ ] В `backend/.env` указан `POLZA_API_KEY`, бэк поднимается без ошибок
+- [ ] Создан файл `.env` в корне с правильным `EXPO_PUBLIC_API_URL`
 - [ ] В `app.json` заменены `bundleIdentifier` и `package`
 - [ ] В `app.json` вставлен `projectId` (после `eas project:init`)
 - [ ] В папке `assets/` лежат `icon.png`, `splash.png`, `adaptive-icon.png`
-- [ ] Бэкенд запущен и доступен по URL из `.env`
+- [ ] Бэкенд задеплоен на HTTPS-хосте, URL прописан в `.env`
 - [ ] Выполнен `eas login`
 
 ---
 
 ## Что уже работает без изменений
 
-- Авторизация по имени (device_id, без паролей и регистрации)
-- Чат с AI-персонажами через бэкенд (`/simulator/start`, `/simulator/message`)
-- Если сервер недоступен — автоматический фолбэк на встроенные ответы
-- Сессии сохраняются между перезапусками приложения
+- Локальный профиль (имя, аватар, настройки) — без авторизации, без регистрации
+- Чат с AI-персонажами через бэкенд → polza.ai (grok-4.1-fast)
+- Stateless-протокол: история чата живёт в приложении, бэк не хранит ничего
+- В DEV — фолбэк на mock-ответы если бэк не отвечает
 - Создание и удаление своих персонажей
 - Избранное, статистика, стрик-дни
 - Профиль, экран PRO (кнопка покупки — заглушка, нужно подключить платёжку)

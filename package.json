@@ -6,14 +6,26 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
+    "lint": "expo lint",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"App.tsx\""
   },
   "dependencies": {
     "@expo/metro-runtime": "~4.0.1",
     "@react-native-async-storage/async-storage": "^3.0.2",
+    "@react-native-community/netinfo": "11.4.1",
+    "@sentry/react-native": "~6.10.0",
+    "crypto-js": "^4.2.0",
     "expo": "~52.0.11",
     "expo-asset": "~11.0.5",
+    "expo-crypto": "~14.0.2",
+    "expo-file-system": "~18.0.6",
+    "expo-image-manipulator": "~13.0.6",
+    "expo-image-picker": "~16.0.6",
     "expo-linear-gradient": "~14.0.1",
+    "expo-screen-capture": "~7.0.1",
+    "expo-secure-store": "~14.0.1",
     "expo-status-bar": "~2.0.1",
     "react": "18.3.1",
     "react-dom": "^18.3.1",
@@ -24,7 +36,10 @@
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",
+    "@types/crypto-js": "^4.2.2",
     "@types/react": "~18.3.12",
+    "eslint-config-expo": "^55.0.0",
+    "prettier": "^3.8.3",
     "typescript": "^5.3.0"
   },
   "private": true

@@ -1,0 +1,20 @@
+{
+  "name": "interstellar-backend",
+  "version": "1.0.0",
+  "description": "Stateless proxy to polza.ai (grok-4.1-fast) for Interstellar chat app",
+  "private": true,
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

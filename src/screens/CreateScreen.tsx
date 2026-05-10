@@ -1,48 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ScrollView, TextInput, Alert,
+  ScrollView, TextInput, Alert, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
 
-import { theme, cardBg } from '../theme';
+import { theme } from '../theme';
 import {
   BackIcon, SmileIcon, BrainIcon, MoonIcon, FlowerIcon, LightningIcon, ShieldIcon,
-  SpiralIcon, SwordIcon, AtomIcon, HeadphonesIcon, CrownIcon,
-  VinciIcon, ChiselIcon, QuillIcon, DnaIcon, AppleIcon, CoilIcon,
-  VictoryIcon, TopHatIcon, DialogueIcon, ScrollIcon, CaveIcon,
-  YinYangIcon, WheelIcon, TrebleIcon, PianoIcon, SnowflakeIcon,
-  RavenIcon, MaskIcon, HammerPhilIcon, FistIcon,
-  CosmosIcon, RocketIcon, ChipIcon, WinGridIcon, StockChartIcon,
-  KiteIcon, BearIcon, Star5Icon, CharkhaIcon, ChainsIcon,
-  DoveIcon, LaurelIcon, LanternIcon, AnchorIcon, SceptreIcon,
-  AxeIcon, ShieldCrossIcon, SabersIcon, TelescopeIcon, RomanovIcon,
-  HelmetIcon, LyreIcon, CandleIcon, WheatIcon, GuitarIcon, EyeMysticIcon, TableChemIcon,
-  FlaskIcon, GobletIcon, JokerCardIcon, WolfIcon, BladesIcon, NoteBookIcon, CakeIcon,
-  WingsIcon, TitanIcon, SaiyanIcon, StrawHatIcon, BoxingGloveIcon, SoccerBallIcon,
-  CigarIcon, RoseIcon, FedoraIcon, PencilIcon, WandIcon, LightsaberIcon, StaffIcon,
-  SharinganIcon, FlameIcon, ThreeSwordsIcon, LeafBandIcon, AutomailIcon,
-  CowboyHatIcon, BarcodeIcon, HiddenBladeIcon, VisorIcon,
-  BannerIcon, HordeIcon, SyringeIcon, CaneIcon,
-  ChidoriIcon, GauntletIcon, MuscleIcon, MorningStarIcon, PlugIcon,
-  SoapIcon, FeatherIcon, BowlerHatIcon, CoinFlipIcon, ChessIcon,
-  WarMapIcon, MandalaIcon, AnkhIcon, DualGunIcon, RingIcon,
-  MushroomIcon, ElderBloodIcon, SunflowerIcon, CarnationIcon, FangIcon,
-  KunaiIcon, AtFieldIcon, ThunderboltIcon, MoonSceptreIcon, BusterIcon,
-  TriforceIcon, BandanaIcon, MicrophoneIcon, ShadesIcon, WebIcon,
-  BatSymbolIcon, ChampagneIcon, HeaddressIcon, LotusIcon, PipeSmokeIcon,
-  InkwellIcon, BatonIcon, PastaIcon, JumpmanIcon, MouthguardIcon,
-  ScarfIcon, PowerupIcon, DragonslayerIcon, EyePatchIcon,
-  RebellionIcon, Compass2Icon, SpearIcon, GloveIcon,
-  RastaIcon, LipsIcon, NunchakuIcon, ZigzagIcon,
-  CartoucheIcon, SpartanIcon, CapIcon, PrismIcon,
-  BeakerIcon, QueenCrownIcon, RacketIcon, WorldCupIcon,
+  JokerCardIcon, MaskIcon, LotusIcon, FlameIcon, ScrollIcon, AutumnLeafIcon,
+  CigarIcon, RoseIcon, FeatherIcon, MushroomIcon,
 } from '../icons';
-import { useApp } from '../context/AppContext';
-import { Character } from '../data/characters';
-
-type CardKey = keyof typeof cardBg;
+import { CharacterIcon } from '../components/CharacterIcon';
+import AgeGateModal from '../components/AgeGateModal';
+import { CUSTOM_GRADIENTS } from '../utils/gradients';
+import { buildPersonaTemplate, validatePersonaText, FIELD_LIMITS } from '../utils/personaTemplate';
+import { isConsentValid } from '../utils/consent';
+import { useApp, FREE_CUSTOM_CHARS } from '../context/AppContext';
+import { Character, Gender, CATEGORIES } from '../data/characters';
+import { saveAvatar } from '../utils/avatarStorage';
 
 const DRAFT_KEY = 'create_draft';
 
@@ -56,6 +35,12 @@ interface Draft {
   memory: boolean;
   gradientIdx: number;
   iconIdx: number;
+  // Новые поля (Задача 3)
+  gender: Gender;
+  category: string;
+  // Временный uri выбранной фотографии (cache image-picker'а). При следующей
+  // сессии может оказаться недействительным — тогда просто загрузится без фото.
+  avatarUri?: string | null;
 }
 
 function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
@@ -76,172 +61,46 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
 }
 
 const MOODS: { id: string; label: string; Icon: React.ComponentType<{ size?: number; color?: string }> }[] = [
-  { id: 'flirt',  label: 'Флиртующий', Icon: SmileIcon },
-  { id: 'smart',  label: 'Умный',       Icon: BrainIcon },
-  { id: 'dark',   label: 'Тёмный',      Icon: MoonIcon },
-  { id: 'gentle', label: 'Нежный',      Icon: FlowerIcon },
-  { id: 'bold',   label: 'Дерзкий',     Icon: LightningIcon },
-  { id: 'loyal',  label: 'Верный',      Icon: ShieldIcon },
+  { id: 'flirt',        label: 'Флиртующий',     Icon: SmileIcon },
+  { id: 'smart',        label: 'Умный',          Icon: BrainIcon },
+  { id: 'dark',         label: 'Тёмный',         Icon: MoonIcon },
+  { id: 'gentle',       label: 'Нежный',         Icon: FlowerIcon },
+  { id: 'bold',         label: 'Дерзкий',        Icon: LightningIcon },
+  { id: 'loyal',        label: 'Верный',         Icon: ShieldIcon },
+  { id: 'humor',        label: 'С юмором',       Icon: JokerCardIcon },
+  { id: 'mystery',      label: 'Загадочный',     Icon: MaskIcon },
+  { id: 'calm',         label: 'Спокойный',      Icon: LotusIcon },
+  { id: 'passionate',   label: 'Страстный',      Icon: FlameIcon },
+  { id: 'wise',         label: 'Мудрый',         Icon: ScrollIcon },
+  { id: 'melancholic',  label: 'Меланхоличный',  Icon: AutumnLeafIcon },
+  { id: 'sarcastic',    label: 'Саркастичный',   Icon: CigarIcon },
+  { id: 'charming',     label: 'Обаятельный',    Icon: RoseIcon },
+  { id: 'dreamer',      label: 'Мечтатель',      Icon: FeatherIcon },
+  { id: 'eccentric',    label: 'Эксцентричный',  Icon: MushroomIcon },
 ];
 
-const GRADIENT_KEYS: CardKey[] = ['freud', 'anime', 'arya', 'einstein', 'miku', 'stranger', 'cleopatra'];
-const ICON_TYPES = ['brain', 'spiral', 'sword', 'atom', 'headphones', 'lightning', 'crown'];
+// Уникальные иконки только для кастомных персонажей (Задача 3.3).
+// Не пересекаются с iconType встроенных персонажей.
+const CUSTOM_ICON_TYPES: readonly string[] = [
+  'robot', 'alien', 'maskface', 'lock', 'heartfull',
+  'star8', 'moonstar', 'electricguitar', 'wolfhowl', 'dragon',
+  'eyerunes', 'phoenix', 'kitsune', 'skullcrossbones', 'octopus',
+  'crystal', 'bookspell', 'rosedark', 'wingedheart', 'compassmagic',
+] as const;
 
-function CharacterIcon({ iconType, size }: { iconType: string; size: number }) {
-  switch (iconType) {
-    case 'brain':       return <BrainIcon size={size} />;
-    case 'spiral':      return <SpiralIcon size={size} />;
-    case 'sword':       return <SwordIcon size={size} />;
-    case 'atom':        return <AtomIcon size={size} />;
-    case 'headphones':  return <HeadphonesIcon size={size} />;
-    case 'lightning':   return <LightningIcon size={size} />;
-    case 'crown':       return <CrownIcon size={size} />;
-    case 'vinci':       return <VinciIcon size={size} />;
-    case 'chisel':      return <ChiselIcon size={size} />;
-    case 'quill':       return <QuillIcon size={size} />;
-    case 'dna':         return <DnaIcon size={size} />;
-    case 'apple':       return <AppleIcon size={size} />;
-    case 'coil':        return <CoilIcon size={size} />;
-    case 'victory':     return <VictoryIcon size={size} />;
-    case 'tophat':      return <TopHatIcon size={size} />;
-    case 'dialogue':    return <DialogueIcon size={size} />;
-    case 'scroll':      return <ScrollIcon size={size} />;
-    case 'cave':        return <CaveIcon size={size} />;
-    case 'yinyang':     return <YinYangIcon size={size} />;
-    case 'wheel':       return <WheelIcon size={size} />;
-    case 'treble':      return <TrebleIcon size={size} />;
-    case 'piano':       return <PianoIcon size={size} />;
-    case 'snowflake':   return <SnowflakeIcon size={size} />;
-    case 'raven':       return <RavenIcon size={size} />;
-    case 'mask':        return <MaskIcon size={size} />;
-    case 'hammerphil':  return <HammerPhilIcon size={size} />;
-    case 'fist':        return <FistIcon size={size} />;
-    case 'cosmos':      return <CosmosIcon size={size} />;
-    case 'rocket':      return <RocketIcon size={size} />;
-    case 'chip':        return <ChipIcon size={size} />;
-    case 'wingrid':     return <WinGridIcon size={size} />;
-    case 'stockchart':  return <StockChartIcon size={size} />;
-    case 'kite':        return <KiteIcon size={size} />;
-    case 'bear':        return <BearIcon size={size} />;
-    case 'star5':       return <Star5Icon size={size} />;
-    case 'charkha':     return <CharkhaIcon size={size} />;
-    case 'chains':      return <ChainsIcon size={size} />;
-    case 'dove':        return <DoveIcon size={size} />;
-    case 'laurel':      return <LaurelIcon size={size} />;
-    case 'lantern':     return <LanternIcon size={size} />;
-    case 'anchor':      return <AnchorIcon size={size} />;
-    case 'sceptre':     return <SceptreIcon size={size} />;
-    case 'axe':         return <AxeIcon size={size} />;
-    case 'shieldcross': return <ShieldCrossIcon size={size} />;
-    case 'sabers':      return <SabersIcon size={size} />;
-    case 'telescope':   return <TelescopeIcon size={size} />;
-    case 'romanov':     return <RomanovIcon size={size} />;
-    case 'helmet':      return <HelmetIcon size={size} />;
-    case 'lyre':        return <LyreIcon size={size} />;
-    case 'candle':      return <CandleIcon size={size} />;
-    case 'wheat':       return <WheatIcon size={size} />;
-    case 'guitar':      return <GuitarIcon size={size} />;
-    case 'eyemystic':   return <EyeMysticIcon size={size} />;
-    case 'tablechem':   return <TableChemIcon size={size} />;
-    case 'flask':       return <FlaskIcon size={size} />;
-    case 'goblet':      return <GobletIcon size={size} />;
-    case 'jokercard':   return <JokerCardIcon size={size} />;
-    case 'wolf':        return <WolfIcon size={size} />;
-    case 'blades':      return <BladesIcon size={size} />;
-    case 'notebook':    return <NoteBookIcon size={size} />;
-    case 'cake':        return <CakeIcon size={size} />;
-    case 'wings':       return <WingsIcon size={size} />;
-    case 'titan':       return <TitanIcon size={size} />;
-    case 'saiyan':      return <SaiyanIcon size={size} />;
-    case 'strawhat':    return <StrawHatIcon size={size} />;
-    case 'boxingglove': return <BoxingGloveIcon size={size} />;
-    case 'soccerball':  return <SoccerBallIcon size={size} />;
-    case 'cigar':       return <CigarIcon size={size} />;
-    case 'rose':        return <RoseIcon size={size} />;
-    case 'fedora':      return <FedoraIcon size={size} />;
-    case 'pencil':      return <PencilIcon size={size} />;
-    case 'wand':        return <WandIcon size={size} />;
-    case 'lightsaber':  return <LightsaberIcon size={size} />;
-    case 'staff':       return <StaffIcon size={size} />;
-    case 'sharingan':   return <SharinganIcon size={size} />;
-    case 'flame':       return <FlameIcon size={size} />;
-    case 'threeswords': return <ThreeSwordsIcon size={size} />;
-    case 'leafband':    return <LeafBandIcon size={size} />;
-    case 'automail':    return <AutomailIcon size={size} />;
-    case 'cowboyhat':   return <CowboyHatIcon size={size} />;
-    case 'barcode':     return <BarcodeIcon size={size} />;
-    case 'hiddenblade': return <HiddenBladeIcon size={size} />;
-    case 'visor':       return <VisorIcon size={size} />;
-    case 'banner':      return <BannerIcon size={size} />;
-    case 'horde':       return <HordeIcon size={size} />;
-    case 'syringe':     return <SyringeIcon size={size} />;
-    case 'cane':        return <CaneIcon size={size} />;
-    case 'chidori':     return <ChidoriIcon size={size} />;
-    case 'gauntlet':    return <GauntletIcon size={size} />;
-    case 'muscle':      return <MuscleIcon size={size} />;
-    case 'morningstar': return <MorningStarIcon size={size} />;
-    case 'plug':        return <PlugIcon size={size} />;
-    case 'soap':        return <SoapIcon size={size} />;
-    case 'feather':     return <FeatherIcon size={size} />;
-    case 'bowlerhat':   return <BowlerHatIcon size={size} />;
-    case 'coinflip':    return <CoinFlipIcon size={size} />;
-    case 'chess':       return <ChessIcon size={size} />;
-    case 'warmap':      return <WarMapIcon size={size} />;
-    case 'mandala':     return <MandalaIcon size={size} />;
-    case 'ankh':        return <AnkhIcon size={size} />;
-    case 'dualgun':     return <DualGunIcon size={size} />;
-    case 'ring':        return <RingIcon size={size} />;
-    case 'mushroom':    return <MushroomIcon size={size} />;
-    case 'elderblood':  return <ElderBloodIcon size={size} />;
-    case 'sunflower':   return <SunflowerIcon size={size} />;
-    case 'carnation':   return <CarnationIcon size={size} />;
-    case 'fang':        return <FangIcon size={size} />;
-    case 'kunai':       return <KunaiIcon size={size} />;
-    case 'atfield':     return <AtFieldIcon size={size} />;
-    case 'thunderbolt': return <ThunderboltIcon size={size} />;
-    case 'moonsceptre': return <MoonSceptreIcon size={size} />;
-    case 'buster':      return <BusterIcon size={size} />;
-    case 'triforce':    return <TriforceIcon size={size} />;
-    case 'bandana':     return <BandanaIcon size={size} />;
-    case 'microphone':  return <MicrophoneIcon size={size} />;
-    case 'shades':      return <ShadesIcon size={size} />;
-    case 'web':         return <WebIcon size={size} />;
-    case 'batsymbol':   return <BatSymbolIcon size={size} />;
-    case 'champagne':   return <ChampagneIcon size={size} />;
-    case 'headdress':   return <HeaddressIcon size={size} />;
-    case 'lotus':       return <LotusIcon size={size} />;
-    case 'pipesmoke':   return <PipeSmokeIcon size={size} />;
-    case 'inkwell':     return <InkwellIcon size={size} />;
-    case 'baton':       return <BatonIcon size={size} />;
-    case 'pasta':       return <PastaIcon size={size} />;
-    case 'jumpman':     return <JumpmanIcon size={size} />;
-    case 'mouthguard':  return <MouthguardIcon size={size} />;
-    case 'scarf':       return <ScarfIcon size={size} />;
-    case 'powerup':     return <PowerupIcon size={size} />;
-    case 'dragonslayer':return <DragonslayerIcon size={size} />;
-    case 'eyepatch':    return <EyePatchIcon size={size} />;
-    case 'rebellion':   return <RebellionIcon size={size} />;
-    case 'compass2':    return <Compass2Icon size={size} />;
-    case 'spear':       return <SpearIcon size={size} />;
-    case 'glove':       return <GloveIcon size={size} />;
-    case 'rasta':       return <RastaIcon size={size} />;
-    case 'lips':        return <LipsIcon size={size} />;
-    case 'nunchaku':    return <NunchakuIcon size={size} />;
-    case 'zigzag':      return <ZigzagIcon size={size} />;
-    case 'cartouche':   return <CartoucheIcon size={size} />;
-    case 'spartan':     return <SpartanIcon size={size} />;
-    case 'cap':         return <CapIcon size={size} />;
-    case 'prism':       return <PrismIcon size={size} />;
-    case 'beaker':      return <BeakerIcon size={size} />;
-    case 'queencrown':  return <QueenCrownIcon size={size} />;
-    case 'racket':      return <RacketIcon size={size} />;
-    case 'worldcup':    return <WorldCupIcon size={size} />;
-    default:            return <BrainIcon size={size} />;
-  }
-}
+const GENDERS: { id: Gender; label: string }[] = [
+  { id: 'male',   label: 'Мужской' },
+  { id: 'female', label: 'Женский' },
+];
+
+// Категории кроме «Все» — нельзя присвоить кастомному персонажу.
+const SELECTABLE_CATEGORIES = CATEGORIES.filter(c => c !== 'Все');
 
 export default function CreateScreen() {
-  const { navigate, addCharacter } = useApp();
+  const {
+    navigate, addCharacter,
+    isPremium, customLimitReached, customCharsCount, openPaywall,
+  } = useApp();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [persona, setPersona] = useState('');
@@ -251,8 +110,17 @@ export default function CreateScreen() {
   const [memory, setMemory] = useState(true);
   const [gradientIdx, setGradientIdx] = useState(0);
   const [iconIdx, setIconIdx] = useState(0);
+  const [gender, setGender] = useState<Gender>('male');
+  const [selectedCategory, setSelectedCategory] = useState<string>('Кумиры');
   const [error, setError] = useState('');
+  const [warning, setWarning] = useState('');
   const [draftSaved, setDraftSaved] = useState(false);
+  const [ageGateVisible, setAgeGateVisible] = useState(false);
+  // Кастомный аватар: временный uri из image-picker, который потом
+  // (при handleCreate) копируется в documentDirectory через saveAvatar.
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  // Блокирует кнопку «Создать», пока saveAvatar копирует фото в FS.
+  const [isCreating, setIsCreating] = useState(false);
 
   // Load draft on mount
   useEffect(() => {
@@ -269,47 +137,168 @@ export default function CreateScreen() {
         setMemory(d.memory ?? true);
         setGradientIdx(d.gradientIdx ?? 0);
         setIconIdx(d.iconIdx ?? 0);
+        setGender(d.gender || 'male');
+        setSelectedCategory(d.category || 'Кумиры');
+        setAvatarUri(d.avatarUri ?? null);
       } catch {}
     }).catch(() => {});
   }, []);
 
   const saveDraft = async () => {
-    const draft: Draft = { name, description, persona, firstMessage, selectedMoods, nsfw, memory, gradientIdx, iconIdx };
+    const draft: Draft = {
+      name, description, persona, firstMessage, selectedMoods,
+      nsfw, memory, gradientIdx, iconIdx, gender, category: selectedCategory,
+      avatarUri,
+    };
     await AsyncStorage.setItem(DRAFT_KEY, JSON.stringify(draft)).catch(() => {});
     setDraftSaved(true);
     setTimeout(() => setDraftSaved(false), 2000);
   };
 
+  // Открытие галереи + квадратный кроп. Permissions попросятся автоматически
+  // через expo-image-picker (config-plugin прописан в app.json). На web —
+  // FileSystem не работает, поэтому функция дисейблится.
+  const pickFromGallery = async () => {
+    if (Platform.OS === 'web') {
+      Alert.alert('Недоступно в веб-версии', 'Загрузка фото работает в мобильном приложении.');
+      return;
+    }
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert(
+        'Нет доступа к фото',
+        'Разрешите доступ к фото в настройках приложения, чтобы установить аватар.',
+      );
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 1,
+      // Resize/JPEG-конвертация будет при saveAvatar — не дублируем здесь.
+    });
+    if (result.canceled || !result.assets?.[0]?.uri) return;
+    setAvatarUri(result.assets[0].uri);
+  };
+
+  const removeAvatar = () => setAvatarUri(null);
+
   const toggleMood = (id: string) => {
     setSelectedMoods(prev => prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]);
   };
 
-  const handleCreate = () => {
+  // Включение NSFW требует возрастного согласия (Задача 4).
+  const handleNsfwToggle = async (next: boolean) => {
+    if (!next) {
+      setNsfw(false);
+      return;
+    }
+    const ok = await isConsentValid('age_18');
+    if (ok) {
+      setNsfw(true);
+    } else {
+      setAgeGateVisible(true);
+    }
+  };
+
+  const onAgeConfirmed = () => {
+    setAgeGateVisible(false);
+    setNsfw(true);
+  };
+
+  const handleCreate = async () => {
+    if (isCreating) return;
     if (!name.trim()) { setError('Введите имя персонажа'); return; }
     if (!description.trim()) { setError('Добавьте описание'); return; }
     if (!firstMessage.trim()) { setError('Добавьте первое сообщение персонажа'); return; }
 
-    const newChar: Character = {
-      id: `custom_${Date.now()}`,
+    // Лимит кастомных персонажей для free-юзеров.
+    // Сохраняем черновик чтобы юзер не потерял ввод после возврата с paywall.
+    if (customLimitReached) {
+      const draft: Draft = {
+        name, description, persona, firstMessage, selectedMoods,
+        nsfw, memory, gradientIdx, iconIdx, gender, category: selectedCategory,
+        avatarUri,
+      };
+      AsyncStorage.setItem(DRAFT_KEY, JSON.stringify(draft)).catch(() => {});
+      openPaywall('create-limit');
+      return;
+    }
+
+    // Локальная мягкая валидация описания (Задача 5)
+    const w = validatePersonaText(persona);
+    if (w) setWarning(w); else setWarning('');
+
+    const tagLabels = selectedMoods.map(m => MOODS.find(x => x.id === m)?.label ?? m);
+    const defaultMood = selectedMoods[0]; // первый mood становится дефолтным
+
+    // Шаблонная сборка persona (Задача 5: гибрид без AI)
+    const composedPersona = buildPersonaTemplate({
       name: name.trim(),
       description: description.trim(),
-      category: 'Кумиры',
-      iconType: ICON_TYPES[iconIdx],
-      gradientKey: GRADIENT_KEYS[gradientIdx],
-      tags: selectedMoods.map(m => MOODS.find(x => x.id === m)?.label ?? m),
+      gender,
+      personaRaw: persona.trim(),
+      firstMessage: firstMessage.trim(),
+      tagLabels,
+      defaultMood,
+      nsfw,
+    });
+
+    const chosenGradient = CUSTOM_GRADIENTS[gradientIdx];
+    const newId = `custom_${Date.now()}`;
+
+    setIsCreating(true);
+
+    // Если юзер выбрал фото — копируем его в постоянное хранилище.
+    // saveAvatar делает resize+JPEG. Если падает (нет места, повреждённый
+    // файл) — продолжаем без аватара, не блокируя создание персонажа.
+    let persistedAvatarUri: string | undefined;
+    if (avatarUri) {
+      try {
+        const saved = await saveAvatar(newId, avatarUri);
+        if (saved) persistedAvatarUri = saved;
+      } catch {
+        // Не блокируем создание — персонаж появится без фото.
+      }
+    }
+
+    const newChar: Character = {
+      id: newId,
+      name: name.trim(),
+      description: description.trim(),
+      category: selectedCategory,
+      iconType: CUSTOM_ICON_TYPES[iconIdx],
+      gradientKey: 'shadow', // фолбэк-ключ; реальный цвет — в customGradient
+      tags: tagLabels,
       messages: 0,
       rating: 5.0,
       isNew: true,
       isNSFW: nsfw,
       firstMessage: firstMessage.trim(),
-      persona: persona.trim() || `${name.trim()}. ${description.trim()}`,
+      persona: composedPersona, // готовый шаблон для backend
+      rawPersona: persona.trim(), // оригинал пользователя
       userCreated: true,
+      gender,
+      customGradient: chosenGradient.colors,
+      avatarUri: persistedAvatarUri,
     };
 
     AsyncStorage.removeItem(DRAFT_KEY).catch(() => {});
     addCharacter(newChar);
+    setIsCreating(false);
     navigate('chat', newChar);
   };
+
+  const currentIconType = CUSTOM_ICON_TYPES[iconIdx];
+  const currentGradient = CUSTOM_GRADIENTS[gradientIdx];
+  // При наличии фото тап по аватару = выбрать другое; иначе циклим preset-иконку.
+  const handleAvatarTap = avatarUri
+    ? pickFromGallery
+    : () => setIconIdx((iconIdx + 1) % CUSTOM_ICON_TYPES.length);
+  const createBtnLabel = customLimitReached
+    ? 'Открыть Pro для создания'
+    : isCreating ? 'Создаю...' : 'Создать персонажа ✦';
 
   return (
     <SafeAreaView style={s.root}>
@@ -328,26 +317,78 @@ export default function CreateScreen() {
       <ScrollView style={s.body} showsVerticalScrollIndicator={false}
         contentContainerStyle={s.bodyContent}>
 
-        {/* Avatar + gradient picker */}
+        {/* Лимит-баннер: счётчик и переход на paywall */}
+        {!isPremium && (
+          <TouchableOpacity
+            style={[s.limitBanner, customLimitReached && s.limitBannerHot]}
+            onPress={() => openPaywall('create-limit')}
+            activeOpacity={0.85}
+          >
+            <Text style={[s.limitBannerText, customLimitReached && s.limitBannerTextHot]}>
+              {customLimitReached
+                ? `Лимит ${FREE_CUSTOM_CHARS} персонажей · Открыть Pro`
+                : `${customCharsCount} / ${FREE_CUSTOM_CHARS} бесплатных персонажей`}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Avatar + gradient picker (Задача 3.4: реальные цвета) */}
         <View style={s.avatarSection}>
           <TouchableOpacity
-            style={s.avatarPicker}
-            onPress={() => { const next = (iconIdx + 1) % ICON_TYPES.length; setIconIdx(next); setGradientIdx(next); }}
-            activeOpacity={0.8}
+            onPress={handleAvatarTap}
+            activeOpacity={0.85}
           >
-            <CharacterIcon iconType={ICON_TYPES[iconIdx]} size={40} />
+            <LinearGradient
+              colors={currentGradient.colors as [string, string]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={s.avatarPicker}
+            >
+              <CharacterIcon
+                iconType={currentIconType}
+                size={48}
+                avatarUri={avatarUri ?? undefined}
+              />
+            </LinearGradient>
           </TouchableOpacity>
-          <Text style={s.avatarHint}>Нажми для смены иконки</Text>
+          <Text style={s.avatarHint}>
+            {avatarUri ? 'Тап по фото — выбрать другое' : 'Нажми для смены иконки'}
+          </Text>
+
+          <View style={s.avatarActions}>
+            <TouchableOpacity
+              style={s.avatarActionBtn}
+              onPress={pickFromGallery}
+              activeOpacity={0.8}
+            >
+              <Text style={s.avatarActionText}>
+                {avatarUri ? 'Сменить фото' : 'Загрузить фото'}
+              </Text>
+            </TouchableOpacity>
+            {avatarUri && (
+              <TouchableOpacity
+                style={[s.avatarActionBtn, s.avatarActionBtnGhost]}
+                onPress={removeAvatar}
+                activeOpacity={0.8}
+              >
+                <Text style={[s.avatarActionText, s.avatarActionTextGhost]}>Сбросить</Text>
+              </TouchableOpacity>
+            )}
+          </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }}
             contentContainerStyle={{ gap: 8, paddingHorizontal: 4 }}>
-            {GRADIENT_KEYS.map((key, i) => (
+            {CUSTOM_GRADIENTS.map((g, i) => (
               <TouchableOpacity
-                key={key}
-                onPress={() => { setGradientIdx(i); setIconIdx(i); }}
+                key={g.id}
+                onPress={() => setGradientIdx(i)}
                 style={[s.colorDot, gradientIdx === i && s.colorDotOn]}
+                activeOpacity={0.8}
               >
-                <View style={[s.colorDotInner, { backgroundColor: cardBg[key][0] }]} />
+                <LinearGradient
+                  colors={g.colors as [string, string]}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                  style={s.colorDotInner}
+                />
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -362,8 +403,44 @@ export default function CreateScreen() {
             placeholderTextColor={theme.text3}
             value={name}
             onChangeText={t => { setName(t); setError(''); }}
+            maxLength={FIELD_LIMITS.name}
             underlineColorAndroid="transparent"
           />
+        </View>
+
+        {/* Gender (Задача 3.1) */}
+        <View style={s.field}>
+          <Text style={s.label}>Пол персонажа</Text>
+          <View style={s.chipsRow}>
+            {GENDERS.map(g => (
+              <TouchableOpacity
+                key={g.id}
+                style={[s.chip, gender === g.id && s.chipOn]}
+                onPress={() => setGender(g.id)}
+                activeOpacity={0.85}
+              >
+                <Text style={[s.chipLabel, gender === g.id && s.chipLabelOn]}>{g.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Category (Задача 3.2) */}
+        <View style={s.field}>
+          <Text style={s.label}>Категория</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8, paddingRight: 16 }}>
+            {SELECTABLE_CATEGORIES.map(cat => (
+              <TouchableOpacity
+                key={cat}
+                style={[s.chip, selectedCategory === cat && s.chipOn]}
+                onPress={() => setSelectedCategory(cat)}
+                activeOpacity={0.85}
+              >
+                <Text style={[s.chipLabel, selectedCategory === cat && s.chipLabelOn]}>{cat}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
 
         {/* Description */}
@@ -375,6 +452,7 @@ export default function CreateScreen() {
             placeholderTextColor={theme.text3}
             value={description}
             onChangeText={t => { setDescription(t); setError(''); }}
+            maxLength={FIELD_LIMITS.description}
             underlineColorAndroid="transparent"
           />
         </View>
@@ -384,14 +462,16 @@ export default function CreateScreen() {
           <Text style={s.label}>Характер и поведение</Text>
           <TextInput
             style={[s.input, s.textarea]}
-            placeholder="Опишите как персонаж говорит, думает, что любит, как реагирует..."
+            placeholder="Опишите как персонаж говорит, думает, что любит, как реагирует... (минимум 30 символов для лучших ответов)"
             placeholderTextColor={theme.text3}
             multiline
             numberOfLines={4}
             value={persona}
-            onChangeText={setPersona}
+            onChangeText={t => { setPersona(t); setWarning(validatePersonaText(t) || ''); }}
+            maxLength={FIELD_LIMITS.personaRaw}
             underlineColorAndroid="transparent"
           />
+          {!!warning && <Text style={s.warningText}>{warning}</Text>}
         </View>
 
         {/* Moods */}
@@ -417,15 +497,19 @@ export default function CreateScreen() {
 
         {/* First message */}
         <View style={s.field}>
-          <Text style={s.label}>Первое сообщение</Text>
+          <Text style={s.label}>Первое сообщение от персонажа</Text>
+          <Text style={s.fieldHint}>
+            Это сообщение персонаж напишет первым, когда вы откроете чат.
+          </Text>
           <TextInput
             style={[s.input, s.textarea]}
-            placeholder="С этого начнётся разговор..."
+            placeholder="Привет! Я Виктор, детектив. Что привело вас ко мне?"
             placeholderTextColor={theme.text3}
             multiline
             numberOfLines={3}
             value={firstMessage}
             onChangeText={t => { setFirstMessage(t); setError(''); }}
+            maxLength={FIELD_LIMITS.firstMessage}
             underlineColorAndroid="transparent"
           />
         </View>
@@ -437,7 +521,7 @@ export default function CreateScreen() {
               <Text style={s.toggleTitle}>Режим 18+</Text>
               <Text style={s.toggleSub}>Откровенный контент</Text>
             </View>
-            <Toggle value={nsfw} onChange={setNsfw} />
+            <Toggle value={nsfw} onChange={handleNsfwToggle} />
           </View>
           <View style={s.divider} />
           <View style={s.toggleRow}>
@@ -451,12 +535,23 @@ export default function CreateScreen() {
 
         {!!error && <Text style={s.errorText}>{error}</Text>}
 
-        <TouchableOpacity style={s.createBtn} onPress={handleCreate} activeOpacity={0.9}>
-          <Text style={s.createBtnText}>Создать персонажа ✦</Text>
+        <TouchableOpacity
+          style={[s.createBtn, isCreating && { opacity: 0.6 }]}
+          onPress={handleCreate}
+          activeOpacity={0.9}
+          disabled={isCreating}
+        >
+          <Text style={s.createBtnText}>{createBtnLabel}</Text>
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      <AgeGateModal
+        visible={ageGateVisible}
+        onConfirm={onAgeConfirmed}
+        onCancel={() => setAgeGateVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -478,12 +573,28 @@ const s = StyleSheet.create({
   avatarSection: { alignItems: 'center', paddingVertical: 8 },
   avatarPicker: {
     width: 96, height: 96, borderRadius: 28,
-    borderWidth: 2, borderStyle: 'dashed', borderColor: theme.border,
     alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
+    overflow: 'hidden',
   },
   avatarHint: { fontSize: 11, color: theme.text3, marginTop: 8 },
+  avatarActions: {
+    flexDirection: 'row', gap: 8, marginTop: 10,
+  },
+  avatarActionBtn: {
+    backgroundColor: theme.surface3, borderRadius: 10,
+    paddingVertical: 8, paddingHorizontal: 14,
+    borderWidth: 1, borderColor: theme.border,
+  },
+  avatarActionBtnGhost: {
+    backgroundColor: 'transparent',
+  },
+  avatarActionText: {
+    fontSize: 12, fontWeight: '600', color: theme.text,
+  },
+  avatarActionTextGhost: { color: theme.text2 },
   colorDot: {
-    width: 28, height: 28, borderRadius: 14,
+    width: 30, height: 30, borderRadius: 15,
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 2, borderColor: 'transparent',
   },
@@ -492,12 +603,22 @@ const s = StyleSheet.create({
 
   field: { gap: 8 },
   label: { fontSize: 13, fontWeight: '600', color: theme.text2, letterSpacing: 0.2 },
+  fieldHint: { fontSize: 11, color: theme.text3, marginTop: -4, lineHeight: 15 },
   input: {
     backgroundColor: theme.surface2, borderWidth: 1, borderColor: theme.border,
     borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
     color: theme.text, fontSize: 14,
   },
   textarea: { minHeight: 90, textAlignVertical: 'top', paddingTop: 12 },
+
+  chipsRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  chip: {
+    backgroundColor: theme.surface2, borderWidth: 1, borderColor: theme.border,
+    borderRadius: 20, paddingVertical: 8, paddingHorizontal: 14,
+  },
+  chipOn: { backgroundColor: '#fff', borderColor: '#fff' },
+  chipLabel: { fontSize: 12, fontWeight: '500', color: theme.text2 },
+  chipLabelOn: { color: '#000' },
 
   moodsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   moodChip: {
@@ -532,7 +653,22 @@ const s = StyleSheet.create({
     width: 20, height: 20, borderRadius: 10,
   },
 
+  warningText: { fontSize: 12, color: '#E0A040', marginTop: 4 },
   errorText: { fontSize: 13, color: '#FF4444', textAlign: 'center' },
+  limitBanner: {
+    backgroundColor: theme.surface2,
+    borderWidth: 1, borderColor: theme.border,
+    borderRadius: 12, paddingVertical: 10, paddingHorizontal: 14,
+    alignItems: 'center',
+  },
+  limitBannerHot: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderColor: 'rgba(255,255,255,0.25)',
+  },
+  limitBannerText: {
+    fontSize: 12, color: theme.text2, fontWeight: '500',
+  },
+  limitBannerTextHot: { color: theme.text, fontWeight: '600' },
   createBtn: {
     backgroundColor: '#FFFFFF', borderRadius: 16,
     paddingVertical: 16, alignItems: 'center',

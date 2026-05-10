@@ -1,108 +1,52 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getDeviceId } from './deviceId';
 import { API_BASE_URL } from './config';
 
-// ── HTTP helper ─────────────────────────────────────────────────────────────
+// Stateless-клиент для бэкенда interstellar-backend.
+// Бэк проксирует запросы в polza.ai (модель grok-4.1-fast).
+// История чата хранится локально (в AppContext.chats), на каждое
+// сообщение целиком уезжает в бэк — никаких серверных сессий.
 
-async function post<T = any>(path: string, body: object): Promise<T> {
+export type ChatRole = 'user' | 'character';
+
+export interface ChatMessage {
+  role: ChatRole;
+  content: string;
+}
+
+const REQUEST_TIMEOUT_MS = 65_000;
+
+/**
+ * Отправить сообщение модели. Возвращает текст ответа персонажа.
+ *
+ * @param persona  системный prompt персонажа (composePersona / buildPersonaTemplate)
+ * @param messages вся история чата для этого персонажа, включая последнее
+ *                 сообщение пользователя
+ */
+export async function sendMessage(
+  persona: string,
+  messages: ChatMessage[],
+): Promise<string> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 30_000);
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
   try {
-    const res = await fetch(`${API_BASE_URL}${path}`, {
+    const res = await fetch(`${API_BASE_URL}/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ persona, messages }),
       signal: controller.signal,
     });
-    const data = await res.json();
-    if (!res.ok || data.ok === false) {
-      throw new Error(data.error || `HTTP ${res.status}`);
+
+    let data: any = null;
+    try { data = await res.json(); } catch { /* not json */ }
+
+    if (!res.ok || data?.ok === false) {
+      throw new Error(data?.error || `HTTP ${res.status}`);
     }
-    return data;
+    if (typeof data?.response !== 'string' || !data.response.trim()) {
+      throw new Error('EMPTY_RESPONSE');
+    }
+    return data.response;
   } finally {
     clearTimeout(timer);
   }
-}
-
-async function get<T = any>(path: string, deviceId: string): Promise<T> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15_000);
-  try {
-    const res = await fetch(`${API_BASE_URL}${path}`, {
-      headers: { 'X-Device-Id': deviceId },
-      signal: controller.signal,
-    });
-    const data = await res.json();
-    if (!res.ok || data.ok === false) {
-      throw new Error(data.error || `HTTP ${res.status}`);
-    }
-    return data;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-// ── Пользователь ────────────────────────────────────────────────────────────
-
-export async function identifyUser() {
-  const device_id = await getDeviceId();
-  return post('/users/identify', { device_id });
-}
-
-export async function getUserStats() {
-  const device_id = await getDeviceId();
-  return get('/users/stats', device_id);
-}
-
-// ── Сессии чата (симулятор) ─────────────────────────────────────────────────
-
-const SESSIONS_KEY = 'chat_session_ids';
-
-async function loadSessions(): Promise<Record<string, string>> {
-  try {
-    const json = await AsyncStorage.getItem(SESSIONS_KEY);
-    return json ? JSON.parse(json) : {};
-  } catch {
-    return {};
-  }
-}
-
-async function saveSessions(sessions: Record<string, string>): Promise<void> {
-  await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions)).catch(() => {});
-}
-
-export async function getOrCreateSession(characterId: string, persona: string): Promise<string> {
-  const sessions = await loadSessions();
-  if (sessions[characterId]) return sessions[characterId];
-
-  const device_id = await getDeviceId();
-  const data = await post<{ ok: boolean; session_id: string }>('/simulator/start', {
-    device_id,
-    typazh: persona,
-    place: 'онлайн-чат',
-    difficulty: 'medium',
-  });
-
-  sessions[characterId] = data.session_id;
-  await saveSessions(sessions);
-  return data.session_id;
-}
-
-export async function clearSession(characterId: string): Promise<void> {
-  const sessions = await loadSessions();
-  delete sessions[characterId];
-  await saveSessions(sessions);
-}
-
-// ── Отправка сообщения ───────────────────────────────────────────────────────
-
-export async function sendMessage(sessionId: string, message: string): Promise<string> {
-  const device_id = await getDeviceId();
-  const data = await post<{ ok: boolean; response: string }>('/simulator/message', {
-    device_id,
-    session_id: sessionId,
-    message,
-  });
-  if (!data.response) throw new Error('Empty response from server');
-  return data.response;
 }

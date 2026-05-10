@@ -2660,12 +2660,1084 @@ export function FlowerIcon({ size = 18, color = 'white' }: IconProps) {
   );
 }
 
+// ── Doc (документ) ────────────────────────────────────────────────────────
+export function DocIcon({ size = 18, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 18 18" fill="none">
+      <Path d="M4 2h7l3 3v11H4z" stroke={color} strokeWidth="1.4" strokeLinejoin="round" fill="none" />
+      <Path d="M11 2v3h3" stroke={color} strokeWidth="1.4" strokeLinejoin="round" fill="none" />
+      <Line x1="6" y1="9"  x2="12" y2="9"  stroke={color} strokeWidth="1.2" strokeLinecap="round" opacity="0.7" />
+      <Line x1="6" y1="12" x2="12" y2="12" stroke={color} strokeWidth="1.2" strokeLinecap="round" opacity="0.7" />
+      <Line x1="6" y1="15" x2="10" y2="15" stroke={color} strokeWidth="1.2" strokeLinecap="round" opacity="0.7" />
+    </Svg>
+  );
+}
+
+// ── Card (для подписки) ───────────────────────────────────────────────────
+export function CardIcon({ size = 18, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 18 18" fill="none">
+      <Rect x="2" y="4" width="14" height="11" rx="1.5" stroke={color} strokeWidth="1.4" fill="none" />
+      <Line x1="2" y1="8" x2="16" y2="8" stroke={color} strokeWidth="1.4" />
+      <Rect x="4" y="11" width="3" height="2" rx="0.3" fill={color} opacity="0.7" />
+    </Svg>
+  );
+}
+
+// ── Info (i в кружке) ─────────────────────────────────────────────────────
+export function InfoIcon({ size = 18, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 18 18" fill="none">
+      <Circle cx="9" cy="9" r="7.5" stroke={color} strokeWidth="1.4" fill="none" />
+      <Circle cx="9" cy="5.5" r="0.9" fill={color} />
+      <Line x1="9" y1="8" x2="9" y2="13" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
 // ── Message / Chat bubble ──────────────────────────────────────────────────
 export function MessageIcon({ size = 18, color = 'white' }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 18 18" fill="none">
       <Path d="M2 3C2 2.45 2.45 2 3 2H15C15.55 2 16 2.45 16 3V12C16 12.55 15.55 13 15 13H6L2 16V3Z"
         stroke={color} strokeWidth="1.4" strokeLinejoin="round" fill="none" />
+    </Svg>
+  );
+}
+
+// ╔════════════════════════════════════════════════════════════════════════╗
+// ║  ТЕМАТИЧЕСКИЕ ИКОНКИ ПЕРСОНАЖЕЙ (Задача 1)                             ║
+// ║  24 переработанные иконки с конкретной символикой                      ║
+// ╚════════════════════════════════════════════════════════════════════════╝
+
+// ── Tesla: катушка с молниями ──────────────────────────────────────────────
+export function CoilLightningsIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* База катушки */}
+      <Rect x="20" y="40" width="14" height="3" rx="1" stroke={color} strokeWidth="1.5" fill="none" />
+      {/* Столбик-сердечник */}
+      <Line x1="27" y1="40" x2="27" y2="22" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+      {/* Тор сверху (катушка) */}
+      <Ellipse cx="27" cy="20" rx="9" ry="4" stroke={color} strokeWidth="1.6" fill="none" />
+      <Ellipse cx="27" cy="20" rx="9" ry="4" stroke={color} strokeWidth="1.2" fill="none" opacity="0.5"
+        transform="translate(0, 1.5)" />
+      {/* Молнии вокруг */}
+      <Path d="M10 14 L13 18 L11 19 L14 24" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.85" />
+      <Path d="M44 14 L41 18 L43 19 L40 24" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.85" />
+      <Path d="M9 32 L13 30 L11 33 L15 32" stroke={color} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.65" />
+      <Path d="M45 32 L41 30 L43 33 L39 32" stroke={color} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.65" />
+      <Path d="M27 7 L25 11 L29 11 L26 16" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.85" />
+    </Svg>
+  );
+}
+
+// ── Mozart: скрипичный ключ + ноты ────────────────────────────────────────
+export function TrebleNotesIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Скрипичный ключ */}
+      <Path d="M22 8 Q22 14 26 18 Q31 22 31 28 Q31 34 25 36 Q19 36 18 30 Q18 25 24 24 Q30 24 30 31 Q30 38 24 42 Q21 44 22 48"
+        stroke={color} strokeWidth="1.7" strokeLinecap="round" fill="none" />
+      <Circle cx="22" cy="48" r="2" stroke={color} strokeWidth="1.4" fill={color} />
+      {/* Нота 1 */}
+      <Ellipse cx="40" cy="34" rx="3" ry="2.2" fill={color} transform="rotate(-15 40 34)" />
+      <Line x1="42.5" y1="33" x2="42.5" y2="20" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+      <Path d="M42.5 20 Q47 22 46 27" stroke={color} strokeWidth="1.4" strokeLinecap="round" fill="none" />
+      {/* Нота 2 */}
+      <Ellipse cx="38" cy="44" rx="2.5" ry="1.8" fill={color} opacity="0.7" transform="rotate(-15 38 44)" />
+      <Line x1="40" y1="43" x2="40" y2="36" stroke={color} strokeWidth="1.2" strokeLinecap="round" opacity="0.7" />
+    </Svg>
+  );
+}
+
+// ── Napoleon: торт «Наполеон» ─────────────────────────────────────────────
+export function CakeNapoleonIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Тарелка */}
+      <Ellipse cx="27" cy="44" rx="20" ry="2.5" stroke={color} strokeWidth="1.4" fill="none" />
+      {/* Слой 1 (нижний) */}
+      <Rect x="9" y="34" width="36" height="8" rx="1" stroke={color} strokeWidth="1.5" fill="none" />
+      {/* Крем 1 (зигзаг) */}
+      <Path d="M11 34 L13 32 L15 34 L17 32 L19 34 L21 32 L23 34 L25 32 L27 34 L29 32 L31 34 L33 32 L35 34 L37 32 L39 34 L41 32 L43 34"
+        stroke={color} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.6" />
+      {/* Слой 2 (средний) */}
+      <Rect x="12" y="24" width="30" height="7" rx="1" stroke={color} strokeWidth="1.5" fill="none" />
+      {/* Крем 2 */}
+      <Path d="M14 24 L16 22 L18 24 L20 22 L22 24 L24 22 L26 24 L28 22 L30 24 L32 22 L34 24 L36 22 L38 24 L40 22"
+        stroke={color} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.6" />
+      {/* Слой 3 (верхний) */}
+      <Rect x="16" y="15" width="22" height="6" rx="1" stroke={color} strokeWidth="1.5" fill="none" />
+      {/* Ягодка-черешня */}
+      <Circle cx="27" cy="11" r="2.5" stroke={color} strokeWidth="1.4" fill="none" />
+      <Path d="M27 8 Q24 5 22 6" stroke={color} strokeWidth="1.2" strokeLinecap="round" fill="none" />
+    </Svg>
+  );
+}
+
+// ── Alexander: меч ────────────────────────────────────────────────────────
+export function GreatSwordIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Лезвие */}
+      <Path d="M27 5 L24 9 L24 36 L30 36 L30 9 Z" stroke={color} strokeWidth="1.5" strokeLinejoin="round" fill="none" />
+      {/* Долы (центральная линия) */}
+      <Line x1="27" y1="9" x2="27" y2="34" stroke={color} strokeWidth="1" opacity="0.5" />
+      {/* Гарда (крестовина) */}
+      <Rect x="13" y="36" width="28" height="3" rx="0.5" stroke={color} strokeWidth="1.5" fill="none" />
+      {/* Концы гарды (загнутые) */}
+      <Path d="M13 37.5 Q11 37.5 11 39.5" stroke={color} strokeWidth="1.4" strokeLinecap="round" fill="none" />
+      <Path d="M41 37.5 Q43 37.5 43 39.5" stroke={color} strokeWidth="1.4" strokeLinecap="round" fill="none" />
+      {/* Рукоять */}
+      <Rect x="25" y="39" width="4" height="9" rx="1" stroke={color} strokeWidth="1.4" fill="none" />
+      {/* Узор на рукояти */}
+      <Line x1="25" y1="42" x2="29" y2="42" stroke={color} strokeWidth="1" opacity="0.6" />
+      <Line x1="25" y1="45" x2="29" y2="45" stroke={color} strokeWidth="1" opacity="0.6" />
+      {/* Навершие (помеле) */}
+      <Circle cx="27" cy="50" r="2.2" stroke={color} strokeWidth="1.4" fill="none" />
+    </Svg>
+  );
+}
+
+// ── Michelangelo: силуэт Давида ───────────────────────────────────────────
+export function DavidStatueIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Голова */}
+      <Ellipse cx="27" cy="11" rx="4" ry="5" stroke={color} strokeWidth="1.5" fill="none" />
+      {/* Кудри */}
+      <Path d="M23 8 Q22 6 24 5" stroke={color} strokeWidth="1.1" strokeLinecap="round" fill="none" opacity="0.7" />
+      <Path d="M30 7 Q31 5 30 4" stroke={color} strokeWidth="1.1" strokeLinecap="round" fill="none" opacity="0.7" />
+      {/* Шея */}
+      <Line x1="26" y1="16" x2="26" y2="19" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+      <Line x1="28" y1="16" x2="28" y2="19" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+      {/* Торс (классическое тело с контрапостом) */}
+      <Path d="M19 19 Q17 25 19 33 Q21 38 25 39 L29 39 Q33 38 35 33 Q37 25 35 19 Z"
+        stroke={color} strokeWidth="1.5" strokeLinejoin="round" fill="none" />
+      {/* Линия груди */}
+      <Path d="M22 24 Q27 26 32 24" stroke={color} strokeWidth="1.1" strokeLinecap="round" fill="none" opacity="0.55" />
+      {/* Пресс */}
+      <Line x1="27" y1="28" x2="27" y2="36" stroke={color} strokeWidth="1" opacity="0.45" />
+      {/* Постамент */}
+      <Rect x="14" y="42" width="26" height="5" rx="0.5" stroke={color} strokeWidth="1.4" fill="none" />
+      <Line x1="14" y1="47" x2="40" y2="47" stroke={color} strokeWidth="1" opacity="0.5" />
+    </Svg>
+  );
+}
+
+// ── Churchill: сигара с дымом ─────────────────────────────────────────────
+export function CigarSmokeIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Сигара (горизонтальная под наклоном) */}
+      <Path d="M14 38 L36 28" stroke={color} strokeWidth="4" strokeLinecap="round" />
+      {/* Кончик зажжённый */}
+      <Circle cx="37" cy="27.5" r="1.8" fill={color} opacity="0.8" />
+      {/* Этикетка/полоска */}
+      <Line x1="22" y1="35" x2="24" y2="34" stroke="#000" strokeWidth="1" />
+      <Line x1="23" y1="35.5" x2="25" y2="34.5" stroke="#000" strokeWidth="1" />
+      {/* Дым закрученный */}
+      <Path d="M37 26 Q40 20 36 16 Q33 12 37 8" stroke={color} strokeWidth="1.5" strokeLinecap="round" fill="none" opacity="0.7" />
+      <Path d="M41 23 Q44 18 41 12" stroke={color} strokeWidth="1.3" strokeLinecap="round" fill="none" opacity="0.5" />
+    </Svg>
+  );
+}
+
+// ── Shakespeare: перо + череп ─────────────────────────────────────────────
+export function QuillSkullIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Череп */}
+      <Path d="M14 22 Q14 13 22 13 L23 13 Q31 13 31 22 L31 28 Q31 30 29 30 L26 30 L26 33 L24 33 L24 30 L21 30 L21 33 L19 33 L19 30 L16 30 Q14 30 14 28 Z"
+        stroke={color} strokeWidth="1.5" strokeLinejoin="round" fill="none" />
+      {/* Глазницы */}
+      <Circle cx="19" cy="22" r="2" fill={color} opacity="0.9" />
+      <Circle cx="26" cy="22" r="2" fill={color} opacity="0.9" />
+      {/* Носовая полость */}
+      <Path d="M22.5 25 L21.5 28 L23.5 28 Z" fill={color} opacity="0.6" />
+      {/* Перо (диагональное справа) */}
+      <Path d="M50 8 L33 35" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+      {/* Бородка пера */}
+      <Path d="M48 11 Q46 11 46 13 L41 21 Q40 21 40 23 L36 30 Q35 30 35 32"
+        stroke={color} strokeWidth="1.2" strokeLinecap="round" fill="none" opacity="0.7" />
+      <Path d="M50 14 Q47 14 47 16 L42 24 Q40 24 40 26"
+        stroke={color} strokeWidth="1.2" strokeLinecap="round" fill="none" opacity="0.5" />
+      {/* Кончик пера */}
+      <Path d="M33 35 L31 38" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+// ── Lincoln: цилиндр + борода ─────────────────────────────────────────────
+export function TopHatBeardIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Цилиндр (тулья) */}
+      <Rect x="16" y="6" width="22" height="20" rx="0.5" stroke={color} strokeWidth="1.5" fill="none" />
+      {/* Лента шляпы */}
+      <Rect x="16" y="22" width="22" height="3" fill={color} opacity="0.5" />
+      {/* Поля шляпы */}
+      <Ellipse cx="27" cy="26" rx="16" ry="2" stroke={color} strokeWidth="1.5" fill="none" />
+      {/* Лоб (короткий силуэт лица) */}
+      <Path d="M22 28 Q22 31 24 32 L30 32 Q32 31 32 28" stroke={color} strokeWidth="1.4" strokeLinecap="round" fill="none" opacity="0.8" />
+      {/* Глаза */}
+      <Circle cx="24" cy="30" r="0.8" fill={color} opacity="0.6" />
+      <Circle cx="30" cy="30" r="0.8" fill={color} opacity="0.6" />
+      {/* Борода (треугольник) */}
+      <Path d="M21 33 L27 49 L33 33 Z" stroke={color} strokeWidth="1.5" strokeLinejoin="round" fill="none" />
+      {/* Текстура бороды */}
+      <Line x1="24" y1="37" x2="25" y2="42" stroke={color} strokeWidth="1" opacity="0.5" />
+      <Line x1="27" y1="37" x2="27" y2="44" stroke={color} strokeWidth="1" opacity="0.5" />
+      <Line x1="30" y1="37" x2="29" y2="42" stroke={color} strokeWidth="1" opacity="0.5" />
+    </Svg>
+  );
+}
+
+// ── Franklin: долларовая купюра ───────────────────────────────────────────
+export function DollarBillIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Купюра */}
+      <Rect x="6" y="14" width="42" height="26" rx="1.5" stroke={color} strokeWidth="1.6" fill="none" />
+      {/* Внутренняя рамка */}
+      <Rect x="9" y="17" width="36" height="20" rx="0.5" stroke={color} strokeWidth="1" fill="none" opacity="0.4" />
+      {/* Овальный портрет */}
+      <Ellipse cx="27" cy="27" rx="7" ry="8" stroke={color} strokeWidth="1.4" fill="none" />
+      {/* Силуэт головы */}
+      <Circle cx="27" cy="25" r="2.5" stroke={color} strokeWidth="1.2" fill="none" opacity="0.7" />
+      <Path d="M23 32 Q27 30 31 32" stroke={color} strokeWidth="1.2" strokeLinecap="round" fill="none" opacity="0.7" />
+      {/* Знаки доллара по углам */}
+      <Path d="M11 22 L11 28 M9.5 23 Q9.5 22 11 22 L12.5 22 Q13.5 22 13.5 23.5 Q13.5 25 12.5 25 L11 25 Q9.5 25 9.5 26.5 Q9.5 28 11 28 L12.5 28 Q13.5 28 13.5 27"
+        stroke={color} strokeWidth="1.2" strokeLinecap="round" fill="none" />
+      <Path d="M43 32 L43 38 M41.5 33 Q41.5 32 43 32 L44.5 32 Q45.5 32 45.5 33.5 Q45.5 35 44.5 35 L43 35 Q41.5 35 41.5 36.5 Q41.5 38 43 38 L44.5 38 Q45.5 38 45.5 37"
+        stroke={color} strokeWidth="1.2" strokeLinecap="round" fill="none" />
+      {/* Цифра 100 в углу */}
+      <Path d="M37 19 L37 22 M40 19 L40 22 M43 19 L43 22" stroke={color} strokeWidth="1" opacity="0.55" />
+    </Svg>
+  );
+}
+
+// ── Dostoevsky: топор Раскольникова ───────────────────────────────────────
+export function AxeBloodIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Топорище (рукоять) */}
+      <Path d="M28 48 L28 22" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
+      {/* Лезвие топора (полумесяц вправо) */}
+      <Path d="M28 8 L28 26 L40 22 Q44 14 36 7 Z" stroke={color} strokeWidth="1.6" strokeLinejoin="round" fill="none" />
+      {/* Внутренний край лезвия */}
+      <Path d="M28 12 L34 11 Q38 14 38 18 L28 22"
+        stroke={color} strokeWidth="1.2" strokeLinecap="round" fill="none" opacity="0.5" />
+      {/* Обух (расширение под лезвием на рукояти) */}
+      <Rect x="26" y="22" width="4" height="5" rx="0.5" stroke={color} strokeWidth="1.4" fill={color} opacity="0.85" />
+      {/* Капля крови */}
+      <Path d="M40 26 Q39 30 41 32 Q43 30 42 26 Z" fill={color} opacity="0.85" />
+    </Svg>
+  );
+}
+
+// ── Buddha: лотос с медитирующей фигурой ──────────────────────────────────
+export function MeditationLotusIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Голова */}
+      <Circle cx="27" cy="14" r="3.5" stroke={color} strokeWidth="1.5" fill="none" />
+      {/* Ушнишь (выпуклость на голове) */}
+      <Circle cx="27" cy="10" r="1.2" fill={color} opacity="0.85" />
+      {/* Тело-треугольник в позе лотоса */}
+      <Path d="M27 18 L19 32 L35 32 Z" stroke={color} strokeWidth="1.5" strokeLinejoin="round" fill="none" />
+      {/* Линия рук */}
+      <Path d="M22 28 Q27 25 32 28" stroke={color} strokeWidth="1.3" strokeLinecap="round" fill="none" opacity="0.7" />
+      {/* Лепестки лотоса под фигурой */}
+      <Path d="M19 32 Q14 36 12 38 Q14 34 19 32" stroke={color} strokeWidth="1.4" strokeLinejoin="round" fill="none" />
+      <Path d="M35 32 Q40 36 42 38 Q40 34 35 32" stroke={color} strokeWidth="1.4" strokeLinejoin="round" fill="none" />
+      <Path d="M22 33 Q19 39 18 42 Q22 38 22 33" stroke={color} strokeWidth="1.3" strokeLinejoin="round" fill="none" opacity="0.85" />
+      <Path d="M32 33 Q35 39 36 42 Q32 38 32 33" stroke={color} strokeWidth="1.3" strokeLinejoin="round" fill="none" opacity="0.85" />
+      <Path d="M27 33 Q25 40 27 44 Q29 40 27 33" stroke={color} strokeWidth="1.3" strokeLinejoin="round" fill="none" opacity="0.7" />
+    </Svg>
+  );
+}
+
+// ── Leonidas: спартанский щит с λ ─────────────────────────────────────────
+export function SpartanShieldIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Внешний круг щита */}
+      <Circle cx="27" cy="27" r="20" stroke={color} strokeWidth="1.7" fill="none" />
+      {/* Средний круг (умбон) */}
+      <Circle cx="27" cy="27" r="17" stroke={color} strokeWidth="1.2" fill="none" opacity="0.5" />
+      {/* Заклёпки по краю */}
+      <Circle cx="27" cy="9" r="0.9" fill={color} opacity="0.7" />
+      <Circle cx="27" cy="45" r="0.9" fill={color} opacity="0.7" />
+      <Circle cx="9" cy="27" r="0.9" fill={color} opacity="0.7" />
+      <Circle cx="45" cy="27" r="0.9" fill={color} opacity="0.7" />
+      <Circle cx="14" cy="14" r="0.8" fill={color} opacity="0.6" />
+      <Circle cx="40" cy="14" r="0.8" fill={color} opacity="0.6" />
+      <Circle cx="14" cy="40" r="0.8" fill={color} opacity="0.6" />
+      <Circle cx="40" cy="40" r="0.8" fill={color} opacity="0.6" />
+      {/* Лямбда λ — символ Лакедемона */}
+      <Path d="M19 17 L27 35 L35 17" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <Path d="M23 28 L30 17" stroke={color} strokeWidth="3" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+// ── Bulgakov: трамвай (Аннушка) ───────────────────────────────────────────
+export function TramIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Корпус трамвая */}
+      <Path d="M8 38 L8 22 Q8 20 10 20 L44 20 Q46 20 46 22 L46 38 Z"
+        stroke={color} strokeWidth="1.6" strokeLinejoin="round" fill="none" />
+      {/* Окна (3 квадрата) */}
+      <Rect x="11" y="24" width="8" height="7" rx="0.5" stroke={color} strokeWidth="1.2" fill="none" opacity="0.65" />
+      <Rect x="22" y="24" width="10" height="7" rx="0.5" stroke={color} strokeWidth="1.2" fill="none" opacity="0.65" />
+      <Rect x="35" y="24" width="8" height="7" rx="0.5" stroke={color} strokeWidth="1.2" fill="none" opacity="0.65" />
+      {/* Дверь по центру */}
+      <Line x1="27" y1="32" x2="27" y2="38" stroke={color} strokeWidth="1" opacity="0.5" />
+      {/* Колёса */}
+      <Circle cx="15" cy="42" r="3" stroke={color} strokeWidth="1.5" fill="none" />
+      <Circle cx="15" cy="42" r="1" fill={color} opacity="0.7" />
+      <Circle cx="39" cy="42" r="3" stroke={color} strokeWidth="1.5" fill="none" />
+      <Circle cx="39" cy="42" r="1" fill={color} opacity="0.7" />
+      {/* Штанга-токоприёмник */}
+      <Line x1="27" y1="20" x2="27" y2="11" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      <Line x1="27" y1="11" x2="20" y2="8" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+      <Circle cx="20" cy="8" r="1.2" fill={color} opacity="0.7" />
+      {/* Передний фонарь */}
+      <Circle cx="44" cy="34" r="1.2" fill={color} opacity="0.85" />
+    </Svg>
+  );
+}
+
+// ── Gogol: стилизованный нос ──────────────────────────────────────────────
+export function GogolNoseIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Контур носа в профиль */}
+      <Path d="M18 8 Q22 14 24 22 Q26 30 22 38 Q20 41 24 43 Q28 42 31 38"
+        stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      {/* Ноздря */}
+      <Ellipse cx="26" cy="40" rx="2.5" ry="1.5" stroke={color} strokeWidth="1.3" fill="none" />
+      {/* Воротник */}
+      <Path d="M14 46 L40 46" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      <Path d="M14 46 L18 49" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+      <Path d="M40 46 L36 49" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+      {/* Шляпа-цилиндр (намёк на личность) */}
+      <Rect x="20" y="3" width="10" height="6" rx="0.5" stroke={color} strokeWidth="1.3" fill="none" opacity="0.55" />
+      <Line x1="17" y1="9" x2="33" y2="9" stroke={color} strokeWidth="1.3" opacity="0.55" />
+    </Svg>
+  );
+}
+
+// ── Genghis Khan: монгольский лук со стрелой ──────────────────────────────
+export function MongolBowIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Лук — изогнутая дуга (составной монгольский) */}
+      <Path d="M14 8 Q8 15 12 22 Q14 27 12 32 Q8 39 14 46"
+        stroke={color} strokeWidth="2" strokeLinecap="round" fill="none" />
+      {/* Концы лука загнуты */}
+      <Path d="M14 8 L18 6" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      <Path d="M14 46 L18 48" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      {/* Тетива натянута */}
+      <Path d="M14 8 L24 27 L14 46" stroke={color} strokeWidth="1.2" strokeLinecap="round" fill="none" opacity="0.85" />
+      {/* Стрела (горизонтально) */}
+      <Line x1="24" y1="27" x2="46" y2="27" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+      {/* Наконечник стрелы */}
+      <Path d="M44 24 L48 27 L44 30 Z" fill={color} />
+      {/* Оперение */}
+      <Path d="M22 24 L26 27 L22 30" stroke={color} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </Svg>
+  );
+}
+
+// ── Marx: серп и молот ────────────────────────────────────────────────────
+export function HammerSickleIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Серп (изогнутый клинок справа) */}
+      <Path d="M14 14 Q40 14 40 38" stroke={color} strokeWidth="2.5" strokeLinecap="round" fill="none" />
+      {/* Лезвие серпа (внутренний край заточен) */}
+      <Path d="M18 17 Q34 17 36 36" stroke={color} strokeWidth="1.2" strokeLinecap="round" fill="none" opacity="0.55" />
+      {/* Рукоять серпа */}
+      <Line x1="14" y1="14" x2="10" y2="10" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
+      {/* Молот — рукоять (диагональ слева вверху → справа внизу) */}
+      <Line x1="11" y1="40" x2="38" y2="13" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
+      {/* Молот — головка (прямоугольник на конце рукояти) */}
+      <Path d="M40 11 L46 17 L42 21 L36 15 Z" stroke={color} strokeWidth="1.6" strokeLinejoin="round" fill={color} opacity="0.85" />
+      {/* Звезда центральная */}
+      <Path d="M27 44 L28.5 47 L32 47 L29 49 L30 52 L27 50 L24 52 L25 49 L22 47 L25.5 47 Z"
+        stroke={color} strokeWidth="1" strokeLinejoin="round" fill={color} opacity="0.55" />
+    </Svg>
+  );
+}
+
+// ── Tolstoy: толстовка (рубаха-косоворотка) ───────────────────────────────
+export function TolstovkaIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Корпус рубахи (трапеция) */}
+      <Path d="M16 14 L16 46 L38 46 L38 14"
+        stroke={color} strokeWidth="1.6" strokeLinejoin="round" fill="none" />
+      {/* Воротник-стойка */}
+      <Path d="M22 14 L22 8 L32 8 L32 14" stroke={color} strokeWidth="1.5" strokeLinejoin="round" fill="none" />
+      {/* Рукава */}
+      <Path d="M16 14 L9 18 L9 30 L13 32 L16 24" stroke={color} strokeWidth="1.5" strokeLinejoin="round" fill="none" />
+      <Path d="M38 14 L45 18 L45 30 L41 32 L38 24" stroke={color} strokeWidth="1.5" strokeLinejoin="round" fill="none" />
+      {/* Косая планка (характерная для косоворотки) — слева от центра */}
+      <Path d="M27 8 L23 26" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+      {/* Пуговицы на планке */}
+      <Circle cx="25.5" cy="14" r="0.9" fill={color} />
+      <Circle cx="24.5" cy="20" r="0.9" fill={color} />
+      {/* Пояс */}
+      <Rect x="14" y="34" width="26" height="3" stroke={color} strokeWidth="1.4" fill="none" />
+      {/* Кисточки пояса */}
+      <Line x1="40" y1="36" x2="44" y2="40" stroke={color} strokeWidth="1.3" strokeLinecap="round" />
+      <Line x1="42" y1="36" x2="46" y2="38" stroke={color} strokeWidth="1.2" strokeLinecap="round" opacity="0.7" />
+    </Svg>
+  );
+}
+
+// ── Kutuzov: бутылка коньяка ──────────────────────────────────────────────
+export function CognacBottleIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Горлышко бутылки */}
+      <Rect x="24" y="6" width="6" height="10" stroke={color} strokeWidth="1.5" fill="none" />
+      {/* Пробка */}
+      <Rect x="23" y="3" width="8" height="4" rx="0.5" stroke={color} strokeWidth="1.4" fill={color} opacity="0.7" />
+      {/* Плечи бутылки (переход к корпусу) */}
+      <Path d="M24 16 Q19 18 18 22 L18 44 Q18 47 21 47 L33 47 Q36 47 36 44 L36 22 Q35 18 30 16"
+        stroke={color} strokeWidth="1.6" strokeLinejoin="round" fill="none" />
+      {/* Этикетка */}
+      <Rect x="20" y="27" width="14" height="14" stroke={color} strokeWidth="1.3" fill="none" opacity="0.85" />
+      {/* Текст «КК» (Кутузов Коньяк) */}
+      <Path d="M22.5 31 L22.5 37 M22.5 34 L25 31 M22.5 34 L25 37" stroke={color} strokeWidth="1.3" strokeLinecap="round" />
+      <Path d="M27.5 31 L27.5 37 M27.5 34 L30 31 M27.5 34 L30 37" stroke={color} strokeWidth="1.3" strokeLinecap="round" />
+      {/* Линия внутри этикетки */}
+      <Line x1="22" y1="38.5" x2="32" y2="38.5" stroke={color} strokeWidth="0.8" opacity="0.6" />
+      {/* Звёзды наверху этикетки */}
+      <Circle cx="23" cy="29.5" r="0.7" fill={color} opacity="0.6" />
+      <Circle cx="27" cy="29.5" r="0.7" fill={color} opacity="0.6" />
+      <Circle cx="31" cy="29.5" r="0.7" fill={color} opacity="0.6" />
+    </Svg>
+  );
+}
+
+// ── Rachmaninov: концертное пианино с поднятой крышкой ────────────────────
+export function GrandPianoV2Icon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Корпус (крылообразная форма сверху) */}
+      <Path d="M8 30 Q8 18 24 18 L42 18 Q46 18 46 22 L46 36 Q46 40 42 40 L12 40 Q8 40 8 36 Z"
+        stroke={color} strokeWidth="1.6" strokeLinejoin="round" fill="none" />
+      {/* Открытая крышка (диагональная линия наверх-вправо) */}
+      <Path d="M24 18 L20 6 L42 6 L46 22"
+        stroke={color} strokeWidth="1.5" strokeLinejoin="round" fill="none" opacity="0.85" />
+      {/* Подпорка крышки */}
+      <Line x1="34" y1="11" x2="34" y2="18" stroke={color} strokeWidth="1.2" opacity="0.6" />
+      {/* Клавиатура */}
+      <Rect x="10" y="32" width="34" height="6" stroke={color} strokeWidth="1.3" fill="none" />
+      {/* Чёрные клавиши */}
+      <Rect x="13" y="32" width="2" height="3.5" fill={color} opacity="0.85" />
+      <Rect x="17" y="32" width="2" height="3.5" fill={color} opacity="0.85" />
+      <Rect x="22" y="32" width="2" height="3.5" fill={color} opacity="0.85" />
+      <Rect x="26" y="32" width="2" height="3.5" fill={color} opacity="0.85" />
+      <Rect x="30" y="32" width="2" height="3.5" fill={color} opacity="0.85" />
+      <Rect x="35" y="32" width="2" height="3.5" fill={color} opacity="0.85" />
+      <Rect x="39" y="32" width="2" height="3.5" fill={color} opacity="0.85" />
+      {/* Ножки */}
+      <Line x1="14" y1="40" x2="14" y2="48" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      <Line x1="40" y1="40" x2="40" y2="48" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+// ── Solzhenitsyn: колючая проволока + столб ───────────────────────────────
+export function BarbedWireV2Icon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Столб (силуэт лагерного столбика на горизонте) */}
+      <Line x1="44" y1="14" x2="44" y2="44" stroke={color} strokeWidth="1.4" opacity="0.6" />
+      <Line x1="42" y1="44" x2="46" y2="44" stroke={color} strokeWidth="1.2" opacity="0.6" />
+      {/* Линия земли */}
+      <Line x1="2" y1="44" x2="52" y2="44" stroke={color} strokeWidth="1" opacity="0.4" />
+      {/* Провод верхний */}
+      <Path d="M4 18 Q14 20 24 18 Q34 16 44 18" stroke={color} strokeWidth="1.6" strokeLinecap="round" fill="none" />
+      {/* Колючки на верхнем проводе (X-крестики) */}
+      <Path d="M10 15 L14 21 M14 15 L10 21" stroke={color} strokeWidth="1.3" strokeLinecap="round" />
+      <Path d="M22 14 L26 20 M26 14 L22 20" stroke={color} strokeWidth="1.3" strokeLinecap="round" />
+      <Path d="M34 14 L38 20 M38 14 L34 20" stroke={color} strokeWidth="1.3" strokeLinecap="round" />
+      {/* Провод нижний */}
+      <Path d="M4 30 Q14 32 24 30 Q34 28 44 30" stroke={color} strokeWidth="1.6" strokeLinecap="round" fill="none" />
+      {/* Колючки на нижнем проводе */}
+      <Path d="M10 27 L14 33 M14 27 L10 33" stroke={color} strokeWidth="1.3" strokeLinecap="round" />
+      <Path d="M22 26 L26 32 M26 26 L22 32" stroke={color} strokeWidth="1.3" strokeLinecap="round" />
+      <Path d="M34 26 L38 32 M38 26 L34 32" stroke={color} strokeWidth="1.3" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+// ── Turgenev: охотничья собака (пойнтер в стойке) ─────────────────────────
+export function HuntingDogIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Тело */}
+      <Path d="M14 30 Q12 26 16 24 L34 24 Q40 24 42 28 L42 32 L36 32"
+        stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      {/* Шея и голова */}
+      <Path d="M14 30 Q12 22 18 18 L26 18 Q24 22 22 24" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      {/* Морда */}
+      <Path d="M18 18 L13 17" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+      <Circle cx="13" cy="17" r="0.9" fill={color} />
+      {/* Глаз */}
+      <Circle cx="20" cy="20" r="0.7" fill={color} />
+      {/* Ухо опущено */}
+      <Path d="M22 18 Q24 22 22 26" stroke={color} strokeWidth="1.3" strokeLinecap="round" fill="none" opacity="0.7" />
+      {/* Передние ноги */}
+      <Line x1="18" y1="30" x2="18" y2="42" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      <Line x1="22" y1="30" x2="22" y2="42" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      {/* Задние ноги */}
+      <Line x1="34" y1="32" x2="34" y2="42" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      <Line x1="38" y1="32" x2="38" y2="42" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      {/* Лапы */}
+      <Line x1="16" y1="42" x2="20" y2="42" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+      <Line x1="20" y1="42" x2="24" y2="42" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+      <Line x1="32" y1="42" x2="36" y2="42" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+      <Line x1="36" y1="42" x2="40" y2="42" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+      {/* Хвост-стрелка (горизонтально, как в стойке) */}
+      <Path d="M42 28 L48 26" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+// ── Ivan Grozny: стена Кремля с зубцами ───────────────────────────────────
+export function KremlinWallIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Зубцы «ласточкин хвост» (М-образные) */}
+      <Path d="M6 22 L6 16 L9 16 L9 18 L12 18 L12 16 L15 16 L15 18 L18 18 L18 16 L21 16 L21 18 L24 18 L24 16 L27 16 L27 18 L30 18 L30 16 L33 16 L33 18 L36 18 L36 16 L39 16 L39 18 L42 18 L42 16 L45 16 L45 18 L48 18 L48 22"
+        stroke={color} strokeWidth="1.5" strokeLinejoin="round" fill="none" />
+      {/* Тело стены */}
+      <Rect x="6" y="22" width="42" height="22" stroke={color} strokeWidth="1.6" fill="none" />
+      {/* Бойницы */}
+      <Rect x="11" y="28" width="3" height="5" rx="0.5" stroke={color} strokeWidth="1.2" fill="none" opacity="0.7" />
+      <Rect x="20" y="28" width="3" height="5" rx="0.5" stroke={color} strokeWidth="1.2" fill="none" opacity="0.7" />
+      <Rect x="29" y="28" width="3" height="5" rx="0.5" stroke={color} strokeWidth="1.2" fill="none" opacity="0.7" />
+      <Rect x="38" y="28" width="3" height="5" rx="0.5" stroke={color} strokeWidth="1.2" fill="none" opacity="0.7" />
+      {/* Кладка (горизонтальные линии) */}
+      <Line x1="6" y1="36" x2="48" y2="36" stroke={color} strokeWidth="0.8" opacity="0.4" />
+      <Line x1="6" y1="40" x2="48" y2="40" stroke={color} strokeWidth="0.8" opacity="0.4" />
+      {/* Земля */}
+      <Line x1="3" y1="44" x2="51" y2="44" stroke={color} strokeWidth="1.3" />
+    </Svg>
+  );
+}
+
+// ── Nicholas II: яйцо Фаберже ─────────────────────────────────────────────
+export function FabergeEggIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Подставка */}
+      <Path d="M22 47 L32 47 L33 49 L21 49 Z" stroke={color} strokeWidth="1.3" strokeLinejoin="round" fill="none" />
+      <Line x1="20" y1="49" x2="34" y2="49" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+      {/* Яйцо (овал) */}
+      <Ellipse cx="27" cy="25" rx="13" ry="18" stroke={color} strokeWidth="1.6" fill="none" />
+      {/* Горизонтальные пояски декора */}
+      <Path d="M14.5 19 Q27 17 39.5 19" stroke={color} strokeWidth="1.2" fill="none" opacity="0.65" />
+      <Path d="M14.5 25 Q27 23 39.5 25" stroke={color} strokeWidth="1.2" fill="none" opacity="0.65" />
+      <Path d="M15 31 Q27 33 39 31" stroke={color} strokeWidth="1.2" fill="none" opacity="0.65" />
+      {/* Ромбики декора */}
+      <Path d="M21 22 L23 24 L21 26 L19 24 Z" stroke={color} strokeWidth="1" fill={color} opacity="0.55" />
+      <Path d="M27 22 L29 24 L27 26 L25 24 Z" stroke={color} strokeWidth="1" fill={color} opacity="0.55" />
+      <Path d="M33 22 L35 24 L33 26 L31 24 Z" stroke={color} strokeWidth="1" fill={color} opacity="0.55" />
+      <Path d="M21 28 L23 30 L21 32 L19 30 Z" stroke={color} strokeWidth="1" fill={color} opacity="0.45" />
+      <Path d="M27 28 L29 30 L27 32 L25 30 Z" stroke={color} strokeWidth="1" fill={color} opacity="0.45" />
+      <Path d="M33 28 L35 30 L33 32 L31 30 Z" stroke={color} strokeWidth="1" fill={color} opacity="0.45" />
+      {/* Маленькая корона на верхушке */}
+      <Path d="M24 9 L25 11 L27 9 L29 11 L30 9 L30 12 L24 12 Z" stroke={color} strokeWidth="1.2" strokeLinejoin="round" fill="none" />
+    </Svg>
+  );
+}
+
+// ╔════════════════════════════════════════════════════════════════════════╗
+// ║  УНИКАЛЬНЫЕ ИКОНКИ ДЛЯ КАСТОМНЫХ ПЕРСОНАЖЕЙ (Задача 3.3)               ║
+// ║  20 иконок которые НЕ используются встроенными персонажами             ║
+// ╚════════════════════════════════════════════════════════════════════════╝
+
+// ── Robot: голова робота ──────────────────────────────────────────────────
+export function RobotIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Антенна */}
+      <Line x1="27" y1="6" x2="27" y2="11" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      <Circle cx="27" cy="5" r="1.8" fill={color} />
+      {/* Голова */}
+      <Rect x="13" y="11" width="28" height="24" rx="3" stroke={color} strokeWidth="1.6" fill="none" />
+      {/* Глаза */}
+      <Circle cx="20" cy="20" r="3" stroke={color} strokeWidth="1.4" fill={color} opacity="0.85" />
+      <Circle cx="34" cy="20" r="3" stroke={color} strokeWidth="1.4" fill={color} opacity="0.85" />
+      {/* Рот-сетка */}
+      <Rect x="19" y="27" width="16" height="4" rx="0.5" stroke={color} strokeWidth="1.2" fill="none" />
+      <Line x1="22" y1="27" x2="22" y2="31" stroke={color} strokeWidth="0.9" opacity="0.6" />
+      <Line x1="26" y1="27" x2="26" y2="31" stroke={color} strokeWidth="0.9" opacity="0.6" />
+      <Line x1="30" y1="27" x2="30" y2="31" stroke={color} strokeWidth="0.9" opacity="0.6" />
+      {/* Шея и грудь */}
+      <Rect x="22" y="35" width="10" height="3" stroke={color} strokeWidth="1.3" fill="none" />
+      <Path d="M16 38 L38 38 L40 47 L14 47 Z" stroke={color} strokeWidth="1.5" strokeLinejoin="round" fill="none" />
+      <Circle cx="27" cy="42" r="1.5" fill={color} opacity="0.8" />
+    </Svg>
+  );
+}
+
+// ── Alien: голова инопланетянина ──────────────────────────────────────────
+export function AlienIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Голова (овал, удлинённый книзу) */}
+      <Path d="M27 7 Q14 8 13 22 Q13 32 19 38 Q22 42 27 47 Q32 42 35 38 Q41 32 41 22 Q40 8 27 7 Z"
+        stroke={color} strokeWidth="1.6" strokeLinejoin="round" fill="none" />
+      {/* Большие миндалевидные глаза */}
+      <Path d="M14 22 Q18 18 24 22 Q22 28 18 28 Q14 28 14 22 Z" fill={color} opacity="0.9" />
+      <Path d="M40 22 Q36 18 30 22 Q32 28 36 28 Q40 28 40 22 Z" fill={color} opacity="0.9" />
+      {/* Блик в глазах */}
+      <Circle cx="20" cy="22" r="0.9" fill="#000" opacity="0.7" />
+      <Circle cx="34" cy="22" r="0.9" fill="#000" opacity="0.7" />
+      {/* Маленький рот-щель */}
+      <Line x1="24" y1="38" x2="30" y2="38" stroke={color} strokeWidth="1.3" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+// ── MaskFace: нейтральная маска ───────────────────────────────────────────
+export function MaskFaceIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Контур маски */}
+      <Path d="M14 18 Q14 8 27 8 Q40 8 40 18 L40 32 Q40 42 32 46 Q27 48 22 46 Q14 42 14 32 Z"
+        stroke={color} strokeWidth="1.6" strokeLinejoin="round" fill="none" />
+      {/* Глаза-прорези */}
+      <Path d="M20 22 Q23 20 26 22" stroke={color} strokeWidth="1.5" strokeLinecap="round" fill="none" />
+      <Path d="M28 22 Q31 20 34 22" stroke={color} strokeWidth="1.5" strokeLinecap="round" fill="none" />
+      {/* Нос */}
+      <Path d="M27 26 L25 32 L29 32 Z" stroke={color} strokeWidth="1.3" strokeLinejoin="round" fill="none" opacity="0.7" />
+      {/* Декоративная линия лба */}
+      <Path d="M18 14 Q27 12 36 14" stroke={color} strokeWidth="1.2" strokeLinecap="round" fill="none" opacity="0.5" />
+      {/* Завязки */}
+      <Path d="M14 24 Q10 24 8 28" stroke={color} strokeWidth="1.3" strokeLinecap="round" fill="none" opacity="0.6" />
+      <Path d="M40 24 Q44 24 46 28" stroke={color} strokeWidth="1.3" strokeLinecap="round" fill="none" opacity="0.6" />
+    </Svg>
+  );
+}
+
+// ── Lock: замочек ─────────────────────────────────────────────────────────
+export function LockIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Дужка */}
+      <Path d="M17 26 L17 18 Q17 9 27 9 Q37 9 37 18 L37 26"
+        stroke={color} strokeWidth="2" strokeLinecap="round" fill="none" />
+      {/* Корпус */}
+      <Rect x="12" y="26" width="30" height="22" rx="3" stroke={color} strokeWidth="1.7" fill="none" />
+      {/* Замочная скважина */}
+      <Circle cx="27" cy="34" r="2.5" stroke={color} strokeWidth="1.4" fill="none" />
+      <Path d="M27 36 L26 42 L28 42 Z" fill={color} opacity="0.85" />
+      {/* Декор-точки на корпусе */}
+      <Circle cx="16" cy="44" r="0.9" fill={color} opacity="0.5" />
+      <Circle cx="38" cy="44" r="0.9" fill={color} opacity="0.5" />
+    </Svg>
+  );
+}
+
+// ── HeartFull: сплошное сердце ────────────────────────────────────────────
+export function HeartFullIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      <Path d="M27 46 Q12 36 8 23 Q6 13 14 11 Q22 9 27 18 Q32 9 40 11 Q48 13 46 23 Q42 36 27 46 Z"
+        stroke={color} strokeWidth="1.7" strokeLinejoin="round" fill={color} opacity="0.9" />
+      {/* Блик */}
+      <Path d="M16 17 Q14 21 17 25" stroke="#000" strokeWidth="1.2" strokeLinecap="round" opacity="0.25" fill="none" />
+    </Svg>
+  );
+}
+
+// ── Star8: 8-конечная звезда ──────────────────────────────────────────────
+export function Star8Icon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      <Path d="M27 6 L30 22 L46 19 L33 30 L46 41 L30 38 L27 54 L24 38 L8 41 L21 30 L8 19 L24 22 Z"
+        stroke={color} strokeWidth="1.5" strokeLinejoin="round" fill={color} opacity="0.85" />
+      <Circle cx="27" cy="30" r="3" fill="#000" opacity="0.4" />
+    </Svg>
+  );
+}
+
+// ── MoonStar: луна со звездой ─────────────────────────────────────────────
+export function MoonStarIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Полумесяц */}
+      <Path d="M36 40 Q24 40 18 32 Q12 24 18 14 Q24 6 36 8 Q26 12 24 24 Q26 36 36 40 Z"
+        stroke={color} strokeWidth="1.5" strokeLinejoin="round" fill={color} opacity="0.85" />
+      {/* Звёздочка справа сверху */}
+      <Path d="M44 14 L45.3 17.5 L49 18 L46 20.5 L47 24 L44 22 L41 24 L42 20.5 L39 18 L42.7 17.5 Z"
+        stroke={color} strokeWidth="0.9" strokeLinejoin="round" fill={color} opacity="0.85" />
+      {/* Маленькая звёздочка снизу справа */}
+      <Path d="M46 36 L46.7 38 L48.5 38 L47 39.3 L47.5 41 L46 40 L44.5 41 L45 39.3 L43.5 38 L45.3 38 Z"
+        stroke={color} strokeWidth="0.8" strokeLinejoin="round" fill={color} opacity="0.6" />
+    </Svg>
+  );
+}
+
+// ── ElectricGuitar: электрогитара ─────────────────────────────────────────
+export function ElectricGuitarIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Корпус (форма stratocaster под наклоном) */}
+      <Path d="M14 38 Q10 32 14 28 L20 22 Q23 20 26 22 L30 26 L24 32 Q22 36 24 40 Q22 44 18 42 Q14 42 14 38 Z"
+        stroke={color} strokeWidth="1.6" strokeLinejoin="round" fill="none" />
+      {/* Дека/звукосниматели */}
+      <Rect x="19" y="29" width="6" height="3" stroke={color} strokeWidth="1.2" fill={color} opacity="0.7" transform="rotate(-30 22 30.5)" />
+      {/* Гриф */}
+      <Path d="M30 26 L46 10" stroke={color} strokeWidth="2.3" strokeLinecap="round" />
+      {/* Лады */}
+      <Line x1="34" y1="22" x2="36" y2="24" stroke={color} strokeWidth="0.8" opacity="0.5" />
+      <Line x1="38" y1="18" x2="40" y2="20" stroke={color} strokeWidth="0.8" opacity="0.5" />
+      <Line x1="42" y1="14" x2="44" y2="16" stroke={color} strokeWidth="0.8" opacity="0.5" />
+      {/* Головка грифа */}
+      <Path d="M46 10 L51 9 L50 5 L46 8 Z" stroke={color} strokeWidth="1.4" strokeLinejoin="round" fill="none" />
+      {/* Колки */}
+      <Circle cx="48" cy="7" r="0.8" fill={color} opacity="0.7" />
+      <Circle cx="50" cy="6" r="0.8" fill={color} opacity="0.7" />
+    </Svg>
+  );
+}
+
+// ── WolfHowl: воющий волк ─────────────────────────────────────────────────
+export function WolfHowlIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Голова волка в профиль (запрокинута для воя) */}
+      <Path d="M14 30 Q10 22 14 18 L18 12 Q20 8 24 10 L28 14 Q32 18 30 24 L26 28 L22 32 L16 32 Z"
+        stroke={color} strokeWidth="1.6" strokeLinejoin="round" fill="none" />
+      {/* Уши торчат */}
+      <Path d="M22 12 L21 6 L25 11 Z" stroke={color} strokeWidth="1.4" strokeLinejoin="round" fill="none" />
+      <Path d="M27 14 L29 8 L31 14 Z" stroke={color} strokeWidth="1.4" strokeLinejoin="round" fill="none" />
+      {/* Глаз */}
+      <Circle cx="24" cy="20" r="1" fill={color} />
+      {/* Морда (открытая пасть для воя) */}
+      <Path d="M14 18 L8 16" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+      <Path d="M10 19 L16 22" stroke={color} strokeWidth="1.3" strokeLinecap="round" opacity="0.7" />
+      {/* Шея/грудь */}
+      <Path d="M22 32 L24 42 L34 44 L36 36" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      {/* Луна на фоне (стилизованно) */}
+      <Circle cx="42" cy="20" r="6" stroke={color} strokeWidth="1.3" fill="none" opacity="0.55" />
+      <Path d="M42 16 Q38 18 38 22 Q38 26 42 26 Q40 22 42 16 Z" fill={color} opacity="0.4" />
+    </Svg>
+  );
+}
+
+// ── Dragon: голова дракона ────────────────────────────────────────────────
+export function DragonIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Голова треугольная */}
+      <Path d="M8 36 L8 28 Q10 22 16 22 L36 22 Q42 22 46 26 L48 36 Z"
+        stroke={color} strokeWidth="1.6" strokeLinejoin="round" fill="none" />
+      {/* Рога */}
+      <Path d="M14 22 L11 12 L17 18" stroke={color} strokeWidth="1.5" strokeLinejoin="round" fill="none" />
+      <Path d="M30 22 L33 10 L37 18" stroke={color} strokeWidth="1.5" strokeLinejoin="round" fill="none" />
+      {/* Глаз */}
+      <Circle cx="22" cy="29" r="1.6" fill={color} opacity="0.85" />
+      <Circle cx="22" cy="29" r="0.6" fill="#000" />
+      {/* Ноздря */}
+      <Circle cx="44" cy="30" r="0.9" fill={color} opacity="0.7" />
+      {/* Зубы */}
+      <Path d="M16 36 L18 40 L20 36 L22 40 L24 36 L26 40 L28 36 L30 40 L32 36 L34 40 L36 36"
+        stroke={color} strokeWidth="1.3" strokeLinejoin="round" fill="none" />
+      {/* Пламя */}
+      <Path d="M48 32 Q52 32 51 36 Q53 38 50 40 Q48 38 47 40"
+        stroke={color} strokeWidth="1.3" strokeLinejoin="round" fill={color} opacity="0.55" />
+      {/* Чешуя на лбу */}
+      <Circle cx="24" cy="24" r="0.7" fill={color} opacity="0.5" />
+      <Circle cx="30" cy="24" r="0.7" fill={color} opacity="0.5" />
+    </Svg>
+  );
+}
+
+// ── EyeRunes: глаз с рунами ───────────────────────────────────────────────
+export function EyeRunesIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Контур глаза */}
+      <Path d="M6 27 Q16 14 27 14 Q38 14 48 27 Q38 40 27 40 Q16 40 6 27 Z"
+        stroke={color} strokeWidth="1.7" strokeLinejoin="round" fill="none" />
+      {/* Радужка */}
+      <Circle cx="27" cy="27" r="7" stroke={color} strokeWidth="1.5" fill="none" />
+      {/* Зрачок */}
+      <Circle cx="27" cy="27" r="3" fill={color} opacity="0.85" />
+      {/* Блик */}
+      <Circle cx="25" cy="25" r="1" fill="#fff" opacity="0.9" />
+      {/* Руны вокруг */}
+      <Path d="M9 8 L11 12 L13 8" stroke={color} strokeWidth="1.3" strokeLinecap="round" fill="none" opacity="0.7" />
+      <Path d="M27 4 L27 8 M25 6 L29 6" stroke={color} strokeWidth="1.3" strokeLinecap="round" opacity="0.7" />
+      <Path d="M45 8 L41 8 L41 12 L45 12" stroke={color} strokeWidth="1.3" strokeLinecap="round" fill="none" opacity="0.7" />
+      <Path d="M9 46 L13 46 L11 50 L13 50" stroke={color} strokeWidth="1.3" strokeLinecap="round" fill="none" opacity="0.7" />
+      <Path d="M27 50 L29 46 L25 46 Z" stroke={color} strokeWidth="1.3" strokeLinejoin="round" fill="none" opacity="0.7" />
+      <Path d="M45 46 L43 50 L41 46 L39 50" stroke={color} strokeWidth="1.3" strokeLinecap="round" fill="none" opacity="0.7" />
+    </Svg>
+  );
+}
+
+// ── Phoenix: силуэт феникса ───────────────────────────────────────────────
+export function PhoenixIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Тело */}
+      <Path d="M27 12 Q22 14 22 22 Q22 30 27 36 Q32 30 32 22 Q32 14 27 12 Z"
+        stroke={color} strokeWidth="1.5" strokeLinejoin="round" fill={color} opacity="0.4" />
+      {/* Голова и клюв */}
+      <Circle cx="27" cy="11" r="2.5" stroke={color} strokeWidth="1.4" fill="none" />
+      <Path d="M27 8 L27 5" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+      {/* Крылья распахнуты */}
+      <Path d="M22 18 Q12 16 6 24 Q12 22 18 26 Q14 30 8 32 Q14 32 22 28"
+        stroke={color} strokeWidth="1.5" strokeLinejoin="round" fill="none" />
+      <Path d="M32 18 Q42 16 48 24 Q42 22 36 26 Q40 30 46 32 Q40 32 32 28"
+        stroke={color} strokeWidth="1.5" strokeLinejoin="round" fill="none" />
+      {/* Хвост-перья */}
+      <Path d="M27 36 L24 50" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      <Path d="M27 36 L27 50" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      <Path d="M27 36 L30 50" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      <Path d="M27 36 L20 47" stroke={color} strokeWidth="1.3" strokeLinecap="round" opacity="0.7" />
+      <Path d="M27 36 L34 47" stroke={color} strokeWidth="1.3" strokeLinecap="round" opacity="0.7" />
+    </Svg>
+  );
+}
+
+// ── Kitsune: лиса с тремя хвостами ────────────────────────────────────────
+export function KitsuneIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Голова лисы (треугольник) */}
+      <Path d="M16 30 L20 12 L34 12 L38 30 Z" stroke={color} strokeWidth="1.6" strokeLinejoin="round" fill="none" />
+      {/* Уши */}
+      <Path d="M20 12 L18 4 L24 10 Z" stroke={color} strokeWidth="1.4" strokeLinejoin="round" fill="none" />
+      <Path d="M30 10 L36 4 L34 12 Z" stroke={color} strokeWidth="1.4" strokeLinejoin="round" fill="none" />
+      {/* Внутренние уши */}
+      <Path d="M20 7 L21 10" stroke={color} strokeWidth="1" opacity="0.6" />
+      <Path d="M34 7 L33 10" stroke={color} strokeWidth="1" opacity="0.6" />
+      {/* Глаза-щёлочки */}
+      <Path d="M22 22 L25 24" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+      <Path d="M29 24 L32 22" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+      {/* Нос */}
+      <Path d="M26 28 L28 28 L27 30 Z" fill={color} />
+      {/* Три хвоста снизу */}
+      <Path d="M16 30 Q10 36 8 44 Q12 42 14 38" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <Path d="M22 32 Q22 40 20 48 Q24 44 24 38" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <Path d="M32 32 Q32 40 34 48 Q30 44 30 38" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <Path d="M38 30 Q44 36 46 44 Q42 42 40 38" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </Svg>
+  );
+}
+
+// ── SkullCrossbones: череп с костями ──────────────────────────────────────
+export function SkullCrossbonesIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Кости (X сзади) */}
+      <Path d="M10 38 L44 8 M44 38 L10 8" stroke={color} strokeWidth="2.5" strokeLinecap="round" opacity="0.55" />
+      {/* Концы костей (косточки на концах X) */}
+      <Circle cx="9" cy="8" r="2.5" stroke={color} strokeWidth="1.4" fill="none" opacity="0.55" />
+      <Circle cx="45" cy="8" r="2.5" stroke={color} strokeWidth="1.4" fill="none" opacity="0.55" />
+      <Circle cx="9" cy="38" r="2.5" stroke={color} strokeWidth="1.4" fill="none" opacity="0.55" />
+      <Circle cx="45" cy="38" r="2.5" stroke={color} strokeWidth="1.4" fill="none" opacity="0.55" />
+      {/* Череп */}
+      <Path d="M14 22 Q14 12 27 12 Q40 12 40 22 L40 30 Q40 33 37 33 L34 33 L34 38 L31 38 L31 33 L23 33 L23 38 L20 38 L20 33 L17 33 Q14 33 14 30 Z"
+        stroke={color} strokeWidth="1.6" strokeLinejoin="round" fill={color} opacity="0.85" />
+      {/* Глазницы */}
+      <Circle cx="21" cy="22" r="2.5" fill="#000" />
+      <Circle cx="33" cy="22" r="2.5" fill="#000" />
+      {/* Нос */}
+      <Path d="M27 25 L25.5 30 L28.5 30 Z" fill="#000" />
+      {/* Зубы */}
+      <Line x1="23" y1="33" x2="23" y2="38" stroke="#000" strokeWidth="0.8" />
+      <Line x1="27" y1="33" x2="27" y2="38" stroke="#000" strokeWidth="0.8" />
+      <Line x1="31" y1="33" x2="31" y2="38" stroke="#000" strokeWidth="0.8" />
+    </Svg>
+  );
+}
+
+// ── Octopus: осьминог ─────────────────────────────────────────────────────
+export function OctopusIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Голова */}
+      <Ellipse cx="27" cy="20" rx="13" ry="11" stroke={color} strokeWidth="1.6" fill="none" />
+      {/* Глаза */}
+      <Circle cx="22" cy="19" r="2.2" fill={color} opacity="0.9" />
+      <Circle cx="32" cy="19" r="2.2" fill={color} opacity="0.9" />
+      <Circle cx="22" cy="19" r="0.8" fill="#000" />
+      <Circle cx="32" cy="19" r="0.8" fill="#000" />
+      {/* Улыбка */}
+      <Path d="M24 24 Q27 26 30 24" stroke={color} strokeWidth="1.2" strokeLinecap="round" fill="none" />
+      {/* Щупальца */}
+      <Path d="M16 28 Q12 36 8 38 Q12 40 14 36" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <Path d="M20 30 Q18 40 14 46" stroke={color} strokeWidth="1.5" strokeLinecap="round" fill="none" />
+      <Path d="M24 31 Q24 42 22 48" stroke={color} strokeWidth="1.5" strokeLinecap="round" fill="none" />
+      <Path d="M30 31 Q30 42 32 48" stroke={color} strokeWidth="1.5" strokeLinecap="round" fill="none" />
+      <Path d="M34 30 Q36 40 40 46" stroke={color} strokeWidth="1.5" strokeLinecap="round" fill="none" />
+      <Path d="M38 28 Q42 36 46 38 Q42 40 40 36" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </Svg>
+  );
+}
+
+// ── Crystal: кристалл ─────────────────────────────────────────────────────
+export function CrystalIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Грани кристалла */}
+      <Path d="M27 6 L13 22 L20 48 L34 48 L41 22 Z"
+        stroke={color} strokeWidth="1.7" strokeLinejoin="round" fill="none" />
+      {/* Внутренние грани */}
+      <Path d="M27 6 L20 22 L27 48" stroke={color} strokeWidth="1.3" strokeLinejoin="round" fill="none" opacity="0.65" />
+      <Path d="M27 6 L34 22 L27 48" stroke={color} strokeWidth="1.3" strokeLinejoin="round" fill="none" opacity="0.65" />
+      <Line x1="13" y1="22" x2="41" y2="22" stroke={color} strokeWidth="1.3" opacity="0.65" />
+      {/* Блики */}
+      <Path d="M25 12 L23 20" stroke={color} strokeWidth="1.5" strokeLinecap="round" opacity="0.85" />
+      <Path d="M30 30 L30 40" stroke={color} strokeWidth="1.3" strokeLinecap="round" opacity="0.5" />
+    </Svg>
+  );
+}
+
+// ── BookSpell: магическая книга ───────────────────────────────────────────
+export function BookSpellIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Корешок */}
+      <Line x1="27" y1="14" x2="27" y2="44" stroke={color} strokeWidth="1.5" />
+      {/* Левая страница */}
+      <Path d="M27 14 Q15 12 8 16 L8 42 Q15 38 27 40 Z"
+        stroke={color} strokeWidth="1.6" strokeLinejoin="round" fill="none" />
+      {/* Правая страница */}
+      <Path d="M27 14 Q39 12 46 16 L46 42 Q39 38 27 40 Z"
+        stroke={color} strokeWidth="1.6" strokeLinejoin="round" fill="none" />
+      {/* Текст слева (волнистые линии) */}
+      <Path d="M12 22 Q15 21 18 22" stroke={color} strokeWidth="0.9" strokeLinecap="round" fill="none" opacity="0.55" />
+      <Path d="M12 26 Q17 25 22 26" stroke={color} strokeWidth="0.9" strokeLinecap="round" fill="none" opacity="0.55" />
+      <Path d="M12 30 Q15 29 18 30" stroke={color} strokeWidth="0.9" strokeLinecap="round" fill="none" opacity="0.55" />
+      {/* Пентаграмма справа */}
+      <Path d="M37 22 L40 30 L33 25 L41 25 L34 30 Z" stroke={color} strokeWidth="1.3" strokeLinejoin="round" fill="none" />
+      {/* Звёздочки магии */}
+      <Path d="M22 8 L23 10 L25 11 L23 12 L22 14 L21 12 L19 11 L21 10 Z" fill={color} opacity="0.7" />
+      <Path d="M40 8 L40.7 9.5 L42 10 L40.7 10.5 L40 12 L39.3 10.5 L38 10 L39.3 9.5 Z" fill={color} opacity="0.55" />
+    </Svg>
+  );
+}
+
+// ── RoseDark: тёмная роза ─────────────────────────────────────────────────
+export function RoseDarkIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Бутон (концентрические завитки) */}
+      <Circle cx="27" cy="20" r="10" stroke={color} strokeWidth="1.6" fill={color} opacity="0.45" />
+      <Path d="M27 12 Q22 12 22 18 Q22 24 28 22 Q32 22 30 16 Q26 14 23 18"
+        stroke={color} strokeWidth="1.4" strokeLinecap="round" fill="none" />
+      <Path d="M27 18 Q24 18 25 22 Q28 24 30 20"
+        stroke={color} strokeWidth="1.2" strokeLinecap="round" fill="none" opacity="0.85" />
+      {/* Шипы на стебле */}
+      <Path d="M27 30 L27 50" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <Path d="M27 36 L24 34" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+      <Path d="M27 42 L30 41" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+      {/* Листья */}
+      <Path d="M27 38 Q22 38 19 42 Q22 44 27 41" stroke={color} strokeWidth="1.4" strokeLinejoin="round" fill="none" />
+      <Path d="M27 44 Q32 44 35 48 Q32 50 27 47" stroke={color} strokeWidth="1.4" strokeLinejoin="round" fill="none" />
+      {/* Центральная жилка листа */}
+      <Path d="M22 41 L26 41" stroke={color} strokeWidth="0.9" opacity="0.6" />
+      <Path d="M32 47 L28 47" stroke={color} strokeWidth="0.9" opacity="0.6" />
+    </Svg>
+  );
+}
+
+// ── WingedHeart: сердце с крыльями ────────────────────────────────────────
+export function WingedHeartIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Сердце по центру */}
+      <Path d="M27 42 Q19 36 17 28 Q16 22 22 21 Q26 20 27 25 Q28 20 32 21 Q38 22 37 28 Q35 36 27 42 Z"
+        stroke={color} strokeWidth="1.6" strokeLinejoin="round" fill={color} opacity="0.85" />
+      {/* Левое крыло */}
+      <Path d="M17 28 Q8 24 4 28 Q10 28 12 32 Q6 30 4 34 Q12 32 16 30"
+        stroke={color} strokeWidth="1.5" strokeLinejoin="round" fill="none" />
+      {/* Правое крыло */}
+      <Path d="M37 28 Q46 24 50 28 Q44 28 42 32 Q48 30 50 34 Q42 32 38 30"
+        stroke={color} strokeWidth="1.5" strokeLinejoin="round" fill="none" />
+      {/* Перья на крыльях */}
+      <Path d="M9 26 L11 28" stroke={color} strokeWidth="1" opacity="0.6" />
+      <Path d="M45 26 L43 28" stroke={color} strokeWidth="1" opacity="0.6" />
+    </Svg>
+  );
+}
+
+// ── CompassMagic: магический компас ───────────────────────────────────────
+export function CompassMagicIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Внешний круг */}
+      <Circle cx="27" cy="27" r="20" stroke={color} strokeWidth="1.7" fill="none" />
+      {/* Внутренний круг */}
+      <Circle cx="27" cy="27" r="14" stroke={color} strokeWidth="1.2" fill="none" opacity="0.55" />
+      {/* Стрелка-роза ветров (4 луча в звезду) */}
+      <Path d="M27 11 L30 27 L27 24 L24 27 Z" stroke={color} strokeWidth="1.4" strokeLinejoin="round" fill={color} opacity="0.85" />
+      <Path d="M27 43 L24 27 L27 30 L30 27 Z" stroke={color} strokeWidth="1.4" strokeLinejoin="round" fill="none" />
+      <Path d="M11 27 L27 24 L24 27 L27 30 Z" stroke={color} strokeWidth="1.4" strokeLinejoin="round" fill="none" />
+      <Path d="M43 27 L27 30 L30 27 L27 24 Z" stroke={color} strokeWidth="1.4" strokeLinejoin="round" fill="none" />
+      {/* Центральная точка */}
+      <Circle cx="27" cy="27" r="1.5" fill={color} />
+      {/* Метки сторон света */}
+      <Path d="M27 5 L26 8 L28 8 Z" fill={color} opacity="0.7" />
+      <Path d="M27 49 L28 46 L26 46 Z" fill={color} opacity="0.55" />
+      {/* Мини-звёздочки магии вокруг */}
+      <Path d="M44 10 L44.5 11.5 L46 12 L44.5 12.5 L44 14 L43.5 12.5 L42 12 L43.5 11.5 Z" fill={color} opacity="0.6" />
+      <Path d="M10 44 L10.5 45.5 L12 46 L10.5 46.5 L10 48 L9.5 46.5 L8 46 L9.5 45.5 Z" fill={color} opacity="0.6" />
+    </Svg>
+  );
+}
+
+// ── Lomonosov: силуэт МГУ (главное здание) ────────────────────────────────
+export function MGUTowerIcon({ size = 54, color = 'white' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 54 54" fill="none">
+      {/* Звезда на шпиле */}
+      <Path d="M27 4 L27.7 5.5 L29.3 5.7 L28.1 6.8 L28.5 8.4 L27 7.5 L25.5 8.4 L25.9 6.8 L24.7 5.7 L26.3 5.5 Z"
+        stroke={color} strokeWidth="0.9" strokeLinejoin="round" fill={color} opacity="0.9" />
+      {/* Шпиль */}
+      <Line x1="27" y1="9" x2="27" y2="14" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      {/* Верхушка центральной башни (трапеция) */}
+      <Path d="M23 14 L31 14 L29 18 L25 18 Z" stroke={color} strokeWidth="1.4" strokeLinejoin="round" fill="none" />
+      {/* Центральная башня */}
+      <Rect x="22" y="18" width="10" height="20" stroke={color} strokeWidth="1.6" fill="none" />
+      {/* Окна центральной башни */}
+      <Line x1="24" y1="22" x2="30" y2="22" stroke={color} strokeWidth="0.8" opacity="0.5" />
+      <Line x1="24" y1="26" x2="30" y2="26" stroke={color} strokeWidth="0.8" opacity="0.5" />
+      <Line x1="24" y1="30" x2="30" y2="30" stroke={color} strokeWidth="0.8" opacity="0.5" />
+      <Line x1="27" y1="18" x2="27" y2="38" stroke={color} strokeWidth="0.8" opacity="0.4" />
+      {/* Левое крыло */}
+      <Rect x="9" y="28" width="13" height="14" stroke={color} strokeWidth="1.5" fill="none" />
+      {/* Маленькая башенка слева */}
+      <Path d="M11 28 L13 24 L15 28 Z" stroke={color} strokeWidth="1.2" strokeLinejoin="round" fill="none" />
+      {/* Правое крыло */}
+      <Rect x="32" y="28" width="13" height="14" stroke={color} strokeWidth="1.5" fill="none" />
+      {/* Маленькая башенка справа */}
+      <Path d="M39 28 L41 24 L43 28 Z" stroke={color} strokeWidth="1.2" strokeLinejoin="round" fill="none" />
+      {/* Окна на крыльях */}
+      <Line x1="11" y1="33" x2="20" y2="33" stroke={color} strokeWidth="0.7" opacity="0.45" />
+      <Line x1="11" y1="37" x2="20" y2="37" stroke={color} strokeWidth="0.7" opacity="0.45" />
+      <Line x1="34" y1="33" x2="43" y2="33" stroke={color} strokeWidth="0.7" opacity="0.45" />
+      <Line x1="34" y1="37" x2="43" y2="37" stroke={color} strokeWidth="0.7" opacity="0.45" />
+      {/* Земля */}
+      <Line x1="6" y1="42" x2="48" y2="42" stroke={color} strokeWidth="1.3" />
     </Svg>
   );
 }

@@ -45,7 +45,16 @@
       "Bash(C:/Users/berez/AppData/Local/Programs/Python/Python313/python.exe -c ' *)",
       "Bash(\"C:/Users/berez/AppData/Local/Programs/Python/Python313/python.exe\")",
       "Bash(\"C:/Users/berez/AppData/Local/Programs/Python/Python313/python.exe\" add_chars.py)",
-      "Bash(del \"C:/Users/berez/Desktop/Character Chat/CharacterChatRN/add_chars.py\")"
+      "Bash(del \"C:/Users/berez/Desktop/Character Chat/CharacterChatRN/add_chars.py\")",
+      "Bash(rm \"C:/Users/berez/.claude/projects/C--Users-berez-Desktop-Character-Chat-CharacterChatRN/memory/project_ebaka.md\")",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(awk 'NR==62 { for \\(i=1;i<=length\\($0\\);i++\\) printf \"%d \", ord\\(substr\\($0,i,1\\)\\); print \"\" } function ord\\(c\\) { return index\\(\"\\\\\\\\1\\\\\\\\2\\\\\\\\3\\\\\\\\4\\\\\\\\5\\\\\\\\6\\\\\\\\7\\\\\\\\10\\\\\\\\11\\\\\\\\12\", c\\) }' personaTemplate.ts)",
+      "WebFetch(domain:twinlab.com)",
+      "WebFetch(domain:twinlab.ru)",
+      "WebFetch(domain:twinlabs.com)",
+      "WebFetch(domain:twinlabs.ru)",
+      "Bash(npm config *)",
+      "Bash(npm uninstall *)"
     ]
   }
 }

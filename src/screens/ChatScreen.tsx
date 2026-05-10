@@ -6,198 +6,19 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Circle } from 'react-native-svg';
+import * as ScreenCapture from 'expo-screen-capture';
 
-import { theme, cardBg } from '../theme';
-import {
-  BrainIcon, SpiralIcon, SwordIcon, AtomIcon, HeadphonesIcon, LightningIcon, CrownIcon,
-  VinciIcon, ChiselIcon, QuillIcon, DnaIcon, AppleIcon, CoilIcon,
-  VictoryIcon, TopHatIcon, DialogueIcon, ScrollIcon, CaveIcon,
-  YinYangIcon, WheelIcon, TrebleIcon, PianoIcon, SnowflakeIcon,
-  RavenIcon, MaskIcon, HammerPhilIcon, FistIcon,
-  CosmosIcon, RocketIcon, ChipIcon, WinGridIcon, StockChartIcon,
-  KiteIcon, BearIcon, Star5Icon, CharkhaIcon, ChainsIcon,
-  DoveIcon, LaurelIcon, LanternIcon, AnchorIcon, SceptreIcon,
-  AxeIcon, ShieldCrossIcon, SabersIcon, TelescopeIcon, RomanovIcon,
-  HelmetIcon, LyreIcon, CandleIcon, WheatIcon, GuitarIcon, EyeMysticIcon, TableChemIcon,
-  FlaskIcon, GobletIcon, JokerCardIcon, WolfIcon, BladesIcon, NoteBookIcon, CakeIcon,
-  WingsIcon, TitanIcon, SaiyanIcon, StrawHatIcon, BoxingGloveIcon, SoccerBallIcon,
-  CigarIcon, RoseIcon, FedoraIcon, PencilIcon, WandIcon, LightsaberIcon, StaffIcon,
-  SharinganIcon, FlameIcon, ThreeSwordsIcon, LeafBandIcon, AutomailIcon,
-  CowboyHatIcon, BarcodeIcon, HiddenBladeIcon, VisorIcon,
-  BannerIcon, HordeIcon, SyringeIcon, CaneIcon,
-  ChidoriIcon, GauntletIcon, MuscleIcon, MorningStarIcon, PlugIcon,
-  SoapIcon, FeatherIcon, BowlerHatIcon, CoinFlipIcon, ChessIcon,
-  WarMapIcon, MandalaIcon, AnkhIcon, DualGunIcon, RingIcon,
-  MushroomIcon, ElderBloodIcon, SunflowerIcon, CarnationIcon, FangIcon,
-  KunaiIcon, AtFieldIcon, ThunderboltIcon, MoonSceptreIcon, BusterIcon,
-  TriforceIcon, BandanaIcon, MicrophoneIcon, ShadesIcon, WebIcon,
-  BatSymbolIcon, ChampagneIcon, HeaddressIcon, LotusIcon, PipeSmokeIcon,
-  InkwellIcon, BatonIcon, PastaIcon, JumpmanIcon, MouthguardIcon,
-  ScarfIcon, PowerupIcon, DragonslayerIcon, EyePatchIcon,
-  RebellionIcon, Compass2Icon, SpearIcon, GloveIcon,
-  RastaIcon, LipsIcon, NunchakuIcon, ZigzagIcon,
-  CartoucheIcon, SpartanIcon, CapIcon, PrismIcon,
-  BeakerIcon, QueenCrownIcon, RacketIcon, WorldCupIcon,
-  BackIcon, BulbIcon, SendIcon,
-} from '../icons';
-import { useApp, Message } from '../context/AppContext';
-import { getOrCreateSession, sendMessage as apiSendMessage, clearSession } from '../utils/api';
+import { theme } from '../theme';
+import { BackIcon, BulbIcon, SendIcon, SmileIcon, LightningIcon, ChevronRightIcon } from '../icons';
+import { CharacterIcon } from '../components/CharacterIcon';
+import MoodPickerModal from '../components/MoodPickerModal';
+import AgeGateModal from '../components/AgeGateModal';
+import { getCharacterGradient } from '../utils/gradients';
+import { composePersona, getMoodLabel } from '../utils/moods';
+import { isConsentValid } from '../utils/consent';
+import { useApp, Message, FREE_DAILY_MESSAGES } from '../context/AppContext';
+import { sendMessage as apiSendMessage, ChatMessage } from '../utils/api';
 import { getMockResponse } from '../utils/mockAI';
-
-type CardKey = keyof typeof cardBg;
-
-function CharacterIcon({ iconType, size }: { iconType: string; size: number }) {
-  switch (iconType) {
-    case 'brain':       return <BrainIcon size={size} />;
-    case 'spiral':      return <SpiralIcon size={size} />;
-    case 'sword':       return <SwordIcon size={size} />;
-    case 'atom':        return <AtomIcon size={size} />;
-    case 'headphones':  return <HeadphonesIcon size={size} />;
-    case 'lightning':   return <LightningIcon size={size} />;
-    case 'crown':       return <CrownIcon size={size} />;
-    case 'vinci':       return <VinciIcon size={size} />;
-    case 'chisel':      return <ChiselIcon size={size} />;
-    case 'quill':       return <QuillIcon size={size} />;
-    case 'dna':         return <DnaIcon size={size} />;
-    case 'apple':       return <AppleIcon size={size} />;
-    case 'coil':        return <CoilIcon size={size} />;
-    case 'victory':     return <VictoryIcon size={size} />;
-    case 'tophat':      return <TopHatIcon size={size} />;
-    case 'dialogue':    return <DialogueIcon size={size} />;
-    case 'scroll':      return <ScrollIcon size={size} />;
-    case 'cave':        return <CaveIcon size={size} />;
-    case 'yinyang':     return <YinYangIcon size={size} />;
-    case 'wheel':       return <WheelIcon size={size} />;
-    case 'treble':      return <TrebleIcon size={size} />;
-    case 'piano':       return <PianoIcon size={size} />;
-    case 'snowflake':   return <SnowflakeIcon size={size} />;
-    case 'raven':       return <RavenIcon size={size} />;
-    case 'mask':        return <MaskIcon size={size} />;
-    case 'hammerphil':  return <HammerPhilIcon size={size} />;
-    case 'fist':        return <FistIcon size={size} />;
-    case 'cosmos':      return <CosmosIcon size={size} />;
-    case 'rocket':      return <RocketIcon size={size} />;
-    case 'chip':        return <ChipIcon size={size} />;
-    case 'wingrid':     return <WinGridIcon size={size} />;
-    case 'stockchart':  return <StockChartIcon size={size} />;
-    case 'kite':        return <KiteIcon size={size} />;
-    case 'bear':        return <BearIcon size={size} />;
-    case 'star5':       return <Star5Icon size={size} />;
-    case 'charkha':     return <CharkhaIcon size={size} />;
-    case 'chains':      return <ChainsIcon size={size} />;
-    case 'dove':        return <DoveIcon size={size} />;
-    case 'laurel':      return <LaurelIcon size={size} />;
-    case 'lantern':     return <LanternIcon size={size} />;
-    case 'anchor':      return <AnchorIcon size={size} />;
-    case 'sceptre':     return <SceptreIcon size={size} />;
-    case 'axe':         return <AxeIcon size={size} />;
-    case 'shieldcross': return <ShieldCrossIcon size={size} />;
-    case 'sabers':      return <SabersIcon size={size} />;
-    case 'telescope':   return <TelescopeIcon size={size} />;
-    case 'romanov':     return <RomanovIcon size={size} />;
-    case 'helmet':      return <HelmetIcon size={size} />;
-    case 'lyre':        return <LyreIcon size={size} />;
-    case 'candle':      return <CandleIcon size={size} />;
-    case 'wheat':       return <WheatIcon size={size} />;
-    case 'guitar':      return <GuitarIcon size={size} />;
-    case 'eyemystic':   return <EyeMysticIcon size={size} />;
-    case 'tablechem':   return <TableChemIcon size={size} />;
-    case 'flask':       return <FlaskIcon size={size} />;
-    case 'goblet':      return <GobletIcon size={size} />;
-    case 'jokercard':   return <JokerCardIcon size={size} />;
-    case 'wolf':        return <WolfIcon size={size} />;
-    case 'blades':      return <BladesIcon size={size} />;
-    case 'notebook':    return <NoteBookIcon size={size} />;
-    case 'cake':        return <CakeIcon size={size} />;
-    case 'wings':       return <WingsIcon size={size} />;
-    case 'titan':       return <TitanIcon size={size} />;
-    case 'saiyan':      return <SaiyanIcon size={size} />;
-    case 'strawhat':    return <StrawHatIcon size={size} />;
-    case 'boxingglove': return <BoxingGloveIcon size={size} />;
-    case 'soccerball':  return <SoccerBallIcon size={size} />;
-    case 'cigar':       return <CigarIcon size={size} />;
-    case 'rose':        return <RoseIcon size={size} />;
-    case 'fedora':      return <FedoraIcon size={size} />;
-    case 'pencil':      return <PencilIcon size={size} />;
-    case 'wand':        return <WandIcon size={size} />;
-    case 'lightsaber':  return <LightsaberIcon size={size} />;
-    case 'staff':       return <StaffIcon size={size} />;
-    case 'sharingan':   return <SharinganIcon size={size} />;
-    case 'flame':       return <FlameIcon size={size} />;
-    case 'threeswords': return <ThreeSwordsIcon size={size} />;
-    case 'leafband':    return <LeafBandIcon size={size} />;
-    case 'automail':    return <AutomailIcon size={size} />;
-    case 'cowboyhat':   return <CowboyHatIcon size={size} />;
-    case 'barcode':     return <BarcodeIcon size={size} />;
-    case 'hiddenblade': return <HiddenBladeIcon size={size} />;
-    case 'visor':       return <VisorIcon size={size} />;
-    case 'banner':      return <BannerIcon size={size} />;
-    case 'horde':       return <HordeIcon size={size} />;
-    case 'syringe':     return <SyringeIcon size={size} />;
-    case 'cane':        return <CaneIcon size={size} />;
-    case 'chidori':     return <ChidoriIcon size={size} />;
-    case 'gauntlet':    return <GauntletIcon size={size} />;
-    case 'muscle':      return <MuscleIcon size={size} />;
-    case 'morningstar': return <MorningStarIcon size={size} />;
-    case 'plug':        return <PlugIcon size={size} />;
-    case 'soap':        return <SoapIcon size={size} />;
-    case 'feather':     return <FeatherIcon size={size} />;
-    case 'bowlerhat':   return <BowlerHatIcon size={size} />;
-    case 'coinflip':    return <CoinFlipIcon size={size} />;
-    case 'chess':       return <ChessIcon size={size} />;
-    case 'warmap':      return <WarMapIcon size={size} />;
-    case 'mandala':     return <MandalaIcon size={size} />;
-    case 'ankh':        return <AnkhIcon size={size} />;
-    case 'dualgun':     return <DualGunIcon size={size} />;
-    case 'ring':        return <RingIcon size={size} />;
-    case 'mushroom':    return <MushroomIcon size={size} />;
-    case 'elderblood':  return <ElderBloodIcon size={size} />;
-    case 'sunflower':   return <SunflowerIcon size={size} />;
-    case 'carnation':   return <CarnationIcon size={size} />;
-    case 'fang':        return <FangIcon size={size} />;
-    case 'kunai':       return <KunaiIcon size={size} />;
-    case 'atfield':     return <AtFieldIcon size={size} />;
-    case 'thunderbolt': return <ThunderboltIcon size={size} />;
-    case 'moonsceptre': return <MoonSceptreIcon size={size} />;
-    case 'buster':      return <BusterIcon size={size} />;
-    case 'triforce':    return <TriforceIcon size={size} />;
-    case 'bandana':     return <BandanaIcon size={size} />;
-    case 'microphone':  return <MicrophoneIcon size={size} />;
-    case 'shades':      return <ShadesIcon size={size} />;
-    case 'web':         return <WebIcon size={size} />;
-    case 'batsymbol':   return <BatSymbolIcon size={size} />;
-    case 'champagne':   return <ChampagneIcon size={size} />;
-    case 'headdress':   return <HeaddressIcon size={size} />;
-    case 'lotus':       return <LotusIcon size={size} />;
-    case 'pipesmoke':   return <PipeSmokeIcon size={size} />;
-    case 'inkwell':     return <InkwellIcon size={size} />;
-    case 'baton':       return <BatonIcon size={size} />;
-    case 'pasta':       return <PastaIcon size={size} />;
-    case 'jumpman':     return <JumpmanIcon size={size} />;
-    case 'mouthguard':  return <MouthguardIcon size={size} />;
-    case 'scarf':       return <ScarfIcon size={size} />;
-    case 'powerup':     return <PowerupIcon size={size} />;
-    case 'dragonslayer':return <DragonslayerIcon size={size} />;
-    case 'eyepatch':    return <EyePatchIcon size={size} />;
-    case 'rebellion':   return <RebellionIcon size={size} />;
-    case 'compass2':    return <Compass2Icon size={size} />;
-    case 'spear':       return <SpearIcon size={size} />;
-    case 'glove':       return <GloveIcon size={size} />;
-    case 'rasta':       return <RastaIcon size={size} />;
-    case 'lips':        return <LipsIcon size={size} />;
-    case 'nunchaku':    return <NunchakuIcon size={size} />;
-    case 'zigzag':      return <ZigzagIcon size={size} />;
-    case 'cartouche':   return <CartoucheIcon size={size} />;
-    case 'spartan':     return <SpartanIcon size={size} />;
-    case 'cap':         return <CapIcon size={size} />;
-    case 'prism':       return <PrismIcon size={size} />;
-    case 'beaker':      return <BeakerIcon size={size} />;
-    case 'queencrown':  return <QueenCrownIcon size={size} />;
-    case 'racket':      return <RacketIcon size={size} />;
-    case 'worldcup':    return <WorldCupIcon size={size} />;
-    default:            return <BrainIcon size={size} />;
-  }
-}
 
 function TypingDot({ delay }: { delay: number }) {
   const anim = useRef(new Animated.Value(0)).current;
@@ -248,6 +69,8 @@ export default function ChatScreen() {
     navigate, currentCharacter, chats,
     addMessage, clearChat, deleteCharacter,
     user, favorites, toggleFavorite,
+    characterMoods, setCharacterMood,
+    isPremium, dailyLimitReached, todayMessageCount, openPaywall,
   } = useApp();
 
   const [inputText, setInputText]     = useState('');
@@ -255,18 +78,44 @@ export default function ChatScreen() {
   const [memoryOn, setMemoryOn]       = useState(true);
   const [statsVisible, setStatsVisible] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
-  const [sessionId, setSessionId]     = useState<string | null>(null);
+  const [moodPickerVisible, setMoodPickerVisible] = useState(false);
+  const [nsfwGateVisible, setNsfwGateVisible] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
   const charId   = currentCharacter?.id ?? '';
   const messages: Message[] = chats[charId] || [];
   const isEmptyChat = messages.length === 0;
   const isFavorite  = favorites.includes(charId);
+  const currentMood = characterMoods[charId] ?? null;
 
   // Редирект если персонаж не задан
   useEffect(() => {
     if (!currentCharacter) navigate('home');
   }, [currentCharacter]);
+
+  // Защита от скриншотов / записи экрана пока юзер в чате (D-extra).
+  // Android: блокирует и системные скриншоты, и захват экрана.
+  // iOS: добавляет наблюдатель на screenshot/recording, скриншот не блокируется
+  //      платформой, но запись экрана даёт чёрный кадр для секций которые
+  //      пометили как secure.
+  // На web — функция no-op.
+  useEffect(() => {
+    let active = true;
+    ScreenCapture.preventScreenCaptureAsync().catch(() => {});
+    return () => {
+      active = false;
+      ScreenCapture.allowScreenCaptureAsync().catch(() => {});
+      void active;
+    };
+  }, []);
+
+  // Возрастной gate при первом открытии NSFW персонажа (Задача 4).
+  useEffect(() => {
+    if (!currentCharacter || !currentCharacter.isNSFW) return;
+    isConsentValid('age_18').then(ok => {
+      if (!ok) setNsfwGateVisible(true);
+    });
+  }, [charId]);
 
   // Первое сообщение — добавляем когда чат пустой (включая после clearChat)
   useEffect(() => {
@@ -280,14 +129,12 @@ export default function ChatScreen() {
     });
   }, [charId, isEmptyChat]);
 
-  // Создаём API-сессию при открытии нового персонажа
-  useEffect(() => {
+  const handleMoodSelect = useCallback((moodId: string | null) => {
     if (!currentCharacter) return;
-    setSessionId(null);
-    getOrCreateSession(currentCharacter.id, currentCharacter.persona)
-      .then(id => setSessionId(id))
-      .catch(() => setSessionId(null));
-  }, [charId]);
+    // Stateless: persona подмешивается на каждый запрос, серверной сессии нет —
+    // менять mood можно прямо в полёте, новые ответы будут учитывать новый стиль.
+    setCharacterMood(currentCharacter.id, moodId);
+  }, [currentCharacter, setCharacterMood]);
 
   // Скролл вниз при новых сообщениях
   useEffect(() => {
@@ -300,6 +147,12 @@ export default function ChatScreen() {
     if (!currentCharacter) return;
     const text = inputText.trim();
     if (!text || isTyping) return;
+
+    // Дневной лимит для free-юзеров. Хук-точка триггера paywall.
+    if (dailyLimitReached) {
+      openPaywall('limit');
+      return;
+    }
     setInputText('');
 
     await addMessage(currentCharacter.id, {
@@ -311,43 +164,51 @@ export default function ChatScreen() {
     });
     setIsTyping(true);
 
+    // Stateless-протокол: persona + полная история уезжают на бэк каждый раз.
+    // Берём messages из state на момент клика и добавляем новое user-сообщение —
+    // это надёжнее чем ждать асинхронного setState из addMessage.
+    const persona = composePersona(
+      currentCharacter.persona,
+      currentMood,
+      currentCharacter.gender,
+    );
+    const history: ChatMessage[] = [
+      ...messages.map(m => ({
+        role: m.role,
+        content: m.text,
+      })),
+      { role: 'user', content: text },
+    ];
+
     try {
-      let responseText: string;
-      if (sessionId) {
-        responseText = await apiSendMessage(sessionId, text);
-      } else {
-        responseText = await getMockResponse(currentCharacter.id);
-      }
+      const responseText = await apiSendMessage(persona, history);
       await addMessage(currentCharacter.id, {
         id: `msg_${Date.now()}_c`,
         role: 'character',
-        text: responseText || '...',
+        text: responseText,
         time: formatTime(),
         date: new Date().toISOString(),
       });
     } catch {
-      try {
-        const fallback = await getMockResponse(currentCharacter.id);
-        await addMessage(currentCharacter.id, {
-          id: `msg_${Date.now()}_c`,
-          role: 'character',
-          text: fallback,
-          time: formatTime(),
-          date: new Date().toISOString(),
-        });
-      } catch {
-        await addMessage(currentCharacter.id, {
-          id: `msg_${Date.now()}_err`,
-          role: 'character',
-          text: 'Нет соединения с сервером. Проверь интернет.',
-          time: formatTime(),
-          date: new Date().toISOString(),
-        });
+      // Production: явная ошибка вместо mock'а — честнее по отношению к юзеру.
+      // В DEV mock-фолбэк остаётся, чтобы не блокировать разработку.
+      let errorText = 'Не удалось получить ответ. Проверьте интернет и попробуйте снова.';
+      if (__DEV__) {
+        try {
+          errorText = await getMockResponse(currentCharacter.id);
+        } catch {}
       }
+      await addMessage(currentCharacter.id, {
+        id: `msg_${Date.now()}_err`,
+        role: 'character',
+        text: errorText,
+        time: formatTime(),
+        date: new Date().toISOString(),
+      });
     } finally {
       setIsTyping(false);
     }
-  }, [inputText, isTyping, currentCharacter, addMessage, sessionId]);
+  }, [inputText, isTyping, currentCharacter, addMessage, messages, currentMood]);
 
   const handleClearChat = useCallback(() => {
     if (!currentCharacter) return;
@@ -359,16 +220,7 @@ export default function ChatScreen() {
         {
           text: 'Очистить',
           style: 'destructive',
-          onPress: () => {
-            const id = currentCharacter.id;
-            const persona = currentCharacter.persona;
-            clearChat(id);
-            // Последовательно: удаляем сессию → создаём новую
-            clearSession(id)
-              .then(() => getOrCreateSession(id, persona))
-              .then(newId => setSessionId(newId))
-              .catch(() => setSessionId(null));
-          },
+          onPress: () => clearChat(currentCharacter.id),
         },
       ]
     );
@@ -390,7 +242,6 @@ export default function ChatScreen() {
           text: 'Удалить',
           style: 'destructive',
           onPress: () => {
-            clearSession(currentCharacter.id).catch(() => {});
             deleteCharacter(currentCharacter.id);
             navigate('home');
           },
@@ -403,7 +254,7 @@ export default function ChatScreen() {
   if (!currentCharacter) return null;
 
   const character      = currentCharacter;
-  const gradientColors = cardBg[character.gradientKey as CardKey] ?? cardBg.freud;
+  const gradientColors = getCharacterGradient(character) as [string, string];
   const userMsgCount   = messages.filter(m => m.role === 'user').length;
   const charMsgCount   = messages.filter(m => m.role === 'character').length;
 
@@ -426,20 +277,26 @@ export default function ChatScreen() {
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
               style={s.charAvatar}
             >
-              <CharacterIcon iconType={character.iconType} size={20} />
+              <CharacterIcon iconType={character.iconType} size={20} avatarUri={character.avatarUri} />
             </LinearGradient>
             <View>
               <Text style={s.charName}>{character.name}</Text>
               <View style={s.statusRow}>
-                <View style={[s.statusDot, !sessionId && { backgroundColor: theme.text3 }]} />
-                <Text style={[s.statusText, !sessionId && { color: theme.text3 }]}>
-                  {sessionId ? 'В роли' : 'Подключение...'}
-                </Text>
+                <View style={s.statusDot} />
+                <Text style={s.statusText}>В роли</Text>
               </View>
             </View>
           </TouchableOpacity>
 
           <View style={s.headerActions}>
+            <TouchableOpacity
+              style={s.iconBtn}
+              onPress={() => setMoodPickerVisible(true)}
+              activeOpacity={0.7}
+            >
+              <SmileIcon size={18} color={currentMood ? '#FFFFFF' : theme.text2} />
+              {currentMood && <View style={s.moodIndicatorDot} />}
+            </TouchableOpacity>
             <TouchableOpacity style={s.iconBtn} onPress={() => toggleFavorite(character.id)} activeOpacity={0.7}>
               <StarIcon filled={isFavorite} color={isFavorite ? '#FFFFFF' : theme.text2} />
             </TouchableOpacity>
@@ -455,6 +312,14 @@ export default function ChatScreen() {
           </View>
         </View>
 
+        {/* Mood indicator under name */}
+        {currentMood && (
+          <View style={s.moodPill}>
+            <SmileIcon size={11} color={theme.text2} />
+            <Text style={s.moodPillText}>Стиль: {getMoodLabel(currentMood)}</Text>
+          </View>
+        )}
+
         {/* Memory bar */}
         <TouchableOpacity style={s.memBar} onPress={() => setMemoryOn(v => !v)} activeOpacity={0.8}>
           <BulbIcon color={memoryOn ? theme.text2 : theme.text3} />
@@ -465,6 +330,23 @@ export default function ChatScreen() {
             <View style={[s.memToggleKnob, !memoryOn && s.memToggleKnobOff]} />
           </View>
         </TouchableOpacity>
+
+        {/* Warning о лимите: показываем когда осталось ≤ 5 сообщений или лимит достигнут */}
+        {!isPremium && todayMessageCount >= FREE_DAILY_MESSAGES - 5 && (
+          <TouchableOpacity
+            style={s.limitBar}
+            onPress={() => openPaywall('limit')}
+            activeOpacity={0.85}
+          >
+            <LightningIcon size={14} color="#FFFFFF" />
+            <Text style={s.limitBarText}>
+              {dailyLimitReached
+                ? 'Дневной лимит исчерпан · Открыть Pro'
+                : `Осталось ${FREE_DAILY_MESSAGES - todayMessageCount} сообщений · Безлимит в Pro`}
+            </Text>
+            <ChevronRightIcon color={theme.text2} size={14} />
+          </TouchableOpacity>
+        )}
 
         {/* Messages */}
         <ScrollView
@@ -489,7 +371,7 @@ export default function ChatScreen() {
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                     style={s.msgAvatar}
                   >
-                    <CharacterIcon iconType={character.iconType} size={16} />
+                    <CharacterIcon iconType={character.iconType} size={16} avatarUri={character.avatarUri} />
                   </LinearGradient>
                 ) : (
                   <View style={[s.msgAvatar, { backgroundColor: '#2A2A2A' }]}>
@@ -515,7 +397,7 @@ export default function ChatScreen() {
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                 style={s.msgAvatar}
               >
-                <CharacterIcon iconType={character.iconType} size={16} />
+                <CharacterIcon iconType={character.iconType} size={16} avatarUri={character.avatarUri} />
               </LinearGradient>
               <View style={s.typingBubble}>
                 <TypingDot delay={0} />
@@ -526,29 +408,40 @@ export default function ChatScreen() {
           )}
         </ScrollView>
 
-        {/* Input */}
+        {/* Input — заменяется на CTA если лимит исчерпан */}
         <View style={s.inputWrap}>
-          <View style={s.inputRow}>
-            <TextInput
-              style={s.textInput}
-              placeholder={`Написать ${character.name.split(' ')[0]}...`}
-              placeholderTextColor={theme.text3}
-              multiline
-              value={inputText}
-              onChangeText={setInputText}
-              onSubmitEditing={sendMessageToChar}
-              underlineColorAndroid="transparent"
-              selectionColor={theme.text}
-            />
+          {dailyLimitReached ? (
             <TouchableOpacity
-              style={[s.sendBtn, (!inputText.trim() || isTyping) && { opacity: 0.4 }]}
-              onPress={sendMessageToChar}
-              activeOpacity={0.85}
-              disabled={!inputText.trim() || isTyping}
+              style={s.limitCta}
+              onPress={() => openPaywall('limit')}
+              activeOpacity={0.9}
             >
-              <SendIcon size={16} color="#000000" />
+              <Text style={s.limitCtaText}>Открыть Pro · безлимит сообщений</Text>
             </TouchableOpacity>
-          </View>
+          ) : (
+            <View style={s.inputRow}>
+              <TextInput
+                style={s.textInput}
+                placeholder={`Написать ${character.name.split(' ')[0]}...`}
+                placeholderTextColor={theme.text3}
+                multiline
+                value={inputText}
+                onChangeText={setInputText}
+                onSubmitEditing={sendMessageToChar}
+                maxLength={2000}
+                underlineColorAndroid="transparent"
+                selectionColor={theme.text}
+              />
+              <TouchableOpacity
+                style={[s.sendBtn, (!inputText.trim() || isTyping) && { opacity: 0.4 }]}
+                onPress={sendMessageToChar}
+                activeOpacity={0.85}
+                disabled={!inputText.trim() || isTyping}
+              >
+                <SendIcon size={16} color="#000000" />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </KeyboardAvoidingView>
 
@@ -578,6 +471,25 @@ export default function ChatScreen() {
         </TouchableOpacity>
       </Modal>
 
+      {/* Mood picker modal */}
+      <MoodPickerModal
+        visible={moodPickerVisible}
+        currentMood={currentMood}
+        characterIsNsfw={Boolean(character.isNSFW)}
+        onSelect={handleMoodSelect}
+        onClose={() => setMoodPickerVisible(false)}
+      />
+
+      {/* NSFW age-gate modal (Задача 4) */}
+      <AgeGateModal
+        visible={nsfwGateVisible}
+        onConfirm={() => setNsfwGateVisible(false)}
+        onCancel={() => {
+          setNsfwGateVisible(false);
+          navigate('home');
+        }}
+      />
+
       {/* Stats modal */}
       <Modal visible={statsVisible} transparent animationType="fade" onRequestClose={() => setStatsVisible(false)}>
         <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setStatsVisible(false)}>
@@ -587,7 +499,7 @@ export default function ChatScreen() {
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
               style={s.statsAvatar}
             >
-              <CharacterIcon iconType={character.iconType} size={28} />
+              <CharacterIcon iconType={character.iconType} size={28} avatarUri={character.avatarUri} />
             </LinearGradient>
             <Text style={s.statsName}>{character.name}</Text>
             <View style={s.statsRow}>
@@ -625,13 +537,28 @@ const s = StyleSheet.create({
   },
   backBtn: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   charInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  charAvatar: { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  charAvatar: { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   charName: { fontSize: 15, fontWeight: '600', letterSpacing: -0.3, color: theme.text },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
   statusDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: theme.green },
   statusText: { fontSize: 11, color: theme.green },
   headerActions: { flexDirection: 'row', gap: 4 },
   iconBtn: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  moodIndicatorDot: {
+    position: 'absolute', top: 7, right: 7,
+    width: 6, height: 6, borderRadius: 3,
+    backgroundColor: '#fff',
+  },
+  moodPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    alignSelf: 'flex-start',
+    marginHorizontal: 16, marginTop: 8,
+    paddingHorizontal: 10, paddingVertical: 4,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 12,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+  },
+  moodPillText: { fontSize: 11, color: theme.text2, fontWeight: '500' },
   memBar: {
     marginHorizontal: 16, marginTop: 10,
     backgroundColor: 'rgba(255,255,255,0.04)',
@@ -640,6 +567,19 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 8,
   },
   memBarText: { flex: 1, fontSize: 12, color: theme.text2 },
+  limitBar: {
+    marginHorizontal: 16, marginTop: 8,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+  },
+  limitBarText: { flex: 1, fontSize: 12, color: theme.text, fontWeight: '500' },
+  limitCta: {
+    backgroundColor: '#FFFFFF', borderRadius: 16,
+    paddingVertical: 14, alignItems: 'center',
+  },
+  limitCtaText: { fontSize: 14, fontWeight: '700', color: '#000', letterSpacing: -0.2 },
   memToggle: {
     width: 32, height: 18, backgroundColor: '#FFFFFF',
     borderRadius: 9, alignItems: 'flex-end', paddingRight: 2, justifyContent: 'center',
@@ -654,7 +594,7 @@ const s = StyleSheet.create({
   dateText: { fontSize: 11, color: theme.text3 },
   msgRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-end', marginBottom: 4 },
   msgRowUser: { flexDirection: 'row-reverse' },
-  msgAvatar: { width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  msgAvatar: { width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' },
   msgContent: { maxWidth: '78%' },
   bubble: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 18 },
   bubbleChar: {
@@ -699,7 +639,7 @@ const s = StyleSheet.create({
     backgroundColor: theme.surface2, borderWidth: 1, borderColor: theme.border,
     borderRadius: 24, padding: 28, alignItems: 'center', width: 280, gap: 16,
   },
-  statsAvatar: { width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  statsAvatar: { width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   statsName: { fontSize: 17, fontWeight: '700', color: theme.text, letterSpacing: -0.4 },
   statsRow: { flexDirection: 'row', alignItems: 'center' },
   statItem: { alignItems: 'center', paddingHorizontal: 20 },

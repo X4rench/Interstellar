@@ -6,21 +6,20 @@
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
-
     "icon": "./assets/icon.png",
-
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#000000"
     },
-
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.yourcompany.interstellar",
-      "buildNumber": "1"
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
-
     "android": {
       "package": "com.yourcompany.interstellar",
       "versionCode": 1,
@@ -29,18 +28,25 @@
         "backgroundColor": "#000000"
       },
       "statusBarColor": "#000000",
-      "statusBarTranslucent": true
+      "statusBarTranslucent": true,
+      "allowBackup": false,
+      "usesCleartextTraffic": false
     },
-
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
-
     "plugins": [
-      "expo-asset"
+      "expo-asset",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Приложение запрашивает доступ к фотографиям, чтобы установить картинку аватара персонажа."
+        }
+      ],
+      "@sentry/react-native"
     ],
-
     "extra": {
       "eas": {
         "projectId": "ВСТАВЬ_СВОЙ_EAS_PROJECT_ID"

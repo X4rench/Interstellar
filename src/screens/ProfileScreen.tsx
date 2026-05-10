@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Modal, TextInput, Image,
 } from 'react-native';
@@ -7,38 +7,55 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../theme';
 import {
   ChevronRightIcon, UserIcon, SettingsIcon,
-  BellIcon, ShieldIcon, LogoutIcon,
-  SparkleIcon, InfinityIcon, BrainIcon, LightningIcon,
-  AgeRestrictedIcon, StarIcon, PaletteIcon,
+  BellIcon, LogoutIcon, ShieldIcon,
 } from '../icons';
 import BottomNav from '../components/BottomNav';
-import { useApp } from '../context/AppContext';
+import { useApp, FREE_DAILY_MESSAGES } from '../context/AppContext';
+import type { LegalDocId } from '../utils/consent';
 
 const SETTINGS = [
-  { id: 'profile',  label: 'Редактировать профиль',           Icon: UserIcon,     danger: false },
-  { id: 'plan',     label: 'Подписка и оплата',                Icon: SettingsIcon, danger: false },
-  { id: 'notifs',   label: 'Уведомления',                      Icon: BellIcon,     danger: false },
-  { id: 'privacy',  label: 'Безопасность и конфиденциальность', Icon: ShieldIcon,  danger: false },
-  { id: 'logout',   label: 'Выйти',                            Icon: LogoutIcon,   danger: true  },
+  { id: 'profile',     label: 'Редактировать профиль', Icon: UserIcon,     danger: false },
+  { id: 'plan',        label: 'Подписка и оплата',     Icon: SettingsIcon, danger: false },
+  { id: 'notifs',      label: 'Уведомления',           Icon: BellIcon,     danger: false },
+  { id: 'clear_chats', label: 'Очистить историю',      Icon: ShieldIcon,   danger: false },
+  { id: 'logout',      label: 'Выйти',                 Icon: LogoutIcon,   danger: true  },
+  { id: 'delete',      label: 'Удалить аккаунт',       Icon: LogoutIcon,   danger: true  },
 ] as const;
 
-const PRO_FEATURES: { Icon: React.ComponentType<{ size?: number; color?: string }>; text: string }[] = [
-  { Icon: InfinityIcon,       text: 'Неограниченные сообщения' },
-  { Icon: BrainIcon,          text: 'Расширенная долгосрочная память' },
-  { Icon: LightningIcon,      text: 'Приоритетные ответы без задержек' },
-  { Icon: AgeRestrictedIcon,  text: 'Доступ ко всему контенту 18+' },
-  { Icon: StarIcon,           text: 'Эксклюзивные персонажи' },
-  { Icon: PaletteIcon,        text: 'Кастомные темы и фоны' },
+const LEGAL_LINKS: { id: LegalDocId; label: string }[] = [
+  { id: 'privacy_policy',   label: 'Конфиденциальность' },
+  { id: 'terms_of_service', label: 'Условия' },
+  { id: 'personal_data',    label: '152-ФЗ' },
+  { id: 'subscription',     label: 'Подписка' },
+  { id: 'about',            label: 'О приложении' },
 ];
 
+// Дата → русский формат "1 мая 2026"
+function formatRuDate(iso: string | null): string {
+  if (!iso) return '—';
+  const months = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+  const d = new Date(iso);
+  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+type DangerStage = null | 'clear_chats' | 'delete' | 'delete_busy';
+
 export default function ProfileScreen() {
-  const { navigate, logout, user, setUser, characters, chats, todayMessageCount, streakDays } = useApp();
+  const {
+    navigate, logout, user, setUser, characters, chats,
+    todayMessageCount, streakDays, setLegalDocId,
+    isPremium, subscription, openPaywall, cancelSubscription,
+    clearAllChats, deleteAccountFully,
+  } = useApp();
 
   const [editVisible, setEditVisible] = useState(false);
-  const [proVisible, setProVisible] = useState(false);
   const [notifsVisible, setNotifsVisible] = useState(false);
+  const [subVisible, setSubVisible] = useState(false);
+  // Двухстадийная отмена в одной модалке: false — статус, true — confirm.
+  const [cancelStage, setCancelStage] = useState(false);
+  // Универсальная confirm-модалка для destructive operations (W2/W3).
+  const [dangerStage, setDangerStage] = useState<DangerStage>(null);
   const [editName, setEditName] = useState('');
-  const [notifsOn, setNotifsOn] = useState(true);
 
   const totalMessages = useMemo(() =>
     Object.values(chats).reduce((acc, msgs) => acc + msgs.length, 0),
@@ -64,21 +81,60 @@ export default function ProfileScreen() {
       return;
     }
     if (id === 'plan') {
-      setProVisible(true);
+      // Pro-юзер: показываем меню управления подпиской.
+      // Free: показываем paywall.
+      if (isPremium) {
+        setCancelStage(false);
+        setSubVisible(true);
+      } else {
+        openPaywall('manual');
+      }
       return;
     }
     if (id === 'notifs') {
       setNotifsVisible(true);
       return;
     }
-    if (id === 'privacy') {
-      Alert.alert(
-        'Конфиденциальность',
-        'Все данные хранятся локально на вашем устройстве и не передаются третьим лицам.',
-        [{ text: 'Понятно' }]
-      );
+    if (id === 'clear_chats') {
+      setDangerStage('clear_chats');
       return;
     }
+    if (id === 'delete') {
+      setDangerStage('delete');
+      return;
+    }
+  };
+
+  // Подтверждение и выполнение destructive operation.
+  // Все ошибки ловим в Alert — modal закрывается в любом случае.
+  const performDanger = async () => {
+    if (dangerStage === 'clear_chats') {
+      try {
+        await clearAllChats();
+      } catch {}
+      setDangerStage(null);
+      return;
+    }
+    if (dangerStage === 'delete') {
+      setDangerStage('delete_busy');
+      try {
+        await deleteAccountFully();
+        // Успех: deleteAccountFully уже сбросил всё state и перешёл на splash.
+      } catch (e) {
+        // Бэк недоступен — локально всё равно почистили.
+        Alert.alert(
+          'Аккаунт удалён локально',
+          'Не удалось связаться с сервером. Данные на устройстве удалены, серверная запись будет удалена при следующем подключении.',
+        );
+      } finally {
+        setDangerStage(null);
+      }
+    }
+  };
+
+  const openLegal = (docId: LegalDocId) => {
+    setLegalDocId(docId);
+    navigate('legal');
   };
 
   const handleSaveName = () => {
@@ -122,23 +178,47 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <View style={s.planCard}>
-          <View style={s.planTop}>
-            <Text style={s.planTitle}>Бесплатный план</Text>
-            <TouchableOpacity style={s.proBtn} onPress={() => setProVisible(true)} activeOpacity={0.85}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                <Text style={s.proBtnText}>Pro</Text>
-                <Image source={require('../icons/invertLogo.png')} style={{ width: 31, height: 15 }} />
+        {isPremium ? (
+          <View style={s.planCardPro}>
+            <View style={s.planTop}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Image source={require('../icons/invertLogo.png')} style={{ width: 28, height: 14, tintColor: '#000' }} />
+                <Text style={s.planTitlePro}>Pro активна</Text>
               </View>
-            </TouchableOpacity>
+              {subscription?.isTrial && (
+                <View style={s.trialBadge}>
+                  <Text style={s.trialBadgeText}>ТРИАЛ</Text>
+                </View>
+              )}
+            </View>
+            <Text style={s.planExpires}>
+              {subscription?.cancelledAt
+                ? `Отменена · активна до ${formatRuDate(subscription.expiresAt)}`
+                : `Активна до ${formatRuDate(subscription?.expiresAt ?? null)}`}
+            </Text>
+            <Text style={s.planBenefits}>Безлимит сообщений · Все 18+ · Без рекламы</Text>
           </View>
-          <View style={s.usageRow}>
-            <Text style={s.usageText}>{Math.min(todayMessageCount, 50)}/50 сообщений сегодня</Text>
+        ) : (
+          <View style={s.planCard}>
+            <View style={s.planTop}>
+              <Text style={s.planTitle}>Бесплатный план</Text>
+              <TouchableOpacity style={s.proBtn} onPress={() => openPaywall('manual')} activeOpacity={0.85}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                  <Text style={s.proBtnText}>Pro</Text>
+                  <Image source={require('../icons/invertLogo.png')} style={{ width: 31, height: 15 }} />
+                </View>
+              </TouchableOpacity>
+            </View>
+            <View style={s.usageRow}>
+              <Text style={s.usageText}>
+                {Math.min(todayMessageCount, FREE_DAILY_MESSAGES)}/{FREE_DAILY_MESSAGES} сообщений сегодня
+              </Text>
+            </View>
+            <View style={s.progressBar}>
+              <View style={[s.progressFill, { width: `${Math.min((todayMessageCount / FREE_DAILY_MESSAGES) * 100, 100)}%` }]} />
+            </View>
           </View>
-          <View style={s.progressBar}>
-            <View style={[s.progressFill, { width: `${Math.min((todayMessageCount / 50) * 100, 100)}%` }]} />
-          </View>
-        </View>
+        )}
 
         <View style={s.settingsList}>
           {SETTINGS.map((item, i) => (
@@ -159,7 +239,19 @@ export default function ProfileScreen() {
           ))}
         </View>
 
-        <View style={{ height: 24 }} />
+        {/* Правовые ссылки */}
+        <View style={s.legalFooter}>
+          {LEGAL_LINKS.map((link, i) => (
+            <React.Fragment key={link.id}>
+              {i > 0 && <Text style={s.legalDot}>·</Text>}
+              <TouchableOpacity onPress={() => openLegal(link.id)} activeOpacity={0.6}>
+                <Text style={s.legalLink}>{link.label}</Text>
+              </TouchableOpacity>
+            </React.Fragment>
+          ))}
+        </View>
+
+        <View style={{ height: 16 }} />
       </ScrollView>
 
       <BottomNav activeTab="profile" />
@@ -178,6 +270,7 @@ export default function ProfileScreen() {
               autoFocus
               returnKeyType="done"
               onSubmitEditing={handleSaveName}
+              maxLength={40}
               underlineColorAndroid="transparent"
             />
             <View style={s.editBtns}>
@@ -192,55 +285,192 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </Modal>
 
-      {/* Pro modal */}
-      <Modal visible={proVisible} transparent animationType="fade" onRequestClose={() => setProVisible(false)}>
-        <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setProVisible(false)}>
-          <TouchableOpacity style={s.proCard} activeOpacity={1} onPress={() => {}}>
-            <View style={s.proTitleRow}>
-              <Text style={s.proTitle}>Интерстеллар Pro</Text>
-              <Image source={require('../icons/invertLogo.png')} style={{ width: 50, height: 26, tintColor: theme.text, marginTop: 6 }} />
+      {/* Notifications modal — push-уведомления пока НЕ реализованы.
+          Toggle disabled, чтобы не вводить юзера в заблуждение. См. MANUAL_TODO.md. */}
+      <Modal visible={notifsVisible} transparent animationType="fade" onRequestClose={() => setNotifsVisible(false)}>
+        <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setNotifsVisible(false)}>
+          <TouchableOpacity style={s.editCard} activeOpacity={1} onPress={() => {}}>
+            <Text style={s.editTitle}>Уведомления</Text>
+            <View style={[s.notifRow, { opacity: 0.5 }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.notifLabel}>Push-уведомления</Text>
+                <Text style={[s.usageText, { marginTop: 4 }]}>Сейчас недоступны</Text>
+              </View>
+              <View style={s.toggle}>
+                <View style={[s.toggleKnob, { left: 3, right: undefined, backgroundColor: '#fff' }]} />
+              </View>
             </View>
-            <Text style={s.proSubtitle}>Открой полный доступ</Text>
-            <View style={s.proFeatures}>
-              {PRO_FEATURES.map(f => (
-                <View key={f.text} style={s.proFeatureRow}>
-                  <f.Icon size={15} color={theme.text2} />
-                  <Text style={s.proFeature}>{f.text}</Text>
-                </View>
-              ))}
-            </View>
-            <TouchableOpacity style={s.proBuyBtn} activeOpacity={0.9}
-              onPress={() => { setProVisible(false); Alert.alert('Скоро', 'Оплата появится в ближайшем обновлении.'); }}>
-              <Text style={s.proBuyText}>299 ₽ / месяц</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setProVisible(false)} activeOpacity={0.7}>
-              <Text style={s.proClose}>Не сейчас</Text>
+            <TouchableOpacity style={s.editBtnSave} onPress={() => setNotifsVisible(false)} activeOpacity={0.85}>
+              <Text style={s.editBtnSaveText}>Готово</Text>
             </TouchableOpacity>
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
 
-      {/* Notifications modal */}
-      <Modal visible={notifsVisible} transparent animationType="fade" onRequestClose={() => setNotifsVisible(false)}>
-        <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setNotifsVisible(false)}>
+      {/* Subscription management modal — для Pro-юзеров.
+          Двухстадийная: cancelStage=false → статус, true → confirm отмены. */}
+      <Modal
+        visible={subVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { setSubVisible(false); setCancelStage(false); }}
+      >
+        <TouchableOpacity
+          style={s.modalOverlay}
+          activeOpacity={1}
+          onPress={() => { setSubVisible(false); setCancelStage(false); }}
+        >
           <TouchableOpacity style={s.editCard} activeOpacity={1} onPress={() => {}}>
-            <Text style={s.editTitle}>Уведомления</Text>
-            <TouchableOpacity
-              style={s.notifRow}
-              onPress={() => setNotifsOn(v => !v)}
-              activeOpacity={0.8}
-            >
-              <Text style={s.notifLabel}>Push-уведомления</Text>
-              <View style={[s.toggle, notifsOn && s.toggleOn]}>
-                <View style={[s.toggleKnob, notifsOn
-                  ? { right: 3, left: undefined, backgroundColor: '#000' }
-                  : { left: 3, right: undefined, backgroundColor: '#fff' }
-                ]} />
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity style={s.editBtnSave} onPress={() => setNotifsVisible(false)} activeOpacity={0.85}>
-              <Text style={s.editBtnSaveText}>Готово</Text>
-            </TouchableOpacity>
+            {!cancelStage ? (
+              <>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Image source={require('../icons/invertLogo.png')} style={{ width: 32, height: 16, tintColor: theme.text }} />
+                  <Text style={s.editTitle}>
+                    {subscription?.isTrial ? 'Триал Pro' : 'Подписка Pro'}
+                  </Text>
+                </View>
+                <View style={s.subInfoRow}>
+                  <Text style={s.subInfoLabel}>Статус</Text>
+                  <Text style={s.subInfoValue}>
+                    {subscription?.cancelledAt
+                      ? 'Отменена'
+                      : subscription?.isTrial ? 'Бесплатный период' : 'Активна'}
+                  </Text>
+                </View>
+                <View style={s.subInfoRow}>
+                  <Text style={s.subInfoLabel}>Тариф</Text>
+                  <Text style={s.subInfoValue}>
+                    {subscription?.isTrial ? 'Пробный · далее месяц' : 'Месяц'}
+                  </Text>
+                </View>
+                <View style={s.subInfoRow}>
+                  <Text style={s.subInfoLabel}>
+                    {subscription?.isTrial ? 'Списание' : 'Действует до'}
+                  </Text>
+                  <Text style={s.subInfoValue}>
+                    {formatRuDate(subscription?.expiresAt ?? null)}
+                  </Text>
+                </View>
+
+                {!subscription?.cancelledAt && (
+                  <TouchableOpacity
+                    style={s.subDangerBtn}
+                    onPress={() => setCancelStage(true)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={s.subDangerText}>Отменить подписку</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  style={s.editBtnSave}
+                  onPress={() => setSubVisible(false)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={s.editBtnSaveText}>Закрыть</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={s.editTitle}>Отменить подписку?</Text>
+                <Text style={s.subConfirmText}>
+                  {subscription?.isTrial
+                    ? `Триал останется активен до ${formatRuDate(subscription.expiresAt)}. После — без автопродления.`
+                    : `Pro останется активна до ${formatRuDate(subscription?.expiresAt ?? null)}. После — без автопродления.`}
+                </Text>
+                <View style={s.editBtns}>
+                  <TouchableOpacity
+                    style={s.editBtnCancel}
+                    onPress={() => setCancelStage(false)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={s.editBtnCancelText}>Назад</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={s.subConfirmBtn}
+                    onPress={async () => {
+                      await cancelSubscription();
+                      setCancelStage(false);
+                      setSubVisible(false);
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={s.subConfirmBtnText}>Отменить</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Destructive confirm modal — для очистки чатов и удаления аккаунта (W2/W3). */}
+      <Modal
+        visible={dangerStage !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => dangerStage !== 'delete_busy' && setDangerStage(null)}
+      >
+        <TouchableOpacity
+          style={s.modalOverlay}
+          activeOpacity={1}
+          onPress={() => dangerStage !== 'delete_busy' && setDangerStage(null)}
+        >
+          <TouchableOpacity style={s.editCard} activeOpacity={1} onPress={() => {}}>
+            {dangerStage === 'clear_chats' && (
+              <>
+                <Text style={s.editTitle}>Очистить всю историю?</Text>
+                <Text style={s.subConfirmText}>
+                  Все диалоги со всеми персонажами будут удалены безвозвратно.
+                  Подписка и кастомные персонажи останутся.
+                </Text>
+                <View style={s.editBtns}>
+                  <TouchableOpacity
+                    style={s.editBtnCancel}
+                    onPress={() => setDangerStage(null)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={s.editBtnCancelText}>Отмена</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={s.subConfirmBtn}
+                    onPress={performDanger}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={s.subConfirmBtnText}>Очистить</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+            {(dangerStage === 'delete' || dangerStage === 'delete_busy') && (
+              <>
+                <Text style={s.editTitle}>Удалить аккаунт?</Text>
+                <Text style={s.subConfirmText}>
+                  Удаляются: профиль, все чаты, кастомные персонажи, подписка
+                  и все настройки. Это действие нельзя отменить.
+                </Text>
+                <View style={s.editBtns}>
+                  <TouchableOpacity
+                    style={s.editBtnCancel}
+                    onPress={() => setDangerStage(null)}
+                    activeOpacity={0.8}
+                    disabled={dangerStage === 'delete_busy'}
+                  >
+                    <Text style={s.editBtnCancelText}>Отмена</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[s.subConfirmBtn, dangerStage === 'delete_busy' && { opacity: 0.5 }]}
+                    onPress={performDanger}
+                    activeOpacity={0.85}
+                    disabled={dangerStage === 'delete_busy'}
+                  >
+                    <Text style={s.subConfirmBtnText}>
+                      {dangerStage === 'delete_busy' ? 'Удаление...' : 'Удалить навсегда'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
@@ -272,8 +502,21 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: theme.border,
     borderRadius: 18, padding: 16, gap: 10,
   },
+  planCardPro: {
+    marginHorizontal: 20, marginBottom: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18, padding: 16, gap: 6,
+  },
   planTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  planTitle: { fontSize: 15, fontWeight: '600', color: theme.text },
+  planTitle:    { fontSize: 15, fontWeight: '600', color: theme.text },
+  planTitlePro: { fontSize: 15, fontWeight: '700', color: '#000', letterSpacing: -0.3 },
+  planExpires:  { fontSize: 13, color: '#222', fontWeight: '500' },
+  planBenefits: { fontSize: 11, color: '#555' },
+  trialBadge: {
+    backgroundColor: '#000', borderRadius: 6,
+    paddingVertical: 3, paddingHorizontal: 7,
+  },
+  trialBadgeText: { fontSize: 9, fontWeight: '800', color: '#fff', letterSpacing: 0.4 },
   proBtn: {
     backgroundColor: '#fff', borderRadius: 6,
     paddingVertical: 5, paddingHorizontal: 10,
@@ -333,23 +576,35 @@ const s = StyleSheet.create({
   },
   editBtnSaveText: { fontSize: 14, fontWeight: '700', color: '#000' },
 
-  // Pro modal
-  proCard: {
-    backgroundColor: theme.surface2, borderWidth: 1, borderColor: theme.border,
-    borderRadius: 24, padding: 28, width: '100%', alignItems: 'center', gap: 16,
+  // Subscription modal
+  subInfoRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1, borderBottomColor: theme.border,
   },
-  proTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 1 },
-  proTitle: { fontSize: 22, fontWeight: '800', color: theme.text, letterSpacing: -0.6 },
-  proSubtitle: { fontSize: 13, color: theme.text3, marginTop: -8 },
-  proFeatures: { width: '100%', gap: 10 },
-  proFeatureRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  proFeature: { fontSize: 14, color: theme.text, lineHeight: 20, flex: 1 },
-  proBuyBtn: {
-    backgroundColor: '#fff', borderRadius: 16, width: '100%',
-    paddingVertical: 16, alignItems: 'center',
+  subInfoLabel: { fontSize: 13, color: theme.text3 },
+  subInfoValue: { fontSize: 14, color: theme.text, fontWeight: '600' },
+  subDangerBtn: {
+    backgroundColor: 'rgba(255,68,68,0.1)',
+    borderWidth: 1, borderColor: 'rgba(255,68,68,0.3)',
+    borderRadius: 12, paddingVertical: 12, alignItems: 'center',
   },
-  proBuyText: { fontSize: 16, fontWeight: '700', color: '#000' },
-  proClose: { fontSize: 13, color: theme.text3, paddingVertical: 4 },
+  subDangerText: { fontSize: 14, fontWeight: '600', color: '#FF4444' },
+  subConfirmText: { fontSize: 13, color: theme.text2, lineHeight: 19 },
+  subConfirmBtn: {
+    flex: 1, backgroundColor: '#FF4444', borderRadius: 12,
+    paddingVertical: 12, alignItems: 'center',
+  },
+  subConfirmBtnText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+
+  // Legal footer
+  legalFooter: {
+    flexDirection: 'row', flexWrap: 'wrap',
+    justifyContent: 'center', alignItems: 'center',
+    gap: 6, paddingHorizontal: 24, paddingTop: 20,
+  },
+  legalLink: { fontSize: 11, color: theme.text3, letterSpacing: 0.1 },
+  legalDot:  { fontSize: 11, color: theme.border },
 
   // Notifs
   notifRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
