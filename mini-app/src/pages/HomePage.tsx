@@ -136,8 +136,9 @@ export function HomePage() {
       <div className={styles.body}>
         {/* Категории — пилюли всегда видимы. Тап на категорию = фильтрация.
             Показываем только те категории где реально есть персонажи.
-            marginTop добавляет дыхание между search и пилюлями. */}
-        <div className={styles.hScroll} style={{ marginTop: 14, marginBottom: 4 }}>
+            paddingTop добавляет дыхание между search и пилюлями (важно на Android
+            где searchBar margin-bottom не такой как на iOS). */}
+        <div className={styles.hScroll} style={{ paddingTop: 20, marginBottom: 6 }}>
           {availableCats.map((cat) => (
             <button
               key={cat}

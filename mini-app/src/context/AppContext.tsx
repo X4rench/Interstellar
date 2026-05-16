@@ -437,7 +437,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // ─── Профиль из TG initData ─────────────────────────────────────────
   const userName = tgUser?.first_name || 'Гость'
-  const userAvatarLetter = userName[0]?.toUpperCase() || 'A'
+  // Array.from корректно итерирует по grapheme/code points, поддерживает emoji.
+  const firstChar = Array.from(userName)[0] || 'И'
+  const userAvatarLetter = /\p{Letter}/u.test(firstChar) ? firstChar.toUpperCase() : firstChar
 
   // ─── deleteAccountFully ─────────────────────────────────────────────
   const deleteAccountFully = useCallback(async () => {

@@ -114,9 +114,8 @@
 }
 
 .list {
-  background: #0D0D0D;
-  border: 1px solid #242424;
-  border-radius: 12px;
+  background: #111;
+  border-radius: 14px;
   overflow: hidden;
 }
 
@@ -127,7 +126,7 @@
   padding: 14px 16px;
   background: transparent;
   border: 0;
-  border-bottom: 1px solid #242424;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   cursor: pointer;
   font-family: inherit;
   width: 100%;

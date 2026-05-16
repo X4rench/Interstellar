@@ -65,7 +65,14 @@ export function ProfilePage() {
 
   const displayName = [tgUser?.first_name, tgUser?.last_name].filter(Boolean).join(' ') || 'Гость'
   const handle = tgUser?.username ? `@${tgUser.username}` : '(без username)'
-  const avatarLetter = (tgUser?.first_name?.[0] || 'A').toUpperCase()
+  // Array.from корректно итерирует по code points (а не UTF-16 units),
+  // поэтому первая буква emoji (например 🫧) не сломается на half-surrogate.
+  const firstGrapheme = tgUser?.first_name ? Array.from(tgUser.first_name)[0] : null
+  // Если first grapheme — это emoji, оставляем как есть (не toUpperCase эмодзи).
+  // Если буква — делаем uppercase. Fallback: «И» (Интерстеллар).
+  const avatarLetter = firstGrapheme
+    ? (/\p{Letter}/u.test(firstGrapheme) ? firstGrapheme.toUpperCase() : firstGrapheme)
+    : 'И'
 
   const handleClearChats = async () => {
     const ok = await appConfirm({
