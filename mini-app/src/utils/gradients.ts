@@ -24,18 +24,18 @@ export interface CustomGradient {
 }
 
 export const CUSTOM_GRADIENTS: readonly CustomGradient[] = [
-  { id: 'royal',    colors: ['#1A0F2E', '#3D1A6B'], label: 'Королевский' },  // тёмно-фиолетовый
-  { id: 'sunset',   colors: ['#2A0E1A', '#7B1A3D'], label: 'Закат'        }, // винный
-  { id: 'gold',     colors: ['#2A1F0A', '#7B5A1A'], label: 'Золото'       }, // тёмно-золотой
-  { id: 'ocean',    colors: ['#0A1F3A', '#1A4D7B'], label: 'Океан'        }, // синий
-  { id: 'forest',   colors: ['#0E2A1A', '#1A5B3D'], label: 'Лес'          }, // изумруд
-  { id: 'volcano',  colors: ['#2A0E0E', '#7B1A1A'], label: 'Лава'         }, // красно-чёрный
-  { id: 'sakura',   colors: ['#2A1A1F', '#7B3D5A'], label: 'Сакура'       }, // розово-сливовый
-  { id: 'midnight', colors: ['#0A0F1A', '#1A2A4D'], label: 'Полночь'      }, // ночной синий
-  { id: 'mint',     colors: ['#0A2A2A', '#1A6B5B'], label: 'Мята'         }, // бирюзовый
-  { id: 'amber',    colors: ['#2A1A0A', '#7B4D1A'], label: 'Янтарь'       }, // янтарный
-  { id: 'shadow',   colors: ['#111111', '#1e1e1e'], label: 'Тень'         }, // классический чёрный
-  { id: 'silver',   colors: ['#1F1F1F', '#3D3D3D'], label: 'Сталь'        }, // светло-серый
+  { id: 'shadow',   colors: ['#111111', '#1e1e1e'], label: 'Чёрный'      }, // дефолт — классический чёрный
+  { id: 'royal',    colors: ['#1A0F2E', '#3D1A6B'], label: 'Королевский' }, // тёмно-фиолетовый
+  { id: 'sunset',   colors: ['#2A0E1A', '#7B1A3D'], label: 'Закат'       }, // винный
+  { id: 'gold',     colors: ['#2A1F0A', '#7B5A1A'], label: 'Золото'      }, // тёмно-золотой
+  { id: 'ocean',    colors: ['#0A1F3A', '#1A4D7B'], label: 'Океан'       }, // синий
+  { id: 'forest',   colors: ['#0E2A1A', '#1A5B3D'], label: 'Лес'         }, // изумруд
+  { id: 'volcano',  colors: ['#2A0E0E', '#7B1A1A'], label: 'Лава'        }, // красно-чёрный
+  { id: 'sakura',   colors: ['#2A1A1F', '#7B3D5A'], label: 'Сакура'      }, // розово-сливовый
+  { id: 'midnight', colors: ['#0A0F1A', '#1A2A4D'], label: 'Полночь'     }, // ночной синий
+  { id: 'mint',     colors: ['#0A2A2A', '#1A6B5B'], label: 'Мята'        }, // бирюзовый
+  { id: 'amber',    colors: ['#2A1A0A', '#7B4D1A'], label: 'Янтарь'      }, // янтарный
+  { id: 'silver',   colors: ['#1F1F1F', '#3D3D3D'], label: 'Сталь'       }, // светло-серый
 ] as const;
 
 /**
