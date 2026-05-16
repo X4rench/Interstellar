@@ -210,8 +210,8 @@
 /* ── Upgrade banner ───────────────────────────────────────────────── */
 .upgradeBanner {
   margin: 16px 20px 0;
-  background: #161616;
-  border: 1px solid #303030;
+  background: #000;
+  border: 1px solid #222;
   border-radius: 16px;
   padding: 14px;
   display: flex;

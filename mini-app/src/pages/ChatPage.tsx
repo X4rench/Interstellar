@@ -10,7 +10,6 @@ import { getMockResponse } from '../utils/mockAI'
 
 import {
   BackIcon,
-  BulbIcon,
   SendIcon,
   SmileIcon,
   LightningIcon,
@@ -89,7 +88,6 @@ export function ChatPage() {
   // ── State ─────────────────────────────────────────────────────────
   const [inputText, setInputText] = useState('')
   const [isTyping, setIsTyping] = useState(false)
-  const [memoryOn, setMemoryOn] = useState(true)
   const [statsVisible, setStatsVisible] = useState(false)
   const [menuVisible, setMenuVisible] = useState(false)
   const [moodPickerVisible, setMoodPickerVisible] = useState(false)
@@ -315,17 +313,6 @@ export function ChatPage() {
           Стиль: {getMoodLabel(currentMood)}
         </span>
       )}
-
-      {/* Memory bar */}
-      <button className={styles.memBar} onClick={() => setMemoryOn((v) => !v)}>
-        <BulbIcon color={memoryOn ? '#888' : '#666'} />
-        <span className={`${styles.memBarText} ${!memoryOn ? styles.memBarTextOff : ''}`}>
-          {memoryOn ? 'Долгосрочная память включена' : 'Долгосрочная память выключена'}
-        </span>
-        <span className={`${styles.memToggle} ${!memoryOn ? styles.memToggleOff : ''}`}>
-          <span className={`${styles.memToggleKnob} ${!memoryOn ? styles.memToggleKnobOff : ''}`} />
-        </span>
-      </button>
 
       {/* Limit warning — показываем только Free юзерам когда осталось мало */}
       {tier === 'free' && freeMessagesRemaining !== null && freeMessagesRemaining <= 5 && (

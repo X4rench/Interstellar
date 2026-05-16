@@ -243,6 +243,40 @@ export function CreatePage() {
           </div>
         </div>
 
+        {/* Цвет карточки — сразу после превью чтобы юзер видел изменение */}
+        <div className={styles.field}>
+          <label className={styles.label}>Цвет карточки</label>
+          <div className={styles.gradientGrid}>
+            {CUSTOM_GRADIENTS.map((g, i) => (
+              <button
+                key={g.id}
+                className={`${styles.gradientCell} ${i === gradientIdx ? styles.gradientCellActive : ''}`}
+                style={{ background: `linear-gradient(135deg, ${g.colors[0]}, ${g.colors[1]})` }}
+                onClick={() => setGradientIdx(i)}
+                aria-label={g.label}
+                title={g.label}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Иконка — тоже сверху, рядом с превью */}
+        <div className={styles.field}>
+          <label className={styles.label}>Иконка</label>
+          <div className={styles.iconGrid}>
+            {ICON_CHOICES.map((c, i) => (
+              <button
+                key={c.id}
+                className={`${styles.iconCell} ${i === iconIdx ? styles.iconCellActive : ''}`}
+                onClick={() => setIconIdx(i)}
+                aria-label={c.id}
+              >
+                <CharacterIcon iconType={c.id} size={24} color="#fff" />
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Name */}
         <div className={styles.field}>
           <label className={styles.label}>Имя персонажа</label>
@@ -328,39 +362,6 @@ export function CreatePage() {
           </button>
         </div>
 
-        {/* Gradient */}
-        <div className={styles.field}>
-          <label className={styles.label}>Цвет карточки</label>
-          <div className={styles.gradientGrid}>
-            {CUSTOM_GRADIENTS.map((g, i) => (
-              <button
-                key={g.id}
-                className={`${styles.gradientCell} ${i === gradientIdx ? styles.gradientCellActive : ''}`}
-                style={{ background: `linear-gradient(135deg, ${g.colors[0]}, ${g.colors[1]})` }}
-                onClick={() => setGradientIdx(i)}
-                aria-label={g.label}
-                title={g.label}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Icon */}
-        <div className={styles.field}>
-          <label className={styles.label}>Иконка</label>
-          <div className={styles.iconGrid}>
-            {ICON_CHOICES.map((c, i) => (
-              <button
-                key={c.id}
-                className={`${styles.iconCell} ${i === iconIdx ? styles.iconCellActive : ''}`}
-                onClick={() => setIconIdx(i)}
-                aria-label={c.id}
-              >
-                <CharacterIcon iconType={c.id} size={24} color="#fff" />
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
 
       <div className={styles.footer}>
