@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { useApp } from '../context/AppContext'
@@ -12,7 +12,7 @@ import styles from './LibraryPage.module.css'
 
 type SortKey = 'rating' | 'messages' | 'alpha' | 'new'
 
-const TABS = ['Все', ...CATEGORIES.slice(1)]
+// TABS вычисляются динамически из персонажей в компоненте (см. useMemo ниже).
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: 'rating', label: 'По рейтингу' },
@@ -53,6 +53,21 @@ export function LibraryPage() {
   const [sortVisible, setSortVisible] = useState(false)
 
   const isMine = libraryFilter === 'mine'
+
+  // Динамические табы: только те категории где реально есть персонажи.
+  // Порядок сохраняется из CATEGORIES (Кумиры/Исторические/...). Пустые
+  // категории — скрываем чтобы юзер не тапал в "Ничего не найдено".
+  const TABS = useMemo(() => {
+    const source = isMine ? characters.filter((c) => c.userCreated) : characters
+    const usedCats = new Set(source.map((c) => c.category))
+    return ['Все', ...CATEGORIES.slice(1).filter((cat) => usedCats.has(cat))]
+  }, [characters, isMine])
+
+  // Reset activeTab если выбранная категория исчезла (например при свитче
+  // между «Все персонажи» и «Мои персонажи»).
+  useEffect(() => {
+    if (!TABS.includes(activeTab)) setActiveTab('Все')
+  }, [TABS, activeTab])
 
   const filtered = useMemo(() => {
     let list = isMine ? characters.filter((c) => c.userCreated) : characters

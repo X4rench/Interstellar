@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { useApp } from '../context/AppContext'
@@ -30,6 +30,17 @@ export function HomePage() {
 
   const [activeCat, setActiveCat] = useState<string>('Все')
   const [search, setSearch] = useState('')
+
+  // Динамические категории: только непустые. Это синхронизировано с
+  // LibraryPage — юзер не видит пустых табов на которые ничего не найдётся.
+  const availableCats = useMemo(() => {
+    const used = new Set(characters.map((c) => c.category))
+    return ['Все', ...CATEGORIES.slice(1).filter((cat) => used.has(cat))]
+  }, [characters])
+
+  useEffect(() => {
+    if (!availableCats.includes(activeCat)) setActiveCat('Все')
+  }, [availableCats, activeCat])
 
   const featured = useMemo(() => characters.slice(0, 4), [characters])
 
@@ -123,9 +134,10 @@ export function HomePage() {
 
       {/* Body */}
       <div className={styles.body}>
-        {/* Категории — пилюли всегда видимы. Тап на категорию = фильтрация. */}
+        {/* Категории — пилюли всегда видимы. Тап на категорию = фильтрация.
+            Показываем только те категории где реально есть персонажи. */}
         <div className={styles.hScroll}>
-          {CATEGORIES.map((cat) => (
+          {availableCats.map((cat) => (
             <button
               key={cat}
               className={`${styles.catPill} ${activeCat === cat ? styles.catPillOn : ''}`}
