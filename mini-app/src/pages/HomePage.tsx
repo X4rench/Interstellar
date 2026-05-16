@@ -135,8 +135,9 @@ export function HomePage() {
       {/* Body */}
       <div className={styles.body}>
         {/* Категории — пилюли всегда видимы. Тап на категорию = фильтрация.
-            Показываем только те категории где реально есть персонажи. */}
-        <div className={styles.hScroll}>
+            Показываем только те категории где реально есть персонажи.
+            marginTop добавляет дыхание между search и пилюлями. */}
+        <div className={styles.hScroll} style={{ marginTop: 14, marginBottom: 4 }}>
           {availableCats.map((cat) => (
             <button
               key={cat}
