@@ -4,8 +4,9 @@
 .root {
   display: flex;
   flex-direction: column;
-  min-height: 100dvh;
+  height: 100dvh;
   background: #000;                                    /* theme.bg */
+  overflow: hidden;
 }
 
 .header {
@@ -72,8 +73,11 @@
 .body {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
+  touch-action: pan-y;
+  padding-bottom: calc(80px + var(--safe-bottom));
 }
 
 /* ── Section row (заголовок + ссылка справа) ───────────────────────── */

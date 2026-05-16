@@ -62,6 +62,7 @@ export function ProfilePage() {
   )
 
   const [tgPhotoUrl] = useState<string | null>(() => tgUser?.photo_url ?? null)
+  const [subExpanded, setSubExpanded] = useState(false)
 
   const displayName = [tgUser?.first_name, tgUser?.last_name].filter(Boolean).join(' ') || 'Гость'
   const handle = tgUser?.username ? `@${tgUser.username}` : '(без username)'
@@ -125,7 +126,7 @@ export function ProfilePage() {
           </div>
           <div className={styles.statBox}>
             <span className={styles.statVal}>{streakDays}</span>
-            <span className={styles.statLbl}>Streak</span>
+            <span className={styles.statLbl}>Подряд</span>
           </div>
           <div className={styles.statBox}>
             <span className={styles.statVal}>{totalMessages}</span>
@@ -137,16 +138,83 @@ export function ProfilePage() {
           </div>
         </div>
 
-        {/* Pro banner — только если не Pro */}
+        {/* Pro banner — только если не Pro. Стиль как Premium-карточка в Paywall. */}
         {!isPremium && (
-          <button className={styles.banner} onClick={() => openPaywall('manual')}>
+          <button
+            className={styles.banner}
+            onClick={() => openPaywall('manual')}
+            style={{
+              background: 'linear-gradient(160deg, #1d1538 0%, #14102a 55%, #0f0a1e 100%)',
+              border: '1.5px solid rgba(124, 92, 255, 0.45)',
+              boxShadow:
+                '0 0 28px rgba(124, 92, 255, 0.18), 0 4px 18px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+            }}
+          >
             <img src={invertLogo} alt="" className={styles.bannerLogo} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p className={styles.bannerTitle}>Открыть Pro</p>
-              <p className={styles.bannerSub}>Безлимит сообщений, 18+ персонажи</p>
+              <p
+                className={styles.bannerTitle}
+                style={{
+                  background: 'linear-gradient(135deg, #c9b8ff, #ff9ee6)',
+                  WebkitBackgroundClip: 'text',
+                  backgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                }}
+              >
+                Открыть Premium
+              </p>
+              <p className={styles.bannerSub} style={{ color: '#b8a8d8' }}>
+                Безлимит сообщений, 18+ персонажи
+              </p>
             </div>
-            <ChevronRightIcon color="#888" />
+            <ChevronRightIcon color="#a89cd8" />
           </button>
+        )}
+
+        {/* Активная подписка — явный индикатор */}
+        {isPremium && subscription?.expiresAt && (
+          <div
+            style={{
+              margin: '16px 20px 0',
+              padding: '14px 16px',
+              background: 'linear-gradient(160deg, #1d1538 0%, #14102a 100%)',
+              border: '1.5px solid rgba(124, 92, 255, 0.4)',
+              boxShadow: '0 0 20px rgba(124, 92, 255, 0.15)',
+              borderRadius: 16,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+            }}
+          >
+            <div
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                background: '#3DBA6F',
+                boxShadow: '0 0 8px #3DBA6F',
+                flexShrink: 0,
+              }}
+            />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  background: 'linear-gradient(135deg, #c9b8ff, #ff9ee6)',
+                  WebkitBackgroundClip: 'text',
+                  backgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                }}
+              >
+                {tier === 'premium' ? 'Premium подписка активна' : 'Basic подписка активна'}
+              </p>
+              <p style={{ margin: '3px 0 0', fontSize: 11, color: '#a89cd8' }}>
+                Действует до {formatRuDate(subscription.expiresAt)}
+              </p>
+            </div>
+          </div>
         )}
 
         {/* Партнёрство (видно только partner'у) */}
@@ -187,14 +255,13 @@ export function ProfilePage() {
           </div>
         )}
 
-        {/* Subscription block */}
+        {/* Subscription block — тап раскрывает фичи текущего тарифа */}
         <div className={styles.section}>
           <h3 className={styles.sectionTitle}>Подписка</h3>
           <div className={styles.list}>
             <button
               className={styles.listItem}
-              onClick={() => (isPremiumTier ? null : openPaywall('manual'))}
-              disabled={isPremiumTier}
+              onClick={() => setSubExpanded((v) => !v)}
             >
               <span className={styles.listLabel}>
                 {subscriptionLoading
@@ -203,17 +270,131 @@ export function ProfilePage() {
                     ? 'Premium активна'
                     : tier === 'basic'
                       ? 'Basic активна'
-                      : 'Free'}
+                      : 'Free тариф'}
               </span>
               <span className={styles.listValue}>
-                {isPremium && subscription?.expiresAt
-                  ? `до ${formatRuDate(subscription.expiresAt)}`
-                  : !isPremium
-                    ? 'от 199 ₽ / мес'
-                    : ''}
+                {tier === 'premium'
+                  ? '750 ₽ / мес'
+                  : tier === 'basic'
+                    ? '300 ₽ / мес'
+                    : '10 бесплатных сообщений'}
               </span>
-              {!isPremiumTier && <ChevronRightIcon color="#888" />}
+              <span
+                style={{
+                  display: 'inline-flex',
+                  transform: subExpanded ? 'rotate(90deg)' : 'rotate(0)',
+                  transition: 'transform 0.2s ease',
+                }}
+              >
+                <ChevronRightIcon color="#888" />
+              </span>
             </button>
+
+            {/* Раскрытый блок — фичи текущего тарифа */}
+            {subExpanded && (
+              <div
+                style={{
+                  padding: '0 16px 16px',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.04)',
+                }}
+              >
+                <p
+                  style={{
+                    margin: '14px 0 10px',
+                    fontSize: 12,
+                    color: '#888',
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  Что входит
+                </p>
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {(tier === 'premium'
+                    ? [
+                        '200 сообщений в день',
+                        'Доступ к 18+ персонажам',
+                        'Память на 30 сообщений',
+                        'Расширенные стили общения',
+                        '∞ кастомных персонажей',
+                      ]
+                    : tier === 'basic'
+                      ? [
+                          '50 сообщений в день',
+                          'Все персонажи без 18+',
+                          'Память на 15 сообщений',
+                          '∞ кастомных персонажей',
+                        ]
+                      : [
+                          '10 сообщений всего (пожизненно)',
+                          'Базовые персонажи',
+                          'Создание своих персонажей',
+                        ]
+                  ).map((feat) => (
+                    <li
+                      key={feat}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        fontSize: 13,
+                        color: '#ddd',
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 14,
+                          height: 14,
+                          borderRadius: 7,
+                          background:
+                            tier === 'premium' || tier === 'basic'
+                              ? 'linear-gradient(135deg, #7c5cff, #ff5cdb)'
+                              : '#444',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <svg width={9} height={9} viewBox="0 0 14 14" fill="none">
+                          <path
+                            d="M2.5 7.5l3 3 6-6.5"
+                            stroke="#fff"
+                            strokeWidth={2}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </span>
+                      {feat}
+                    </li>
+                  ))}
+                </ul>
+
+                {/* Кнопка апгрейда — для не-Premium */}
+                {!isPremiumTier && (
+                  <button
+                    onClick={() => openPaywall('manual')}
+                    style={{
+                      marginTop: 16,
+                      width: '100%',
+                      padding: '12px',
+                      background: 'linear-gradient(135deg, #7c5cff 0%, #b455e8 50%, #ff5cdb 100%)',
+                      color: '#fff',
+                      border: 0,
+                      borderRadius: 12,
+                      fontSize: 14,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 18px rgba(124, 92, 255, 0.35)',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    {tier === 'basic' ? 'Перейти на Premium за 750 ₽' : 'Открыть Premium за 750 ₽'}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

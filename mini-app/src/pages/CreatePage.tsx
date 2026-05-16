@@ -7,6 +7,10 @@ import { buildPersonaTemplate, FIELD_LIMITS } from '../utils/personaTemplate'
 import { saveAvatar, resizeImageToBlob, getAvatarUrl } from '../utils/avatarStorage'
 import { isConsentValid } from '../utils/consent'
 import type { Character, Gender } from '../data/characters'
+import { CATEGORIES } from '../data/characters'
+
+// Категории для кастомных персонажей (исключаем 'Все' который только фильтр).
+const USER_CATEGORIES = CATEGORIES.slice(1)
 
 import {
   BackIcon,
@@ -60,6 +64,7 @@ export function CreatePage() {
   const [persona, setPersona] = useState('')
   const [firstMessage, setFirstMessage] = useState('')
   const [gender, setGender] = useState<Gender>('male')
+  const [category, setCategory] = useState<string>(USER_CATEGORIES[0] || 'Кумиры')
   const [nsfw, setNsfw] = useState(false)
   const [gradientIdx, setGradientIdx] = useState(0)
   const [iconIdx, setIconIdx] = useState(0)
@@ -162,7 +167,7 @@ export function CreatePage() {
         id,
         name: name.trim(),
         description: description.trim(),
-        category: 'Свои',
+        category,
         iconType,
         gradientKey: 'shadow',
         customGradient: grad.colors,
@@ -344,6 +349,29 @@ export function CreatePage() {
             >
               Женский
             </button>
+          </div>
+        </div>
+
+        {/* Category */}
+        <div className={styles.field}>
+          <label className={styles.label}>Категория</label>
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 8,
+            }}
+          >
+            {USER_CATEGORIES.map((cat) => (
+              <button
+                key={cat}
+                className={`${styles.radioBtn} ${category === cat ? styles.radioBtnActive : ''}`}
+                style={{ flex: 'unset', padding: '8px 14px', fontSize: 13 }}
+                onClick={() => setCategory(cat)}
+              >
+                {cat}
+              </button>
+            ))}
           </div>
         </div>
 
