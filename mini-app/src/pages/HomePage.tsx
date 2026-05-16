@@ -96,8 +96,8 @@ export function HomePage() {
       {/* AI Disclaimer — компактная плашка под header */}
       <div
         style={{
-          margin: '0 16px 8px',
-          padding: '8px 12px',
+          margin: '14px 16px 10px',
+          padding: '10px 14px',
           background: 'rgba(124,92,255,0.08)',
           border: '1px solid rgba(124,92,255,0.2)',
           borderRadius: 10,
@@ -123,9 +123,64 @@ export function HomePage() {
 
       {/* Body */}
       <div className={styles.body}>
-        {!search && (
+        {/* Категории — пилюли всегда видимы. Тап на категорию = фильтрация. */}
+        <div className={styles.hScroll}>
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat}
+              className={`${styles.catPill} ${activeCat === cat ? styles.catPillOn : ''}`}
+              onClick={() => setActiveCat(cat)}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        {/* Если активен фильтр (поиск или категория ≠ Все) — показываем list. */}
+        {(search.trim() || activeCat !== 'Все') ? (
           <>
-            {/* Популярные */}
+            <div className={styles.secRow}>
+              <h2 className={styles.secTitle}>
+                {search.trim() && activeCat !== 'Все'
+                  ? `${activeCat} + «${search}»: ${filtered.length}`
+                  : search.trim()
+                    ? `Результаты: ${filtered.length}`
+                    : `${activeCat}: ${filtered.length}`}
+              </h2>
+            </div>
+            <div className={styles.recentList}>
+              {filtered.map((c) => {
+                const grad = getCharacterGradient(c)
+                return (
+                  <button
+                    key={c.id}
+                    className={styles.recentItem}
+                    onClick={() => openChat(c)}
+                  >
+                    <div
+                      className={styles.recentAvatar}
+                      style={{ background: `linear-gradient(135deg, ${grad[0]}, ${grad[1]})` }}
+                    >
+                      <CharacterIcon iconType={c.iconType} size={26} avatarUri={c.avatarUri} />
+                    </div>
+                    <div className={styles.recentInfo}>
+                      <p className={styles.recentName}>{c.name}</p>
+                      <p className={styles.recentMsg}>{c.description}</p>
+                    </div>
+                    <ChevronRightIcon color="#666" />
+                  </button>
+                )
+              })}
+              {filtered.length === 0 && (
+                <p className={styles.emptyText}>
+                  В категории «{activeCat}» пока нет персонажей. Скоро добавим ✨
+                </p>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Default Home: Популярные + Недавние + Pro banner */}
             <div className={styles.secRow}>
               <h2 className={styles.secTitle}>Популярные</h2>
               <button className={styles.secMore} onClick={() => nav('/library')}>
@@ -166,22 +221,6 @@ export function HomePage() {
               })}
             </div>
 
-            {/* Категории */}
-            <div className={styles.secRow} style={{ paddingTop: 18 }}>
-              <h2 className={styles.secTitle}>Категории</h2>
-            </div>
-            <div className={styles.hScroll}>
-              {CATEGORIES.map((cat) => (
-                <button
-                  key={cat}
-                  className={`${styles.catPill} ${activeCat === cat ? styles.catPillOn : ''}`}
-                  onClick={() => setActiveCat(cat)}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-
             {/* Pro upgrade */}
             {!isPremium && (
               <button className={styles.upgradeBanner} onClick={() => openPaywall('manual')}>
@@ -193,45 +232,7 @@ export function HomePage() {
                 <ChevronRightIcon color="#888" />
               </button>
             )}
-          </>
-        )}
 
-        {/* Search results */}
-        {search ? (
-          <>
-            <div className={styles.secRow}>
-              <h2 className={styles.secTitle}>Результаты: {filtered.length}</h2>
-            </div>
-            <div className={styles.recentList}>
-              {filtered.map((c) => {
-                const grad = getCharacterGradient(c)
-                return (
-                  <button
-                    key={c.id}
-                    className={styles.recentItem}
-                    onClick={() => openChat(c)}
-                  >
-                    <div
-                      className={styles.recentAvatar}
-                      style={{ background: `linear-gradient(135deg, ${grad[0]}, ${grad[1]})` }}
-                    >
-                      <CharacterIcon iconType={c.iconType} size={26} avatarUri={c.avatarUri} />
-                    </div>
-                    <div className={styles.recentInfo}>
-                      <p className={styles.recentName}>{c.name}</p>
-                      <p className={styles.recentMsg}>{c.description}</p>
-                    </div>
-                    <ChevronRightIcon color="#666" />
-                  </button>
-                )
-              })}
-              {filtered.length === 0 && (
-                <p className={styles.emptyText}>Ничего не найдено</p>
-              )}
-            </div>
-          </>
-        ) : (
-          <>
             {/* Недавние */}
             <div className={styles.secRow}>
               <h2 className={styles.secTitle}>Недавние</h2>
