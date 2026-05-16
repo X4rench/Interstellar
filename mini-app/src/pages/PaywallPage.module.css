@@ -128,9 +128,12 @@
 }
 
 .tierCardPopular {
-  background: linear-gradient(180deg, #ffffff, #f0f0f0);
-  border: 1px solid #fff;
-  color: #000;
+  background: linear-gradient(160deg, #1d1538 0%, #14102a 55%, #0f0a1e 100%);
+  border: 1.5px solid rgba(124, 92, 255, 0.45);
+  box-shadow:
+    0 0 28px rgba(124, 92, 255, 0.18),
+    0 4px 18px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .tierBadge {
@@ -156,7 +159,11 @@
 }
 
 .tierCardPopular .tierTitle {
-  color: #000;
+  color: #fff;
+  background: linear-gradient(135deg, #c9b8ff, #ff9ee6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .tierSubtitle {
@@ -167,7 +174,7 @@
 }
 
 .tierCardPopular .tierSubtitle {
-  color: #555;
+  color: #b8a8d8;
 }
 
 .tierPriceRow {
@@ -185,7 +192,7 @@
 }
 
 .tierCardPopular .tierPriceStars {
-  color: #000;
+  color: #fff;
 }
 
 .tierPriceRub {
@@ -195,7 +202,7 @@
 }
 
 .tierCardPopular .tierPriceRub {
-  color: #555;
+  color: #a89cd8;
 }
 
 .tierPeriod {
@@ -205,7 +212,7 @@
 }
 
 .tierCardPopular .tierPeriod {
-  color: #777;
+  color: #8a7eb3;
 }
 
 .tierFeatures {
@@ -227,7 +234,7 @@
 }
 
 .tierCardPopular .tierFeatureItem {
-  color: #111;
+  color: #ebe5ff;
 }
 
 .tierFeatureCheck {
@@ -242,7 +249,8 @@
 }
 
 .tierCardPopular .tierFeatureCheck {
-  background: #000;
+  background: linear-gradient(135deg, #7c5cff, #ff5cdb);
+  box-shadow: 0 0 8px rgba(124, 92, 255, 0.4);
 }
 
 .tierBtn {
@@ -278,6 +286,13 @@
   opacity: 0.5;
 }
 
+/* Кнопка на popular-карточке — фиолетовый градиент в тон бренду. */
+.tierCardPopular .tierBtnPrimary {
+  background: linear-gradient(135deg, #7c5cff 0%, #b455e8 50%, #ff5cdb 100%);
+  color: #fff;
+  box-shadow: 0 4px 18px rgba(124, 92, 255, 0.35);
+}
+
 .tierBtnSecondary {
   background: #fff;
   color: #000;
@@ -294,9 +309,9 @@
 }
 
 .tierCardPopular .tierBtnDisabled {
-  background: rgba(0, 0, 0, 0.08);
-  color: #555;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: rgba(124, 92, 255, 0.12);
+  color: #a89cd8;
+  border: 1px solid rgba(124, 92, 255, 0.25);
 }
 
 /* ───── Guarantee + footer ───── */

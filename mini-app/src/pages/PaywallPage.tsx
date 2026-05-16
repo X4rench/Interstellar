@@ -76,10 +76,11 @@ function CheckIconSmall({ color = '#000' }: { color?: string }) {
 }
 
 function SpinnerIcon() {
+  // currentColor — спиннер наследует цвет текста кнопки (белый на любой кнопке).
   return (
-    <svg width={18} height={18} viewBox="0 0 24 24" style={{ animation: 'paywallSpin 1s linear infinite' }}>
-      <circle cx={12} cy={12} r={10} stroke="rgba(0,0,0,0.15)" strokeWidth={3} fill="none" />
-      <path d="M22 12a10 10 0 0 0-10-10" stroke="#000" strokeWidth={3} strokeLinecap="round" fill="none" />
+    <svg width={18} height={18} viewBox="0 0 24 24" style={{ animation: 'paywallSpin 1s linear infinite', color: 'currentColor' }}>
+      <circle cx={12} cy={12} r={10} stroke="currentColor" strokeOpacity={0.25} strokeWidth={3} fill="none" />
+      <path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" strokeWidth={3} strokeLinecap="round" fill="none" />
     </svg>
   )
 }
@@ -127,7 +128,7 @@ function TierCard({ plan, popular, features, currentTier, flowState, busyPlan, o
         {features.map((f) => (
           <li key={f} className={styles.tierFeatureItem}>
             <span className={styles.tierFeatureCheck}>
-              <CheckIconSmall color={popular ? '#000' : '#fff'} />
+              <CheckIconSmall color={popular ? '#fff' : '#000'} />
             </span>
             <span>{f}</span>
           </li>
