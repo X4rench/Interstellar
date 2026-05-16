@@ -371,7 +371,10 @@ export function ProfilePage() {
                   ))}
                 </ul>
 
-                {/* Кнопка апгрейда — для не-Premium */}
+                {/* Кнопка апгрейда — для не-Premium.
+                    Free → Basic (минимальный вход, низкий barrier).
+                    Basic → Premium (естественный апгрейд).
+                    В полном Paywall юзер увидит все тарифы и выберет сам. */}
                 {!isPremiumTier && (
                   <button
                     onClick={() => openPaywall('manual')}
@@ -390,7 +393,9 @@ export function ProfilePage() {
                       fontFamily: 'inherit',
                     }}
                   >
-                    {tier === 'basic' ? 'Перейти на Premium за 750 ₽' : 'Открыть Premium за 750 ₽'}
+                    {tier === 'basic'
+                      ? 'Перейти на Premium за 750 ₽'
+                      : 'Открыть Basic за 300 ₽'}
                   </button>
                 )}
               </div>
