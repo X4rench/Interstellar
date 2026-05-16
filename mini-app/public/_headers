@@ -1,0 +1,36 @@
+# Cloudflare Pages headers (https://developers.cloudflare.com/pages/configuration/headers/)
+# Применяются к статике из dist/ автоматически.
+
+/*
+  # ── Безопасность ───────────────────────────────────────────────────
+  # CSP блокирует XSS-инъекции через подменённый script. Разрешаем:
+  #   - 'self' для всего
+  #   - https://telegram.org для telegram-web-app.js (загружается в index.html)
+  #   - 'unsafe-inline' для script-elem-stylesheet (Vite + telegram-web-app
+  #     требует — оставляем; в Phase 5 переедем на CSP с nonce)
+  #   - connect-src — наш backend (cloudflare/render URL) + ingest Sentry
+  #     (заменить на реальный SENTRY_DSN если используется)
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://*.trycloudflare.com https://*.onrender.com https://*.ingest.sentry.io; frame-ancestors 'self' https://web.telegram.org https://*.telegram.org; base-uri 'self'; form-action 'self'
+
+  # Не разрешать встраивание в произвольные iframe — только TG.
+  X-Frame-Options: SAMEORIGIN
+
+  # Block sniffing.
+  X-Content-Type-Options: nosniff
+
+  # Referrer без чувствительной части path.
+  Referrer-Policy: strict-origin-when-cross-origin
+
+  # Disable opt-in to FLoC / Topics.
+  Permissions-Policy: interest-cohort=(), browsing-topics=(), camera=(), microphone=(), geolocation=()
+
+  # HSTS — Cloudflare уже включает по умолчанию, но дублируем.
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+
+# Long-cache для immutable assets с hash в имени.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# HTML — никакого кэша, при деплое обновляется сразу.
+/index.html
+  Cache-Control: no-cache, no-store, must-revalidate

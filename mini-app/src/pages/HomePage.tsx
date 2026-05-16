@@ -1,0 +1,284 @@
+import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+
+import { useApp } from '../context/AppContext'
+import { CATEGORIES, type Character } from '../data/characters'
+import { getCharacterGradient } from '../utils/gradients'
+import {
+  LogoImageSmall,
+  SearchIcon,
+  ChevronRightIcon,
+  AgeRestrictedIcon,
+} from '../icons'
+import { CharacterIcon } from '../components/CharacterIcon'
+import { BottomNav } from '../components/BottomNav'
+
+import styles from './HomePage.module.css'
+import invertLogo from '../icons/invertLogo.png'
+
+export function HomePage() {
+  const nav = useNavigate()
+  const {
+    characters,
+    chats,
+    userAvatarLetter,
+    isPremium,
+    isPremiumTier,
+    canOpenCharacter,
+    openPaywall,
+  } = useApp()
+
+  const [activeCat, setActiveCat] = useState<string>('Все')
+  const [search, setSearch] = useState('')
+
+  const featured = useMemo(() => characters.slice(0, 4), [characters])
+
+  const filtered = useMemo(() => {
+    let list = characters
+    if (activeCat !== 'Все') list = list.filter((c) => c.category === activeCat)
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      list = list.filter(
+        (c) =>
+          c.name.toLowerCase().includes(q) ||
+          c.description.toLowerCase().includes(q),
+      )
+    }
+    return list
+  }, [characters, activeCat, search])
+
+  const recentChars = useMemo(
+    () => characters.filter((c) => chats[c.id] && chats[c.id].length > 0).slice(0, 4),
+    [characters, chats],
+  )
+
+  // NSFW-гейт: для NSFW-персонажа без премиума — открывается paywall.
+  const openChat = (char: Character) => {
+    if (!canOpenCharacter(char)) {
+      openPaywall('nsfw')
+      return
+    }
+    nav(`/chat/${char.id}`)
+  }
+
+  return (
+    <div className={styles.root}>
+      {/* Header */}
+      <header className={styles.header}>
+        <div className={styles.logoRow}>
+          <div style={{ marginTop: 4 }}>
+            <LogoImageSmall size={30} />
+          </div>
+          <span className={styles.logoText}>интерстеллар</span>
+          {/* 18+ метка — 436-ФЗ. Часть приложения содержит контент 18+. */}
+          <span
+            style={{
+              marginLeft: 6,
+              fontSize: 10,
+              fontWeight: 800,
+              color: '#fff',
+              background: '#7c5cff',
+              padding: '2px 5px',
+              borderRadius: 4,
+              letterSpacing: 0.3,
+            }}
+            aria-label="Возрастная маркировка 18 плюс"
+            title="Часть контента предназначена для совершеннолетних"
+          >
+            18+
+          </span>
+        </div>
+        <button className={styles.avatar} onClick={() => nav('/profile')} aria-label="Профиль">
+          {userAvatarLetter}
+        </button>
+      </header>
+
+      {/* AI Disclaimer — компактная плашка под header */}
+      <div
+        style={{
+          margin: '0 16px 8px',
+          padding: '8px 12px',
+          background: 'rgba(124,92,255,0.08)',
+          border: '1px solid rgba(124,92,255,0.2)',
+          borderRadius: 10,
+          fontSize: 11,
+          color: '#a89cff',
+          lineHeight: 1.4,
+          textAlign: 'center',
+        }}
+      >
+        Ответы персонажей сгенерированы ИИ и носят развлекательный характер. Не используй для медицинских, юридических или финансовых решений.
+      </div>
+
+      {/* Search */}
+      <div className={styles.searchBar}>
+        <SearchIcon />
+        <input
+          className={styles.searchInput}
+          placeholder="Найти персонажа или кумира..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
+      {/* Body */}
+      <div className={styles.body}>
+        {!search && (
+          <>
+            {/* Популярные */}
+            <div className={styles.secRow}>
+              <h2 className={styles.secTitle}>Популярные</h2>
+              <button className={styles.secMore} onClick={() => nav('/library')}>
+                Все →
+              </button>
+            </div>
+
+            <div className={styles.hScroll}>
+              {featured.map((c) => {
+                const locked = c.isNSFW && !isPremiumTier
+                const grad = getCharacterGradient(c)
+                return (
+                  <button
+                    key={c.id}
+                    className={styles.featCard}
+                    onClick={() => openChat(c)}
+                  >
+                    <div
+                      className={styles.featImg}
+                      style={{ background: `linear-gradient(135deg, ${grad[0]}, ${grad[1]})` }}
+                    >
+                      <CharacterIcon iconType={c.iconType} size={52} avatarUri={c.avatarUri} />
+                    </div>
+                    {locked ? (
+                      <span className={`${styles.featBadge} ${styles.featBadgeLock}`}>
+                        <AgeRestrictedIcon size={10} color="#FFFFFF" />
+                        PRO
+                      </span>
+                    ) : c.isNew ? (
+                      <span className={styles.featBadge}>ТОП</span>
+                    ) : null}
+                    <div className={styles.featInfo}>
+                      <p className={styles.featName}>{c.name}</p>
+                      <p className={styles.featDesc}>{c.description}</p>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Категории */}
+            <div className={styles.secRow} style={{ paddingTop: 18 }}>
+              <h2 className={styles.secTitle}>Категории</h2>
+            </div>
+            <div className={styles.hScroll}>
+              {CATEGORIES.map((cat) => (
+                <button
+                  key={cat}
+                  className={`${styles.catPill} ${activeCat === cat ? styles.catPillOn : ''}`}
+                  onClick={() => setActiveCat(cat)}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            {/* Pro upgrade */}
+            {!isPremium && (
+              <button className={styles.upgradeBanner} onClick={() => openPaywall('manual')}>
+                <img src={invertLogo} alt="" className={styles.upgradeLogo} />
+                <div style={{ flex: 1 }}>
+                  <p className={styles.upgradeTitle}>Интерстеллар Pro</p>
+                  <p className={styles.upgradeSub}>Безлимит сообщений · 18+ персонажи</p>
+                </div>
+                <ChevronRightIcon color="#888" />
+              </button>
+            )}
+          </>
+        )}
+
+        {/* Search results */}
+        {search ? (
+          <>
+            <div className={styles.secRow}>
+              <h2 className={styles.secTitle}>Результаты: {filtered.length}</h2>
+            </div>
+            <div className={styles.recentList}>
+              {filtered.map((c) => {
+                const grad = getCharacterGradient(c)
+                return (
+                  <button
+                    key={c.id}
+                    className={styles.recentItem}
+                    onClick={() => openChat(c)}
+                  >
+                    <div
+                      className={styles.recentAvatar}
+                      style={{ background: `linear-gradient(135deg, ${grad[0]}, ${grad[1]})` }}
+                    >
+                      <CharacterIcon iconType={c.iconType} size={26} avatarUri={c.avatarUri} />
+                    </div>
+                    <div className={styles.recentInfo}>
+                      <p className={styles.recentName}>{c.name}</p>
+                      <p className={styles.recentMsg}>{c.description}</p>
+                    </div>
+                    <ChevronRightIcon color="#666" />
+                  </button>
+                )
+              })}
+              {filtered.length === 0 && (
+                <p className={styles.emptyText}>Ничего не найдено</p>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Недавние */}
+            <div className={styles.secRow}>
+              <h2 className={styles.secTitle}>Недавние</h2>
+            </div>
+            <div className={styles.recentList}>
+              {recentChars.length === 0 ? (
+                <p className={styles.emptyText}>Начните чат с персонажем →</p>
+              ) : (
+                recentChars.map((c) => {
+                  const msgs = chats[c.id] || []
+                  const lastMsg = msgs[msgs.length - 1]
+                  const grad = getCharacterGradient(c)
+                  return (
+                    <button
+                      key={c.id}
+                      className={styles.recentItem}
+                      onClick={() => openChat(c)}
+                    >
+                      <div
+                        className={styles.recentAvatar}
+                        style={{ background: `linear-gradient(135deg, ${grad[0]}, ${grad[1]})` }}
+                      >
+                        <CharacterIcon iconType={c.iconType} size={26} avatarUri={c.avatarUri} />
+                      </div>
+                      <div className={styles.recentInfo}>
+                        <p className={styles.recentName}>{c.name}</p>
+                        <p className={styles.recentMsg}>
+                          {lastMsg
+                            ? (lastMsg.role === 'user' ? 'Вы: ' : '') + lastMsg.text
+                            : c.firstMessage}
+                        </p>
+                      </div>
+                      <div className={styles.recentMeta}>
+                        <span className={styles.recentTime}>{lastMsg?.time ?? ''}</span>
+                      </div>
+                    </button>
+                  )
+                })
+              )}
+            </div>
+          </>
+        )}
+
+        <div style={{ height: 16 }} />
+      </div>
+
+      <BottomNav activeTab="home" />
+    </div>
+  )
+}

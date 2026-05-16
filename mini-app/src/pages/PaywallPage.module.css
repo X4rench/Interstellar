@@ -1,0 +1,340 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: paywallFadeIn 0.2s ease;
+}
+
+@keyframes paywallFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.sheet {
+  width: 100%;
+  max-width: 480px;
+  background: #000;
+  border-radius: 24px 24px 0 0;
+  max-height: 95dvh;
+  overflow-y: auto;
+  position: relative;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(24px + var(--safe-bottom));
+}
+
+.closeBtn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 0;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 1;
+  font-family: inherit;
+}
+
+.closeBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ───── Hero block ───── */
+.hero {
+  padding: 40px 24px 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.heroBadge {
+  width: 80px;
+  height: 60px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #1A1A1A, #0A0A0A);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.heroLogo {
+  width: 56px;
+  height: 28px;
+  filter: brightness(0) invert(1);
+}
+
+.heroTitle {
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.5px;
+  margin: 8px 0 6px;
+  line-height: 1.2;
+}
+
+.heroSub {
+  font-size: 14px;
+  color: #888;
+  margin: 0;
+  line-height: 1.4;
+  max-width: 320px;
+}
+
+/* ───── Current tier indicator ───── */
+.currentTierBanner {
+  margin: 0 20px 16px;
+  padding: 10px 14px;
+  background: rgba(60, 180, 80, 0.1);
+  border: 1px solid rgba(60, 180, 80, 0.3);
+  border-radius: 12px;
+  font-size: 12px;
+  color: #3DBA6F;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.currentTierBanner b {
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ───── Tier cards grid ───── */
+.tiers {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 20px 16px;
+}
+
+.tierCard {
+  position: relative;
+  background: #131313;
+  border: 1px solid #232323;
+  border-radius: 18px;
+  padding: 20px 18px 18px;
+  display: flex;
+  flex-direction: column;
+}
+
+.tierCardPopular {
+  background: linear-gradient(180deg, #ffffff, #f0f0f0);
+  border: 1px solid #fff;
+  color: #000;
+}
+
+.tierBadge {
+  position: absolute;
+  top: -10px;
+  right: 16px;
+  background: linear-gradient(135deg, #7c5cff, #ff5cdb);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(124, 92, 255, 0.4);
+}
+
+.tierTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.3px;
+  margin: 0 0 4px;
+}
+
+.tierCardPopular .tierTitle {
+  color: #000;
+}
+
+.tierSubtitle {
+  font-size: 12px;
+  color: #888;
+  margin: 0 0 14px;
+  line-height: 1.4;
+}
+
+.tierCardPopular .tierSubtitle {
+  color: #555;
+}
+
+.tierPriceRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.tierPriceStars {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.5px;
+  line-height: 1;
+}
+
+.tierCardPopular .tierPriceStars {
+  color: #000;
+}
+
+.tierPriceRub {
+  font-size: 13px;
+  color: #888;
+  font-weight: 500;
+}
+
+.tierCardPopular .tierPriceRub {
+  color: #555;
+}
+
+.tierPeriod {
+  font-size: 11px;
+  color: #666;
+  margin: 4px 0 14px;
+}
+
+.tierCardPopular .tierPeriod {
+  color: #777;
+}
+
+.tierFeatures {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tierFeatureItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #ddd;
+  line-height: 1.3;
+}
+
+.tierCardPopular .tierFeatureItem {
+  color: #111;
+}
+
+.tierFeatureCheck {
+  width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tierCardPopular .tierFeatureCheck {
+  background: #000;
+}
+
+.tierBtn {
+  border: 0;
+  border-radius: 14px;
+  padding: 14px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  cursor: pointer;
+  font-family: inherit;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+}
+
+.tierBtn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.tierBtn:disabled {
+  cursor: not-allowed;
+}
+
+.tierBtnPrimary {
+  background: #000;
+  color: #fff;
+}
+
+.tierBtnPrimary:disabled {
+  opacity: 0.5;
+}
+
+.tierBtnSecondary {
+  background: #fff;
+  color: #000;
+}
+
+.tierBtnSecondary:disabled {
+  opacity: 0.5;
+}
+
+.tierBtnDisabled {
+  background: #1f1f1f;
+  color: #5a5a5a;
+  border: 1px solid #2a2a2a;
+}
+
+.tierCardPopular .tierBtnDisabled {
+  background: rgba(0, 0, 0, 0.08);
+  color: #555;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* ───── Guarantee + footer ───── */
+.guaranteeRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 8px 20px 8px;
+}
+
+.guaranteeText {
+  font-size: 11px;
+  color: #666;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 20px 0;
+  flex-wrap: wrap;
+}
+
+.footerLink {
+  font-size: 12px;
+  color: #888;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  text-decoration: underline;
+}
+
+.footerDot {
+  font-size: 12px;
+  color: #444;
+}

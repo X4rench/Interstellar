@@ -1,0 +1,131 @@
+:root {
+  /*
+    Стандартные TG-темные переменные. Заполняются через themeParams.bindCssVars()
+    после init SDK. Дефолты ниже — на случай если SDK не успел подмонтировать
+    (короткая мигалка перед раскраской).
+  */
+  --tg-theme-bg-color: #0a0612;
+  --tg-theme-text-color: #ffffff;
+  --tg-theme-hint-color: #888888;
+  --tg-theme-link-color: #7c5cff;
+  --tg-theme-button-color: #7c5cff;
+  --tg-theme-button-text-color: #ffffff;
+  --tg-theme-secondary-bg-color: #100a1e;
+  --tg-theme-section-bg-color: #181028;
+  --tg-theme-section-header-text-color: #7c5cff;
+  --tg-theme-subtitle-text-color: #888888;
+  --tg-theme-destructive-text-color: #ec3942;
+  --tg-theme-accent-text-color: #7c5cff;
+
+  /*
+    Safe-area из viewport.bindCssVars(). На современных TG-клиентах SDK
+    выставит --tg-viewport-safe-area-inset-*. На старых — fallback на
+    нативные CSS env() для iOS WebView. В Phase 3 будем использовать эти
+    переменные в layout (BottomNav, sticky header).
+  */
+  --safe-top: var(--tg-viewport-safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --safe-right: var(--tg-viewport-safe-area-inset-right, env(safe-area-inset-right, 0px));
+  --safe-bottom: var(--tg-viewport-safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --safe-left: var(--tg-viewport-safe-area-inset-left, env(safe-area-inset-left, 0px));
+
+  /* Палитра приложения (вне TG-темы) — использовать для брендовых акцентов */
+  --accent-purple: #7c5cff;
+  --accent-pink: #ff5cdb;
+  --bg-elevated: #181028;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  background: var(--tg-theme-bg-color);
+  color: var(--tg-theme-text-color);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* dvh — динамический viewport, корректно работает с iOS-bar.
+     Доп. fallback на 100vh для совсем старых клиентов. */
+  min-height: 100vh;
+  min-height: 100dvh;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+a {
+  color: var(--tg-theme-link-color);
+  text-decoration: none;
+}
+
+/* ── Phase 1 placeholder layout ───────────────────────────────────────── */
+
+.home-page {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.home-page__header h1 {
+  margin: 16px 0 4px;
+  font-size: 28px;
+  background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.home-page__subtitle {
+  margin: 0 0 24px;
+  opacity: 0.7;
+  font-size: 14px;
+}
+
+.home-page__panel {
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.home-page__panel h2,
+.home-page__panel h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.home-page__panel ul,
+.home-page__panel ol {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.home-page__panel code {
+  background: rgba(124, 92, 255, 0.18);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+}
+
+.error-screen {
+  padding: 24px;
+  font-family: system-ui;
+  color: #fff;
+  background: #0a0612;
+  min-height: 100vh;
+  min-height: 100dvh;
+}

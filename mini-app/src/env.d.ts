@@ -1,0 +1,14 @@
+/// <reference types="vite/client" />
+
+interface ImportMetaEnv {
+  readonly VITE_API_BASE_URL: string
+  readonly VITE_SENTRY_DSN?: string
+  readonly VITE_DEV_PORT?: string
+  readonly VITE_DEV_MOCK_USER_ID?: string
+  readonly VITE_DEV_MOCK_USERNAME?: string
+  readonly VITE_DEV_MOCK_START_PARAM?: string
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv
+}

@@ -1,0 +1,93 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.card {
+  background: #161616;
+  border: 1px solid #242424;
+  border-radius: 16px;
+  padding: 20px;
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.3px;
+  margin: 0;
+}
+
+.message {
+  font-size: 14px;
+  line-height: 1.45;
+  color: #aaa;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.input {
+  width: 100%;
+  background: #0D0D0D;
+  border: 1px solid #303030;
+  border-radius: 10px;
+  padding: 11px 13px;
+  color: #fff;
+  font-size: 14px;
+  font-family: inherit;
+  outline: 0;
+}
+
+.input:focus {
+  border-color: #7c5cff;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.btn {
+  flex: 1;
+  border-radius: 10px;
+  padding: 11px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  border: 0;
+}
+
+.btnPrimary {
+  background: #fff;
+  color: #000;
+}
+
+.btnPrimary:disabled {
+  background: #333;
+  color: #888;
+  cursor: not-allowed;
+}
+
+.btnDanger {
+  background: #FF4444;
+  color: #fff;
+}
+
+.btnGhost {
+  background: transparent;
+  border: 1px solid #303030;
+  color: #888;
+}

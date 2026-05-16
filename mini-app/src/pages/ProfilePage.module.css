@@ -1,0 +1,214 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: #000;
+}
+
+.body {
+  flex: 1;
+  overflow-y: auto;
+  padding: calc(40px + var(--safe-top)) 20px 16px;
+}
+
+.headerRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 32px;
+  background: #1F1F1F;
+  border: 1px solid #303030;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.avatarImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.userName {
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.4px;
+  margin: 0 0 2px;
+}
+
+.userHandle {
+  font-size: 13px;
+  color: #888;
+  margin: 0;
+}
+
+.proPill {
+  display: inline-block;
+  background: linear-gradient(135deg, #7c5cff, #ff5cdb);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+}
+
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.statBox {
+  background: #161616;
+  border: 1px solid #242424;
+  border-radius: 12px;
+  padding: 12px 8px;
+  text-align: center;
+}
+
+.statVal {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.3px;
+  display: block;
+  line-height: 1.2;
+}
+
+.statLbl {
+  font-size: 10px;
+  color: #888;
+  margin-top: 2px;
+  display: block;
+}
+
+.section {
+  margin-bottom: 20px;
+}
+
+.sectionTitle {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #666;
+  margin: 0 0 8px;
+  padding: 0 4px;
+}
+
+.list {
+  background: #0D0D0D;
+  border: 1px solid #242424;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.listItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #242424;
+  cursor: pointer;
+  font-family: inherit;
+  width: 100%;
+  text-align: left;
+  font-size: 14px;
+  color: #fff;
+}
+
+.listItem:last-child {
+  border-bottom: 0;
+}
+
+.listItemDanger {
+  color: #FF4444;
+}
+
+.listLabel {
+  flex: 1;
+}
+
+.listValue {
+  font-size: 12px;
+  color: #888;
+}
+
+.banner {
+  background: linear-gradient(135deg, #181028, #0d0717);
+  border: 1px solid #303030;
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  width: 100%;
+  text-align: left;
+  margin-bottom: 20px;
+}
+
+.bannerLogo {
+  width: 40px;
+  height: 24px;
+  filter: brightness(0) invert(1);
+  flex-shrink: 0;
+}
+
+.bannerTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 2px;
+}
+
+.bannerSub {
+  font-size: 11px;
+  color: #888;
+  margin: 0;
+}
+
+.legalRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 0 4px;
+}
+
+.legalLink {
+  font-size: 12px;
+  color: #888;
+  background: transparent;
+  border: 0;
+  padding: 4px 0;
+  cursor: pointer;
+  font-family: inherit;
+  text-decoration: underline;
+}
+
+.versionText {
+  font-size: 11px;
+  color: #444;
+  text-align: center;
+  margin-top: 16px;
+}

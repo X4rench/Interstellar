@@ -1,0 +1,81 @@
+# Render Blueprint для бэка Interstellar.
+# https://render.com/docs/blueprint-spec
+#
+# Деплой одной командой:
+#   1. Залить репозиторий на GitHub
+#   2. На render.com → New → Blueprint → подключить repo
+#   3. Render автоматически прочитает этот файл и поднимет 1 web-service + 1 disk
+#   4. В Dashboard заполнить env-переменные (см. .env.example) и сохранить
+#
+# Free tier: 750 ч/мес инстанс-времени (бесплатно если использовать 1 сервис).
+# Persistent disk Free: до 1 GB, $7/мес за каждый GB сверх.
+
+services:
+  - type: web
+    name: interstellar-backend
+    runtime: node
+    region: frankfurt          # ближе к РФ; альтернативы: oregon, ohio, singapore
+    plan: free                  # для прод-сервиса с реальными платежами — обнови до starter ($7/мес)
+    branch: main                # ветка для auto-deploy
+    rootDir: backend
+    buildCommand: npm ci --omit=dev
+    startCommand: node server.js
+    autoDeploy: true
+    healthCheckPath: /health
+
+    # Постоянный диск для SQLite. Render free даёт 1 GB бесплатно при наличии
+    # disks-секции. SQLite-файл размером ~10MB для 100k юзеров — с запасом.
+    disk:
+      name: interstellar-data
+      mountPath: /var/data
+      sizeGB: 1
+
+    # ENV переменные. SECRET-значения (POLZA_API_KEY, BOT_TOKEN, etc.) НЕ кладём
+    # в этот файл — добавляются в Render Dashboard вручную. Здесь только
+    # non-secret defaults + ссылки на secrets через `sync: false`.
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: '10000'              # Render expects 10000 для web-сервиса
+      - key: DB_PATH
+        value: /var/data/interstellar.sqlite
+
+      - key: TRUST_PROXY_HOPS
+        value: '1'                  # Render проксирует через Cloudflare
+
+      - key: POLZA_API_URL
+        value: https://api.polza.ai/api/v1/chat/completions
+      - key: POLZA_MODEL
+        value: grok-4.1-fast
+
+      - key: STAR_PRICE_MONTH
+        value: '199'
+      - key: RECONCILE_INTERVAL_MIN
+        value: '5'
+      - key: PARTNER_PII_CONSENT_VERSION
+        value: '2026.05'
+
+      # ── Secrets (заполнить в Render Dashboard) ────────────────────────
+      - key: POLZA_API_KEY
+        sync: false               # = secret, в blueprint не храним
+      - key: BOT_TOKEN
+        sync: false
+      - key: BOT_USERNAME
+        sync: false
+      - key: BOT_APP_NAME
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        sync: false
+      - key: PAYOUT_ENCRYPTION_KEY
+        sync: false
+      - key: ADMIN_TELEGRAM_IDS
+        sync: false
+      - key: BUSINESS_INN
+        sync: false
+      - key: BUSINESS_NAME
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false               # https://<your-app>.pages.dev,https://yourdomain.com
+      - key: PUBLIC_BASE_URL
+        sync: false               # https://<this-service>.onrender.com

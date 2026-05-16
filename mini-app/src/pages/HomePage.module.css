@@ -1,0 +1,325 @@
+/* Порт RN HomeScreen.tsx → web. Палитра — theme.ts.
+   Структура классов соответствует RN-StyleSheet (root, header, ...). */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: #000;                                    /* theme.bg */
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(40px + var(--safe-top)) 20px 0;
+}
+
+.logoRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.logoText {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.7px;
+  color: #fff;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 16px;
+  background: #1F1F1F;                                  /* theme.surface3 */
+  border: 1px solid #303030;                            /* theme.borderLight */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.searchBar {
+  margin: 16px 20px 0;
+  background: #161616;                                  /* theme.surface2 */
+  border: 1px solid #242424;                            /* theme.border */
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  height: 42px;
+  gap: 10px;
+}
+
+.searchInput {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: #fff;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.searchInput::placeholder {
+  color: #666;                                          /* theme.text3 */
+}
+
+.body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* ── Section row (заголовок + ссылка справа) ───────────────────────── */
+.secRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 20px 12px;
+}
+
+.secTitle {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  color: #fff;
+}
+
+.secMore {
+  font-size: 13px;
+  color: #888;                                          /* theme.text2 */
+  font-weight: 500;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* ── Featured карусель ─────────────────────────────────────────────── */
+.hScroll {
+  display: flex;
+  gap: 12px;
+  padding: 0 20px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.hScroll::-webkit-scrollbar {
+  display: none;
+}
+
+.featCard {
+  flex-shrink: 0;
+  width: 150px;
+  background: #0D0D0D;                                  /* theme.surface1 */
+  border: 1px solid #242424;
+  border-radius: 18px;
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  padding: 0;
+}
+
+.featImg {
+  width: 100%;
+  height: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 18px 18px 0 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.featBadge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid #303030;
+  border-radius: 8px;
+  padding: 3px 8px;
+  display: flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: #E8E8E8;                                       /* theme.accentLight */
+}
+
+.featBadgeLock {
+  background: rgba(0, 0, 0, 0.85);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #fff;
+  gap: 3px;
+}
+
+.featInfo {
+  padding: 10px 12px 12px;
+}
+
+.featName {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: -0.1px;
+  margin: 0 0 3px;
+}
+
+.featDesc {
+  font-size: 11px;
+  color: #666;
+  line-height: 15px;
+  margin: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* ── Категории (pills) ────────────────────────────────────────────── */
+.catPill {
+  flex-shrink: 0;
+  background: #161616;
+  border: 1px solid #242424;
+  border-radius: 20px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #888;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.catPillOn {
+  background: #fff;
+  border-color: #fff;
+  color: #000;
+}
+
+/* ── Upgrade banner ───────────────────────────────────────────────── */
+.upgradeBanner {
+  margin: 16px 20px 0;
+  background: #161616;
+  border: 1px solid #303030;
+  border-radius: 16px;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  width: calc(100% - 40px);
+  font-family: inherit;
+  text-align: left;
+}
+
+.upgradeLogo {
+  width: 56px;
+  height: 30px;
+  filter: brightness(0) invert(1);                      /* png → белый */
+  flex-shrink: 0;
+}
+
+.upgradeTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0 0 2px;
+}
+
+.upgradeSub {
+  font-size: 11px;
+  color: #666;
+  margin: 0;
+}
+
+/* ── Recent / Search list ─────────────────────────────────────────── */
+.recentList {
+  padding: 0 20px;
+}
+
+.recentItem {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid #242424;
+  cursor: pointer;
+  width: 100%;
+  background: transparent;
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+  font-family: inherit;
+  text-align: left;
+}
+
+.recentItem:last-child {
+  border-bottom: 0;
+}
+
+.recentAvatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.recentInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.recentName {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+  color: #fff;
+  margin: 0 0 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recentMsg {
+  font-size: 12px;
+  color: #666;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recentMeta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.recentTime {
+  font-size: 11px;
+  color: #666;
+}
+
+.emptyText {
+  color: #666;
+  font-size: 14px;
+  text-align: center;
+  padding: 24px 0;
+}

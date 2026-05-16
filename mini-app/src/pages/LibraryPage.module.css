@@ -1,0 +1,283 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: #000;
+}
+
+.header {
+  padding: calc(40px + var(--safe-top)) 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.8px;
+  color: #fff;
+  margin: 0;
+}
+
+.showAll {
+  font-size: 13px;
+  color: #888;
+  font-weight: 500;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.searchRow {
+  background: #161616;
+  border: 1px solid #242424;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  height: 42px;
+  gap: 10px;
+}
+
+.searchInput {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: #fff;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.searchInput::placeholder {
+  color: #666;
+}
+
+.filterBtn {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  color: #888;
+}
+
+.sortHint {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -4px;
+}
+
+.sortHintText {
+  font-size: 11px;
+  color: #666;
+}
+
+.tabsRow {
+  display: flex;
+  gap: 8px;
+  padding-bottom: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.tabsRow::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  flex-shrink: 0;
+  background: #161616;
+  border: 1px solid #242424;
+  border-radius: 20px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #888;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.tabOn {
+  background: #fff;
+  border-color: #fff;
+  color: #000;
+}
+
+.body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px 20px 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.card {
+  background: #0D0D0D;
+  border: 1px solid #242424;
+  border-radius: 18px;
+  overflow: hidden;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.cardImg {
+  height: 150px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.nsfwBadge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: rgba(220, 50, 50, 0.85);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 9px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.newBadge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid #303030;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 9px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.newBadgeMine {
+  background: rgba(60, 180, 80, 0.85);
+  border-color: transparent;
+}
+
+.cardBody {
+  padding: 10px 12px 12px;
+}
+
+.cardName {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: -0.1px;
+  margin: 0 0 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cardSub {
+  font-size: 10px;
+  color: #666;
+  margin: 0 0 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cardStats {
+  display: flex;
+  gap: 8px;
+}
+
+.cardStatRow {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.cardStat {
+  font-size: 10px;
+  color: #888;
+}
+
+.emptyText {
+  color: #666;
+  font-size: 14px;
+  text-align: center;
+  padding: 40px 0;
+  grid-column: 1 / -1;
+}
+
+/* ── Sort modal ──────────────────────────────────────────────────── */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.sortCard {
+  background: #161616;
+  border: 1px solid #242424;
+  border-radius: 20px;
+  padding: 20px;
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sortTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 8px;
+  letter-spacing: -0.3px;
+}
+
+.sortItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  font-family: inherit;
+  width: 100%;
+  text-align: left;
+  font-size: 14px;
+  color: #fff;
+  font-weight: 500;
+}
+
+.sortItemOn {
+  background: #fff;
+  color: #000;
+  font-weight: 600;
+}

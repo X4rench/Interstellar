@@ -1,0 +1,553 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  /* dvh избавляет от прыжков viewport на iOS WebView. */
+  height: 100dvh;
+  background: #000;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  padding: calc(40px + var(--safe-top)) 16px 12px;
+  border-bottom: 1px solid #242424;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.iconBtn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.charInfo {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  min-width: 0;
+}
+
+.charAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.charName {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  color: #fff;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 1px;
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: #3DBA6F;
+}
+
+.statusText {
+  font-size: 11px;
+  color: #3DBA6F;
+}
+
+.headerActions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.moodIndicatorDot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: #fff;
+}
+
+.moodPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  margin: 8px 16px 0;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  font-size: 11px;
+  color: #888;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.memBar {
+  margin: 10px 16px 0;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  flex-shrink: 0;
+  text-align: left;
+}
+
+.memBarText {
+  flex: 1;
+  font-size: 12px;
+  color: #888;
+  margin: 0;
+}
+
+.memBarTextOff {
+  color: #666;
+}
+
+.memToggle {
+  width: 32px;
+  height: 18px;
+  background: #fff;
+  border-radius: 9px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding-right: 2px;
+  flex-shrink: 0;
+}
+
+.memToggleOff {
+  background: rgba(255, 255, 255, 0.15);
+  justify-content: flex-start;
+  padding-right: 0;
+  padding-left: 2px;
+}
+
+.memToggleKnob {
+  width: 14px;
+  height: 14px;
+  border-radius: 7px;
+  background: #000;
+}
+
+.memToggleKnobOff {
+  background: #555;
+}
+
+.limitBar {
+  margin: 8px 16px 0;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  flex-shrink: 0;
+  text-align: left;
+}
+
+.limitBarText {
+  flex: 1;
+  font-size: 12px;
+  color: #fff;
+  font-weight: 500;
+  margin: 0;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dateDivider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+}
+
+.dateLine {
+  flex: 1;
+  height: 1px;
+  background: #242424;
+}
+
+.dateText {
+  font-size: 11px;
+  color: #666;
+}
+
+.msgRow {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  margin-bottom: 4px;
+}
+
+.msgRowUser {
+  flex-direction: row-reverse;
+}
+
+.msgAvatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  position: relative;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.msgContent {
+  max-width: 78%;
+  display: flex;
+  flex-direction: column;
+}
+
+.bubble {
+  padding: 10px 14px;
+  border-radius: 18px;
+  font-size: 14px;
+  line-height: 21px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.bubbleChar {
+  background: #161616;
+  border: 1px solid #242424;
+  border-bottom-left-radius: 6px;
+  color: #fff;
+}
+
+.bubbleUser {
+  background: #fff;
+  border-bottom-right-radius: 6px;
+  color: #000;
+}
+
+.msgTime {
+  font-size: 10px;
+  color: #666;
+  margin-top: 4px;
+  padding: 0 4px;
+}
+
+.msgTimeUser {
+  text-align: right;
+  color: rgba(0, 0, 0, 0.35);
+}
+
+.typingRow {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  margin-top: 4px;
+}
+
+.typingBubble {
+  background: #161616;
+  border: 1px solid #242424;
+  border-radius: 18px;
+  border-bottom-left-radius: 6px;
+  padding: 12px 16px;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.typingDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: #666;
+  animation: typingBounce 1s infinite;
+}
+
+.typingDot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typingDot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-4px); }
+}
+
+.inputWrap {
+  padding: 10px 16px calc(20px + var(--safe-bottom));
+  background: #000;
+  border-top: 1px solid #242424;
+  flex-shrink: 0;
+}
+
+.inputRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #161616;
+  border: 1px solid #242424;
+  border-radius: 20px;
+  padding: 8px 8px 8px 16px;
+}
+
+.textInput {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: #fff;
+  font-size: 14px;
+  line-height: 20px;
+  font-family: inherit;
+  resize: none;
+  min-height: 22px;
+  max-height: 80px;
+  padding: 0;
+}
+
+.textInput::placeholder {
+  color: #666;
+}
+
+.sendBtn {
+  width: 34px;
+  height: 34px;
+  background: #fff;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.sendBtnDisabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.limitCta {
+  background: #fff;
+  border-radius: 16px;
+  padding: 14px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #000;
+  letter-spacing: -0.2px;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  width: 100%;
+}
+
+/* ── Menu modal (3-dot bottom sheet) ───────────────────────────── */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 60;
+}
+
+.menuCard {
+  width: 100%;
+  max-width: 480px;
+  background: #161616;
+  border: 1px solid #242424;
+  border-bottom: 0;
+  border-radius: 24px 24px 0 0;
+  padding: 12px 0 calc(34px + var(--safe-bottom));
+  display: flex;
+  flex-direction: column;
+}
+
+.menuHandle {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: #1F1F1F;
+  align-self: center;
+  margin-bottom: 16px;
+}
+
+.menuTitle {
+  font-size: 13px;
+  color: #666;
+  text-align: center;
+  margin: 0 0 8px;
+  font-weight: 500;
+}
+
+.menuItem {
+  padding: 16px 24px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.menuItemDanger {
+  color: #FF4444;
+}
+
+.menuItemCancel {
+  color: #888;
+}
+
+.menuDivider {
+  height: 1px;
+  background: #242424;
+  margin: 4px 24px;
+}
+
+/* ── Stats modal (centered) ────────────────────────────────────── */
+.statsOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+  padding: 24px;
+}
+
+.statsCard {
+  background: #161616;
+  border: 1px solid #242424;
+  border-radius: 24px;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 280px;
+  max-width: 100%;
+  gap: 16px;
+}
+
+.statsAvatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.statsName {
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.4px;
+  margin: 0;
+}
+
+.statsRow {
+  display: flex;
+  align-items: center;
+}
+
+.statItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 20px;
+}
+
+.statVal {
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.5px;
+}
+
+.statLbl {
+  font-size: 11px;
+  color: #666;
+  margin-top: 2px;
+}
+
+.statDivider {
+  width: 1px;
+  height: 32px;
+  background: #242424;
+}
+
+.statsClose {
+  background: #1F1F1F;
+  border-radius: 12px;
+  padding: 10px 32px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
