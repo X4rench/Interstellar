@@ -209,7 +209,7 @@ export function ProfilePage() {
                 {isPremium && subscription?.expiresAt
                   ? `до ${formatRuDate(subscription.expiresAt)}`
                   : !isPremium
-                    ? 'от 199 ⭐ / мес'
+                    ? 'от 199 ₽ / мес'
                     : ''}
               </span>
               {!isPremiumTier && <ChevronRightIcon color="#888" />}

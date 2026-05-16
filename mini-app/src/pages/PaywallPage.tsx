@@ -117,8 +117,7 @@ function TierCard({ plan, popular, features, currentTier, flowState, busyPlan, o
       <p className={styles.tierSubtitle}>{meta.shortDescription}</p>
 
       <div className={styles.tierPriceRow}>
-        <span className={styles.tierPriceStars}>{meta.stars} ⭐</span>
-        <span className={styles.tierPriceRub}>~{meta.approxRub}₽</span>
+        <span className={styles.tierPriceStars}>{meta.approxRub} ₽</span>
       </div>
       <p className={styles.tierPeriod}>
         {plan === 'day_pass' ? 'разово / 24 часа' : '/ месяц'}
@@ -155,7 +154,7 @@ function TierCard({ plan, popular, features, currentTier, flowState, busyPlan, o
           ) : currentTier === 'basic' && plan === 'premium_month' ? (
             'Апгрейд'
           ) : (
-            `Купить за ${meta.stars} ⭐`
+            `Подписаться за ${meta.approxRub} ₽`
           )}
         </button>
       )}
@@ -279,7 +278,7 @@ export function PaywallPage() {
     }
     if (status === 'failed') {
       setState('failed')
-      setErrorDetail('Платёж не прошёл. Проверь баланс Stars.')
+      setErrorDetail('Платёж не прошёл. Попробуйте ещё раз или свяжитесь с поддержкой.')
       setBusyPlan(null)
       return
     }
@@ -407,7 +406,7 @@ export function PaywallPage() {
         <div className={styles.guaranteeRow}>
           <StarIcon size={11} color="#888" />
           <span className={styles.guaranteeText}>
-            Оплата через нативный Telegram Stars · Отмена в любой момент
+            Безопасная оплата · Отмена в любой момент · Возврат по ЗоЗПП
           </span>
         </div>
 
