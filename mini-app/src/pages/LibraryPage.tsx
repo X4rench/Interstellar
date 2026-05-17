@@ -45,7 +45,7 @@ function fmtNum(n: number) {
 
 export function LibraryPage() {
   const nav = useNavigate()
-  const { characters, libraryFilter, setLibraryFilter } = useApp()
+  const { characters, libraryFilter, setLibraryFilter, isPremiumTier } = useApp()
 
   const [activeTab, setActiveTab] = useState<string>('Все')
   const [search, setSearch] = useState('')
@@ -54,14 +54,21 @@ export function LibraryPage() {
 
   const isMine = libraryFilter === 'mine'
 
+  // Скрываем 18+ персонажей от не-Premium (требование модерации платёжных
+  // систем — adult-контент только за подпиской).
+  const visibleCharacters = useMemo(
+    () => characters.filter((c) => !c.isNSFW || isPremiumTier),
+    [characters, isPremiumTier],
+  )
+
   // Динамические табы: только те категории где реально есть персонажи.
   // Порядок сохраняется из CATEGORIES (Кумиры/Исторические/...). Пустые
   // категории — скрываем чтобы юзер не тапал в "Ничего не найдено".
   const TABS = useMemo(() => {
-    const source = isMine ? characters.filter((c) => c.userCreated) : characters
+    const source = isMine ? visibleCharacters.filter((c) => c.userCreated) : visibleCharacters
     const usedCats = new Set(source.map((c) => c.category))
     return ['Все', ...CATEGORIES.slice(1).filter((cat) => usedCats.has(cat))]
-  }, [characters, isMine])
+  }, [visibleCharacters, isMine])
 
   // Reset activeTab если выбранная категория исчезла (например при свитче
   // между «Все персонажи» и «Мои персонажи»).
@@ -70,7 +77,7 @@ export function LibraryPage() {
   }, [TABS, activeTab])
 
   const filtered = useMemo(() => {
-    let list = isMine ? characters.filter((c) => c.userCreated) : characters
+    let list = isMine ? visibleCharacters.filter((c) => c.userCreated) : visibleCharacters
     if (activeTab !== 'Все') list = list.filter((c) => c.category === activeTab)
     if (search.trim()) {
       const q = search.toLowerCase()

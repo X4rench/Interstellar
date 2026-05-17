@@ -33,19 +33,28 @@ export function HomePage() {
 
   // Динамические категории: только непустые. Это синхронизировано с
   // LibraryPage — юзер не видит пустых табов на которые ничего не найдётся.
+  // Базовый список: для не-Premium 18+ персонажи полностью скрыты (не видны в
+  // каталоге даже с замком). Это требование модерации платёжных систем —
+  // adult-контент не должен быть виден без явного age-gate и подписки.
+  // Premium-юзеры видят всех.
+  const visibleCharacters = useMemo(
+    () => characters.filter((c) => !c.isNSFW || isPremiumTier),
+    [characters, isPremiumTier],
+  )
+
   const availableCats = useMemo(() => {
-    const used = new Set(characters.map((c) => c.category))
+    const used = new Set(visibleCharacters.map((c) => c.category))
     return ['Все', ...CATEGORIES.slice(1).filter((cat) => used.has(cat))]
-  }, [characters])
+  }, [visibleCharacters])
 
   useEffect(() => {
     if (!availableCats.includes(activeCat)) setActiveCat('Все')
   }, [availableCats, activeCat])
 
-  const featured = useMemo(() => characters.slice(0, 4), [characters])
+  const featured = useMemo(() => visibleCharacters.slice(0, 4), [visibleCharacters])
 
   const filtered = useMemo(() => {
-    let list = characters
+    let list = visibleCharacters
     if (activeCat !== 'Все') list = list.filter((c) => c.category === activeCat)
     if (search.trim()) {
       const q = search.toLowerCase()
@@ -56,7 +65,7 @@ export function HomePage() {
       )
     }
     return list
-  }, [characters, activeCat, search])
+  }, [visibleCharacters, activeCat, search])
 
   const recentChars = useMemo(
     () => characters.filter((c) => chats[c.id] && chats[c.id].length > 0).slice(0, 4),
