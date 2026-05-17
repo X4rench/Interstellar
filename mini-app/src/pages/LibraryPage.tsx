@@ -45,7 +45,7 @@ function fmtNum(n: number) {
 
 export function LibraryPage() {
   const nav = useNavigate()
-  const { characters, libraryFilter, setLibraryFilter, isPremiumTier } = useApp()
+  const { characters, libraryFilter, setLibraryFilter, isPremiumTier, favorites } = useApp()
 
   const [activeTab, setActiveTab] = useState<string>('Все')
   const [search, setSearch] = useState('')
@@ -53,31 +53,43 @@ export function LibraryPage() {
   const [sortVisible, setSortVisible] = useState(false)
 
   const isMine = libraryFilter === 'mine'
+  const isFavorites = libraryFilter === 'favorites'
 
-  // Скрываем 18+ персонажей от не-Premium (требование модерации платёжных
-  // систем — adult-контент только за подпиской).
+  // Скрываем 18+ персонажей от не-Premium для каталога/избранного — требование
+  // модерации платёжных систем (adult-контент только за подпиской).
+  // НО! Для "Мои" фильтр не применяем: юзер всегда видит СВОИХ персонажей,
+  // даже если он создал их с NSFW=true и не имеет Premium. Иначе мы бы
+  // прятали его собственный контент и он бы думал что "не сохранилось".
   const visibleCharacters = useMemo(
     () => characters.filter((c) => !c.isNSFW || isPremiumTier),
     [characters, isPremiumTier],
   )
 
+  // Источник для всех вычислений на странице. Зависит от libraryFilter.
+  // Для 'mine' — берём из characters напрямую (без NSFW-фильтра).
+  // Для 'favorites' — пересекаем visibleCharacters с favorites (NSFW сохраняем).
+  // Для 'all' — visibleCharacters.
+  const sourceCharacters = useMemo(() => {
+    if (isMine) return characters.filter((c) => c.userCreated)
+    if (isFavorites) return visibleCharacters.filter((c) => favorites.includes(c.id))
+    return visibleCharacters
+  }, [characters, visibleCharacters, isMine, isFavorites, favorites])
+
   // Динамические табы: только те категории где реально есть персонажи.
-  // Порядок сохраняется из CATEGORIES (Кумиры/Исторические/...). Пустые
-  // категории — скрываем чтобы юзер не тапал в "Ничего не найдено".
+  // Пустые категории — скрываем чтобы юзер не тапал в "Ничего не найдено".
   const TABS = useMemo(() => {
-    const source = isMine ? visibleCharacters.filter((c) => c.userCreated) : visibleCharacters
-    const usedCats = new Set(source.map((c) => c.category))
+    const usedCats = new Set(sourceCharacters.map((c) => c.category))
     return ['Все', ...CATEGORIES.slice(1).filter((cat) => usedCats.has(cat))]
-  }, [visibleCharacters, isMine])
+  }, [sourceCharacters])
 
   // Reset activeTab если выбранная категория исчезла (например при свитче
-  // между «Все персонажи» и «Мои персонажи»).
+  // между фильтрами).
   useEffect(() => {
     if (!TABS.includes(activeTab)) setActiveTab('Все')
   }, [TABS, activeTab])
 
   const filtered = useMemo(() => {
-    let list = isMine ? visibleCharacters.filter((c) => c.userCreated) : visibleCharacters
+    let list = sourceCharacters
     if (activeTab !== 'Все') list = list.filter((c) => c.category === activeTab)
     if (search.trim()) {
       const q = search.toLowerCase()
@@ -95,20 +107,81 @@ export function LibraryPage() {
       if (sortKey === 'new') return (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0)
       return 0
     })
-  }, [characters, activeTab, search, sortKey, isMine])
+  }, [sourceCharacters, activeTab, search, sortKey])
 
   const currentSortLabel = SORT_OPTIONS.find((o) => o.key === sortKey)?.label ?? ''
+
+  // Названия для трёх режимов фильтра — заголовок страницы и empty-state.
+  const pageTitle = isMine ? 'Мои персонажи' : isFavorites ? 'Избранное' : 'Каталог'
+  const emptyText = isMine
+    ? 'Вы ещё не создали персонажей'
+    : isFavorites
+      ? 'Нет избранных. Открой персонажа и нажми ⭐, чтобы добавить.'
+      : 'Ничего не найдено'
 
   return (
     <div className={styles.root}>
       <header className={styles.header}>
         <div className={styles.titleRow}>
-          <h1 className={styles.title}>{isMine ? 'Мои персонажи' : 'Каталог'}</h1>
-          {isMine && (
+          <h1 className={styles.title}>{pageTitle}</h1>
+          {(isMine || isFavorites) && (
             <button className={styles.showAll} onClick={() => setLibraryFilter('all')}>
               Все →
             </button>
           )}
+        </div>
+
+        {/* Сегмент-контрол: Все / Мои / Избранное.
+            Был только переход через BottomNav (Каталог=all, Мои=mine),
+            а Избранное вообще было «висячее» — без consumer'а в UI.
+            Теперь юзер видит все три режима прямо здесь и в одно касание
+            переключается. */}
+        <div
+          style={{
+            display: 'flex',
+            gap: 6,
+            padding: '4px',
+            margin: '0 0 10px',
+            background: '#131313',
+            borderRadius: 12,
+            border: '1px solid #232323',
+          }}
+        >
+          {[
+            { key: 'all', label: 'Все' },
+            { key: 'mine', label: 'Мои' },
+            { key: 'favorites', label: 'Избранное' },
+          ].map((opt) => {
+            const active = libraryFilter === opt.key
+            return (
+              <button
+                key={opt.key}
+                onClick={() => setLibraryFilter(opt.key as 'all' | 'mine' | 'favorites')}
+                style={{
+                  flex: 1,
+                  padding: '8px 4px',
+                  fontSize: 13,
+                  fontWeight: active ? 700 : 500,
+                  color: active ? '#000' : '#aaa',
+                  background: active
+                    ? 'linear-gradient(135deg, #c9b8ff, #ff9ee6)'
+                    : 'transparent',
+                  border: 0,
+                  borderRadius: 9,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  transition: 'background 0.15s ease',
+                }}
+              >
+                {opt.label}
+                {opt.key === 'favorites' && favorites.length > 0 && (
+                  <span style={{ marginLeft: 4, opacity: active ? 0.7 : 0.5 }}>
+                    {favorites.length}
+                  </span>
+                )}
+              </button>
+            )
+          })}
         </div>
 
         <div className={styles.searchRow}>
@@ -148,9 +221,7 @@ export function LibraryPage() {
       <div className={styles.body}>
         <div className={styles.grid}>
           {filtered.length === 0 && (
-            <p className={styles.emptyText}>
-              {isMine ? 'Вы ещё не создали персонажей' : 'Ничего не найдено'}
-            </p>
+            <p className={styles.emptyText}>{emptyText}</p>
           )}
           {filtered.map((c) => {
             const grad = getCharacterGradient(c)
@@ -194,6 +265,10 @@ export function LibraryPage() {
       </div>
 
       <BottomNav activeTab={isMine ? 'mine' : 'library'} />
+      {/* BottomNav подсвечивает Каталог и для 'favorites' — потому что
+          в нижней навигации нет отдельной иконки Избранного (5 слотов уже
+          заняты). Пользователь переключается на favorites через сегмент
+          выше или через карточку «Избранное» в Profile. */}
 
       {sortVisible && (
         <div className={styles.modalOverlay} onClick={() => setSortVisible(false)}>

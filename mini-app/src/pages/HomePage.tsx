@@ -67,10 +67,21 @@ export function HomePage() {
     return list
   }, [visibleCharacters, activeCat, search])
 
-  const recentChars = useMemo(
-    () => characters.filter((c) => chats[c.id] && chats[c.id].length > 0).slice(0, 4),
-    [characters, chats],
-  )
+  // Недавние: только из visibleCharacters, чтобы NSFW-персонажи (свои custom
+  // или встроенные) не показывались не-Premium юзерам. Раньше брали из
+  // characters напрямую — это создавало баг: юзер видел NSFW-карточку,
+  // тапал, попадал на paywall. Также: показываем user-created всегда,
+  // независимо от NSFW-флага (это «свои» — не скрываем от автора).
+  const recentChars = useMemo(() => {
+    const visibleIds = new Set(
+      characters
+        .filter((c) => !c.isNSFW || isPremiumTier || c.userCreated)
+        .map((c) => c.id),
+    )
+    return characters
+      .filter((c) => visibleIds.has(c.id) && chats[c.id] && chats[c.id].length > 0)
+      .slice(0, 4)
+  }, [characters, chats, isPremiumTier])
 
   // NSFW-гейт: для NSFW-персонажа без премиума — открывается paywall.
   const openChat = (char: Character) => {

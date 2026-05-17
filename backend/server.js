@@ -59,7 +59,11 @@ import {
 // ─── env ──────────────────────────────────────────────────────────────────
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const POLZA_API_URL = process.env.POLZA_API_URL || 'https://api.polza.ai/api/v1/chat/completions';
-const MODEL = process.env.POLZA_MODEL || 'grok-4.1-fast';
+// Дефолт = openai/gpt-4o-mini. Раньше был 'grok-4.1-fast' — xAI её
+// депрекейтнул, и если на сервере POLZA_MODEL не задан в .env, чат падает
+// с 'model not found' и юзер видит «не удалось получить ответ».
+// Перепроверить актуальный каталог: см. .env.example.
+const MODEL = process.env.POLZA_MODEL || 'openai/gpt-4o-mini';
 const PORT = Number(process.env.PORT) || 3001;
 const POLZA_KEY = process.env.POLZA_API_KEY;
 const BOT_TOKEN = process.env.BOT_TOKEN || '';

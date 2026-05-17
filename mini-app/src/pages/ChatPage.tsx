@@ -185,9 +185,34 @@ export function ChatPage() {
         }
       }
 
-      // Production: явная ошибка вместо mock'а — честнее по отношению к юзеру.
+      // Логируем подробно — без этого юзер видит только «нет интернета»,
+      // и мы не знаем что реально упало (upstream, timeout, auth, CORS).
+      // В Telegram WebView нет devtools, но eruda в DEV или /eruda-link
+      // в prod debug-режиме читает console.error.
+      // eslint-disable-next-line no-console
+      console.error('[chat] sendMessage failed', err)
+
+      // Production: понятная ошибка с кодом — юзер видит ЧТО конкретно
+      // сломалось и может скинуть нам код, а не «не работает».
       // В DEV mock-фолбэк остаётся, чтобы не блокировать разработку.
       let errorText = 'Не удалось получить ответ. Проверьте интернет и попробуйте снова.'
+      if (err instanceof ApiError) {
+        // Понятная копия + технический хвост в скобках чтоб юзер мог
+        // переслать его в саппорт.
+        if (err.code === 'UPSTREAM_ERROR' || err.status === 502) {
+          errorText = 'Нейросеть временно недоступна. Попробуй через минуту. (UPSTREAM_ERROR)'
+        } else if (err.code === 'TIMEOUT' || err.status === 504) {
+          errorText = 'Ответ занял слишком много времени. Попробуй ещё раз. (TIMEOUT)'
+        } else if (err.code === 'EMPTY_RESPONSE') {
+          errorText = 'Нейросеть вернула пустой ответ. Попробуй переформулировать. (EMPTY_RESPONSE)'
+        } else if (err.code === 'NO_INIT_DATA') {
+          errorText = 'Нужно открыть приложение через Telegram-бота. (AUTH)'
+        } else if (err.status === 0) {
+          errorText = 'Нет подключения к серверу. Проверь интернет. (NETWORK)'
+        } else {
+          errorText = `Не удалось получить ответ. Попробуй ещё раз. (${err.code || 'ERR_' + err.status})`
+        }
+      }
       if (import.meta.env.DEV) {
         try {
           errorText = await getMockResponse(character.id)
@@ -284,8 +309,22 @@ export function ChatPage() {
           </button>
           <button
             className={styles.iconBtn}
-            onClick={() => toggleFavorite(character.id)}
+            onClick={() => {
+              toggleFavorite(character.id)
+              // Telegram haptic — даём юзеру тактильную обратку, чтобы
+              // он понял что что-то произошло. Само избранное смотрится
+              // на /library с фильтром «Избранное» или в Profile.
+              // window.Telegram.WebApp выставляется /telegram-web-app.js
+              // (мы хостим его сами с Phase 5).
+              try {
+                const tg = (window as unknown as { Telegram?: { WebApp?: { HapticFeedback?: { impactOccurred?: (s: string) => void } } } }).Telegram
+                tg?.WebApp?.HapticFeedback?.impactOccurred?.('light')
+              } catch {
+                /* not in TG WebApp — ignore */
+              }
+            }}
             aria-label="В избранное"
+            title={isFavorite ? 'Убрать из избранного' : 'Добавить в избранное (смотри в Профиль → Избранное)'}
           >
             <StarIconSmall filled={isFavorite} color={isFavorite ? '#fff' : '#888'} />
           </button>

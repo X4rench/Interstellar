@@ -103,9 +103,10 @@ interface AppContextValue {
   characterMoods: Record<string, string>
   setCharacterMood: (characterId: string, moodId: string | null) => void
 
-  // Library filter.
-  libraryFilter: 'all' | 'mine'
-  setLibraryFilter: (f: 'all' | 'mine') => void
+  // Library filter. 'all' = весь каталог, 'mine' = user-created,
+  // 'favorites' = всё что юзер пометил ❤ (любая категория).
+  libraryFilter: 'all' | 'mine' | 'favorites'
+  setLibraryFilter: (f: 'all' | 'mine' | 'favorites') => void
 
   // Premium / подписка (источник истины — бэкенд).
   subscription: Subscription | null
@@ -201,9 +202,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [characterMoods, setCharacterMoodsState] = useState<Record<string, string>>(() =>
     loadJSON<Record<string, string>>(LS_MOODS, {}),
   )
-  const [libraryFilter, setLibraryFilterState] = useState<'all' | 'mine'>(() =>
-    loadJSON<'all' | 'mine'>(LS_LIBRARY_FILTER, 'all'),
-  )
+  const [libraryFilter, setLibraryFilterState] = useState<'all' | 'mine' | 'favorites'>(() => {
+    // Backwards-compat: старый формат был 'all' | 'mine'. Если в LS что-то
+    // невалидное — fallback на 'all'.
+    const raw = loadJSON<'all' | 'mine' | 'favorites'>(LS_LIBRARY_FILTER, 'all')
+    return raw === 'mine' || raw === 'favorites' ? raw : 'all'
+  })
   const [legalDocId, setLegalDocId] = useState<LegalDocId | null>(null)
 
   // Premium state — приходит с бэка.
@@ -356,7 +360,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const setLibraryFilter = useCallback((f: 'all' | 'mine') => {
+  const setLibraryFilter = useCallback((f: 'all' | 'mine' | 'favorites') => {
     setLibraryFilterState(f)
     saveJSON(LS_LIBRARY_FILTER, f)
   }, [])

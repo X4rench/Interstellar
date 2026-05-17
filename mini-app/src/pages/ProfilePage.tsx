@@ -18,6 +18,17 @@ const LEGAL_LINKS: { id: 'privacy_policy' | 'terms_of_service' | 'personal_data'
   { id: 'about', label: 'О приложении' },
 ]
 
+// Русское склонение для «персонаж/персонажа/персонажей».
+// 1 персонаж, 2-4 персонажа, 5+ персонажей. Исключение: 11-14 → персонажей.
+function pluralChars(n: number): string {
+  const mod10 = n % 10
+  const mod100 = n % 100
+  if (mod100 >= 11 && mod100 <= 14) return 'персонажей'
+  if (mod10 === 1) return 'персонаж'
+  if (mod10 >= 2 && mod10 <= 4) return 'персонажа'
+  return 'персонажей'
+}
+
 function formatRuDate(iso: string | null): string {
   if (!iso) return '—'
   const months = [
@@ -40,6 +51,7 @@ export function ProfilePage() {
     clearAllChats, deleteAccountFully,
     refreshSubscription, subscriptionLoading,
     isAdmin, isPartner, partnerInfo,
+    favorites, setLibraryFilter,
   } = useApp()
 
   // Лейбл и цвет для tier-badge в шапке.
@@ -132,11 +144,81 @@ export function ProfilePage() {
             <span className={styles.statVal}>{totalMessages}</span>
             <span className={styles.statLbl}>Всего</span>
           </div>
-          <div className={styles.statBox}>
+          <button
+            className={styles.statBox}
+            onClick={() => {
+              setLibraryFilter('mine')
+              nav('/library')
+            }}
+            style={{
+              background: 'inherit',
+              border: 0,
+              padding: 0,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
             <span className={styles.statVal}>{myCharsCount}</span>
             <span className={styles.statLbl}>Свои</span>
-          </div>
+          </button>
         </div>
+
+        {/* Быстрый доступ к Избранному. Видим всегда (даже если 0 — это
+            подсказка: «есть такая фича, отметь сердечком в чате»). */}
+        <button
+          onClick={() => {
+            setLibraryFilter('favorites')
+            nav('/library')
+          }}
+          style={{
+            margin: '12px 20px 0',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            padding: '14px 16px',
+            background: '#131313',
+            border: '1px solid #232323',
+            borderRadius: 14,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            width: 'calc(100% - 40px)',
+            textAlign: 'left',
+          }}
+        >
+          <span
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 10,
+              background: 'linear-gradient(135deg, #c9b8ff, #ff9ee6)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <svg width={18} height={18} viewBox="0 0 18 18" fill="none">
+              <path
+                d="M9 1l2 6h6L12 11l2 6-5-3.5L4 17l2-6L1 7h6z"
+                fill="#000"
+                stroke="#000"
+                strokeWidth={1.4}
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: '#fff' }}>
+              Избранное
+            </p>
+            <p style={{ margin: '2px 0 0', fontSize: 12, color: '#888' }}>
+              {favorites.length === 0
+                ? 'Открой персонажа и нажми ⭐, чтобы сохранить'
+                : `${favorites.length} ${pluralChars(favorites.length)}`}
+            </p>
+          </div>
+          <ChevronRightIcon color="#888" />
+        </button>
 
         {/* Pro banner — только если не Pro. Стиль как Premium-карточка в Paywall. */}
         {!isPremium && (
