@@ -59,11 +59,19 @@ import {
 // ─── env ──────────────────────────────────────────────────────────────────
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const POLZA_API_URL = process.env.POLZA_API_URL || 'https://api.polza.ai/api/v1/chat/completions';
-// Дефолт = openai/gpt-4o-mini. Раньше был 'grok-4.1-fast' — xAI её
-// депрекейтнул, и если на сервере POLZA_MODEL не задан в .env, чат падает
-// с 'model not found' и юзер видит «не удалось получить ответ».
-// Перепроверить актуальный каталог: см. .env.example.
-const MODEL = process.env.POLZA_MODEL || 'openai/gpt-4o-mini';
+// Дефолт = qwen/qwen3-235b-a22b-2507. Перешли с openai/gpt-4o-mini по
+// причинам: (a) ~6× дешевле на output, (b) гораздо разговорнее в
+// character-play (gpt-4o-mini был склонен к «помощник-стилю» с
+// бесконечными «Интересный вопрос!»), (c) отличный русский, (d) быстро
+// (non-thinking instruct, без reasoning-блоков).
+//
+// ВНИМАНИЕ: перед переключением проверь что модель есть в каталоге polza:
+//   curl -H "Authorization: Bearer $POLZA_API_KEY" \
+//        https://api.polza.ai/api/v1/models | jq '.data[].id' | grep qwen3
+//
+// Если qwen3-235b нет — возьми qwen2.5-72b-instruct как fallback. На крайний
+// случай вернись на openai/gpt-4o-mini (хуже, но точно работает).
+const MODEL = process.env.POLZA_MODEL || 'qwen/qwen3-235b-a22b-2507';
 const PORT = Number(process.env.PORT) || 3001;
 const POLZA_KEY = process.env.POLZA_API_KEY;
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
@@ -198,9 +206,12 @@ const MAX_HISTORY = 60;
 //   free: 10, basic: 20, premium: 40
 // Сейчас единый порог для всех.
 const HISTORY_TRIM_TO = 20;
-// max_tokens для output. Большинство ответов 200-400 tok. 600 — компромисс
-// между запасом и экономией на cap'е.
-const LLM_MAX_OUTPUT_TOKENS = 600;
+// max_tokens для output. Жёсткий cap чтобы модель не растягивалась в
+// лекции. Раньше было 600 — модель выходила на 3-4 длинных абзаца
+// (типичный gpt-4o-mini «помощник-стиль»). Снизили до 280: хватает на
+// 2-4 предложения живого ответа, отрезает многословность.
+// Эмодзи/одно слово/короткие реплики — естественно укладываются.
+const LLM_MAX_OUTPUT_TOKENS = 280;
 const REQUEST_TIMEOUT_MS = 60_000;
 
 const app = express();
@@ -938,8 +949,18 @@ app.post(
       body: JSON.stringify({
         model: MODEL,
         messages: aiMessages,
-        temperature: 0.9,
+        // 0.9 → 0.75: всё ещё живо и разнообразно, но модель меньше
+        // «уходит» в типичные фразы-связки. Помогает следовать persona
+        // и UNIVERSAL_RULES вместо дефолтного «помощник-стиля».
+        temperature: 0.75,
         max_tokens: LLM_MAX_OUTPUT_TOKENS,
+        // frequency_penalty снижает повторение тех же фраз — это режет
+        // «Интересный вопрос!» и подобные шаблонные зачины которые
+        // gpt-4o-mini лепит на каждый ответ.
+        frequency_penalty: 0.4,
+        // presence_penalty подталкивает к новым темам/словам вместо
+        // переформулирования мысли собеседника.
+        presence_penalty: 0.3,
       }),
       signal: controller.signal,
     });
