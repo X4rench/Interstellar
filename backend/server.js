@@ -76,6 +76,17 @@ const CORS_ORIGINS = (process.env.CORS_ALLOWED_ORIGINS || '')
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean);
+// Production-домены прода — добавляем ВСЕГДА, как страховка от ситуации
+// «забыли обновить .env при переезде». Раньше из-за этого фронт получал
+// CORS-ошибку и юзеры видели «не удалось получить ответ» в чате.
+// Эти конкретно — наши собственные домены, чужие сюда не попадут.
+const PROD_CORS_FALLBACK = [
+  'https://interstellar-app.ru',
+  'https://app.interstellar-app.ru',
+];
+for (const o of PROD_CORS_FALLBACK) {
+  if (!CORS_ORIGINS.includes(o)) CORS_ORIGINS.push(o);
+}
 
 // ─── pre-flight checks ────────────────────────────────────────────────────
 if (!POLZA_KEY) {
