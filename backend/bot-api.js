@@ -259,14 +259,22 @@ export async function editUserStarSubscription({ userId, telegramPaymentChargeId
  * Требует чтобы юзер уже написал боту хотя бы /start, иначе 403 Forbidden.
  * Ошибки не throw'аем (notifications не должны блокировать основной flow).
  */
-export async function sendMessage({ chatId, text, parseMode = 'HTML', disableWebPagePreview = true }) {
+export async function sendMessage({
+  chatId,
+  text,
+  parseMode = 'HTML',
+  disableWebPagePreview = true,
+  replyMarkup,
+}) {
   try {
-    return await tgCall('sendMessage', {
+    const params = {
       chat_id: chatId,
       text,
       parse_mode: parseMode,
       disable_web_page_preview: disableWebPagePreview,
-    });
+    };
+    if (replyMarkup) params.reply_markup = JSON.stringify(replyMarkup);
+    return await tgCall('sendMessage', params);
   } catch (err) {
     // eslint-disable-next-line no-console
     console.warn('[bot-api] sendMessage failed:', err.message);

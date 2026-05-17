@@ -408,15 +408,50 @@ app.post('/api/v1/telegram/webhook', verifyTelegramWebhook, async (req, res) => 
         });
         return res.status(200).end();
       }
-      if (text === '/start') {
+      if (text === '/start' || text?.startsWith('/start ')) {
         const { sendMessage: sendBotMessage } = await import('./bot-api.js');
         const botUsername = process.env.BOT_USERNAME || 'InterstellarBot';
+        const appName = process.env.BOT_APP_NAME || 'app';
+        const webAppUrl = `https://t.me/${botUsername}/${appName}`;
+
+        // first_name юзера — для персонализации (если есть)
+        const firstName = update.message?.from?.first_name?.trim() || 'друг';
+
         sendBotMessage({
           chatId,
           text:
-            `Добро пожаловать в <b>Interstellar</b> ⭐️\n\n` +
-            `AI-чаты с великими личностями. Открой приложение через кнопку Menu или по ссылке: ` +
-            `https://t.me/${botUsername}/app`,
+            `<b>Привет, ${firstName}!</b> ✨\n\n` +
+            `Это <b>Интерстеллар</b> — твой портал в разговоры с великими людьми всех времён.\n\n` +
+            `🧠 <b>Зигмунд Фрейд</b> — расскажет про сны и подсознание\n` +
+            `⚡ <b>Альберт Эйнштейн</b> — о вселенной простыми словами\n` +
+            `👑 <b>Клеопатра</b> — про власть, любовь и Египет\n` +
+            `📖 <b>Достоевский, Ницше, Тесла...</b> — и ещё 50+ персонажей\n\n` +
+            `🎁 Первые <b>10 сообщений — бесплатно</b>.\n\n` +
+            `Жми кнопку ниже, чтобы начать ↓`,
+          replyMarkup: {
+            inline_keyboard: [
+              [{ text: '🚀 Открыть приложение', web_app: { url: 'https://interstellar-2s4.pages.dev' } }],
+              [{ text: '💎 Тарифы и подписка', url: webAppUrl }],
+            ],
+          },
+        });
+        return res.status(200).end();
+      }
+
+      // /help — краткая помощь
+      if (text === '/help') {
+        const { sendMessage: sendBotMessage } = await import('./bot-api.js');
+        const botUsername = process.env.BOT_USERNAME || 'InterstellarBot';
+        const appName = process.env.BOT_APP_NAME || 'app';
+        sendBotMessage({
+          chatId,
+          text:
+            `<b>Команды Интерстеллар</b>\n\n` +
+            `/start — приветствие и кнопка запуска\n` +
+            `/help — эта подсказка\n` +
+            `/paysupport — помощь по платежам и возвратам\n\n` +
+            `Чтобы начать общение с персонажами — открой Mini App через меню снизу ⬇️\n` +
+            `Или по ссылке: https://t.me/${botUsername}/${appName}`,
         });
         return res.status(200).end();
       }
