@@ -11,11 +11,16 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Interstellar</title>
     <!--
-      Telegram-WebApp скрипт. Подключаем напрямую тегом script — @telegram-apps/sdk-react
-      работает поверх него. Версионный query (?56) гарантирует свежий API,
-      Telegram сам игнорирует если клиент не поддерживает фичу.
+      Telegram-WebApp скрипт. Хостим у себя в /public/telegram-web-app.js
+      вместо https://telegram.org/js/telegram-web-app.js — иначе у юзеров
+      с MTProto-прокси (или просто заблокированным telegram.org у провайдера)
+      Mini App не грузился: домен telegram.org часто блочат ровно те же ISP,
+      из-за которых юзер и включил MTProto. Сам Mini App уже доступен (раз
+      юзер сюда дошёл), значит и скрипт с нашего домена догрузится. Файл
+      обновляем редко (Telegram бампит API раз в несколько месяцев) — пере-
+      качиваем при необходимости через прокси (см. README).
     -->
-    <script src="https://telegram.org/js/telegram-web-app.js?56"></script>
+    <script src="/telegram-web-app.js"></script>
   </head>
   <body>
     <div id="root"></div>
