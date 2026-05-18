@@ -97,7 +97,7 @@ function renderLandingPage(): string {
               <span style="font-size: 16px; font-weight: 700;">Free</span>
               <span style="font-size: 16px; font-weight: 700; color: #aaa;">0 ₽</span>
             </div>
-            <p style="margin: 0; font-size: 13px; color: #888;">10 сообщений бесплатно (пожизненно)</p>
+            <p style="margin: 0; font-size: 13px; color: #888;">10 сообщений каждый день бесплатно</p>
           </div>
 
           <div style="background: #131313; border: 1px solid #232323; border-radius: 14px; padding: 16px;">

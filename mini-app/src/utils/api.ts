@@ -127,9 +127,9 @@ export interface MeResponse {
   tier?: Tier
   /** Активный Day Pass — снимает дневной лимит в текущем тире на 24h. */
   day_pass_active?: boolean
-  /** Сколько у юзера осталось бесплатных сообщений (one-shot Free). */
+  /** Сколько у юзера осталось бесплатных сообщений сегодня. */
   free_messages_remaining?: number
-  /** Total lifetime квота Free тарифа (для прогресс-бара). */
+  /** Total дневная квота Free тарифа (для прогресс-бара). */
   free_messages_lifetime?: number
 }
 
@@ -193,7 +193,7 @@ export const PLANS: Record<PlanCode | 'free', PlanMeta> = {
   free: {
     code: 'free',
     title: 'Free',
-    shortDescription: '10 сообщений на пробу',
+    shortDescription: '10 сообщений каждый день',
     stars: 0,
     approxRub: 0,
     daily_msg_limit: 0, // не используется для Free

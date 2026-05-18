@@ -117,9 +117,9 @@ interface AppContextValue {
   dayPassActive: boolean
   /** Удобный флаг: реальный Premium (а не просто Basic). */
   isPremiumTier: boolean
-  /** One-shot Free: сколько осталось бесплатных сообщений (null = ещё не загрузили). */
+  /** Сколько осталось бесплатных сообщений сегодня (null = ещё не загрузили). */
   freeMessagesRemaining: number | null
-  /** Total lifetime квота Free (для прогресс-бара / paywall копии). */
+  /** Total дневная квота Free (для прогресс-бара / paywall копии). */
   freeMessagesLifetime: number
   refreshSubscription: () => Promise<void>
   subscriptionLoading: boolean
@@ -216,8 +216,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [subscriptionError, setSubscriptionError] = useState<string | null>(null)
   const [tier, setTier] = useState<Tier>('free')
   const [dayPassActive, setDayPassActive] = useState(false)
-  // One-shot Free: сколько у юзера осталось пожизненных бесплатных сообщений.
-  // Если 0 и tier='free' — все исчерпаны, надо в paywall.
+  // Сколько у юзера осталось бесплатных сообщений на сегодня.
+  // Сбрасывается в полночь UTC. Если 0 и tier='free' — лимит дня исчерпан.
   const [freeMessagesRemaining, setFreeMessagesRemaining] = useState<number | null>(null)
   const [freeMessagesLifetime, setFreeMessagesLifetime] = useState<number>(10)
 

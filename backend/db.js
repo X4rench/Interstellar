@@ -170,22 +170,29 @@ export function getActiveSubscription(db, telegram_user_id) {
  * Если N = 10, юзер получает примерно 1 полноценный диалог (5-10 туров с
  * каким-нибудь Эйнштейном) и должен решить — стоит ли подписка.
  */
+// Free тариф: ДНЕВНОЙ лимит (раньше был lifetime — менялся для retention).
+// Логика: юзер тратит 10 сообщений за вечер → завтра возвращается →
+// продукт в рутине → выше шанс конверсии. Lifetime убивал retention:
+// потратил 10 и ушёл навсегда, потому что paywall не воспринимался.
+// Имя оставили FREE_LIFETIME_MESSAGES для совместимости со старыми
+// импортами в server.js (он отдаёт его как free_messages_lifetime в
+// /users/me — фронт читает как «общая квота»). Семантически теперь —
+// дневная.
 export const FREE_LIFETIME_MESSAGES = 10;
+export const FREE_DAILY_MESSAGES = 10;
 
 /**
- * Дневные лимиты для ПЛАТНЫХ тарифов. Точка истины — синхронизировать
+ * Дневные лимиты для всех тарифов. Точка истины — синхронизировать
  * с frontend (mini-app/src/utils/api.ts PLANS) при изменении.
  *
- * Basic: 50 msg/день — комфортно для casual-юзеров (~3-5 диалогов).
- * Premium: 200 msg/день — для активных, включая power users + NSFW + ∞ custom.
+ * Free: 10/день — пробник, сбрасывается в полночь UTC.
+ * Basic: 50 msg/день — комфортно для casual-юзеров.
+ * Premium: 200 msg/день — для активных, включая power users + NSFW.
  *
  * Day Pass снимает любой из этих лимитов на 24h в текущем тире.
- *
- * Внимание: tier='free' НЕ имеет daily limit — у него только lifetime
- * (FREE_LIFETIME_MESSAGES). Поэтому в этом объекте free=0 (placeholder).
  */
 export const TIER_DAILY_LIMITS = {
-  free: 0,        // не используется — free ограничен FREE_LIFETIME_MESSAGES
+  free: FREE_DAILY_MESSAGES,
   basic: 50,
   premium: 200,
 };
@@ -243,11 +250,16 @@ export function hasActiveDayPass(db, telegramUserId) {
  * Только для tier='free'. Платным юзерам результат не имеет смысла.
  */
 export function getFreeMessagesRemaining(db, telegramUserId) {
+  // Раньше читали users.free_messages_used (lifetime). Теперь — chat_usage
+  // за сегодняшний UTC-день. users.free_messages_used остаётся в схеме
+  // (legacy, не трогаем — миграция была бы дорогой), но больше не
+  // используется в проверках лимита.
+  const bucket = getDayBucket();
   const row = db
-    .prepare('SELECT free_messages_used FROM users WHERE telegram_user_id = ?')
-    .get(telegramUserId);
-  const used = row?.free_messages_used ?? 0;
-  return Math.max(0, FREE_LIFETIME_MESSAGES - used);
+    .prepare('SELECT count FROM chat_usage WHERE telegram_user_id = ? AND day_bucket = ?')
+    .get(telegramUserId, bucket);
+  const used = row?.count ?? 0;
+  return Math.max(0, FREE_DAILY_MESSAGES - used);
 }
 
 /**
@@ -270,38 +282,12 @@ export function checkAndIncrementChatUsage(db, telegramUserId) {
   const tier = getUserTier(db, telegramUserId);
   const hasPass = hasActiveDayPass(db, telegramUserId);
 
-  // ─── Free tier: lifetime cap ──────────────────────────────────────────
-  if (tier === 'free') {
-    const limit = FREE_LIFETIME_MESSAGES;
-    let result;
-    const tx = db.transaction(() => {
-      const row = db
-        .prepare('SELECT free_messages_used FROM users WHERE telegram_user_id = ?')
-        .get(telegramUserId);
-      const current = row?.free_messages_used ?? 0;
-
-      if (current >= limit) {
-        result = { ok: false, tier, count: current, limit, has_day_pass: false };
-        return;
-      }
-
-      db.prepare(
-        'UPDATE users SET free_messages_used = free_messages_used + 1 WHERE telegram_user_id = ?',
-      ).run(telegramUserId);
-
-      result = {
-        ok: true,
-        tier,
-        count: current + 1,
-        limit,
-        has_day_pass: false,
-      };
-    });
-    tx.immediate();
-    return result;
-  }
-
-  // ─── Paid tiers: daily cap (с обходом через Day Pass) ────────────────
+  // Унифицированная логика для всех тиров (free/basic/premium): дневная
+  // квота из chat_usage с UTC-day-bucket. Раньше free шёл по отдельной
+  // ветке через users.free_messages_used (lifetime) — поменяли на daily
+  // для retention. Day Pass снимает лимит для платных, для free не
+  // применяется (free не может купить Day Pass — он сначала покупает
+  // подписку, и тогда DP relevant).
   const limit = TIER_DAILY_LIMITS[tier];
   const bucket = getDayBucket();
 
