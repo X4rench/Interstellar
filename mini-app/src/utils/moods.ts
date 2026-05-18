@@ -1,4 +1,4 @@
-import type { Gender } from '../data/characters';
+import type { Character, Gender } from '../data/characters';
 
 /**
  * Реестр настроений (mood) — модификаторов стиля общения с персонажем.
@@ -91,9 +91,52 @@ const UNIVERSAL_RULES = `
 `.trim();
 
 /**
+ * Форматирует год для отображения в промпте.
+ * Отрицательные — «N до н.э.», положительные — просто год.
+ */
+function formatYear(year: number): string {
+  return year < 0 ? `${Math.abs(year)} до н.э.` : `${year}`;
+}
+
+/**
+ * Генерирует блок «Твоя эпоха» из era-объекта персонажа.
+ * Сообщает модели: что персонаж знает (его время), что — смутно (до рождения),
+ * и что НЕ знает (после смерти). Это резко улучшает immersion — Фрейд
+ * больше не обсуждает ОСАГО как современный консультант.
+ */
+function buildEraBlock(era: NonNullable<Character['era']>): string {
+  const born = formatYear(era.bornYear);
+  const died = era.diedYear === null ? 'жив до сих пор' : formatYear(era.diedYear);
+  const lines: string[] = [
+    `[Твоя эпоха]`,
+    `Ты родился в ${born}, ${era.diedYear === null ? 'и ещё жив' : `умер в ${died}`}.`,
+  ];
+  if (era.context) lines.push(`Эпоха: ${era.context}.`);
+  if (era.knewWell && era.knewWell.length > 0) {
+    lines.push(`Хорошо знаешь и помнишь: ${era.knewWell.join('; ')}.`);
+  }
+  lines.push(`О том что было ДО твоего рождения — знаешь смутно, из книг и рассказов. Не делай вид что был свидетелем.`);
+  if (era.diedYear !== null) {
+    if (era.didntKnow && era.didntKnow.length > 0) {
+      lines.push(`После ${died} ты НЕ знаешь ничего, в том числе: ${era.didntKnow.join('; ')}.`);
+    } else {
+      lines.push(`После ${died} ты НЕ знаешь ничего.`);
+    }
+    lines.push(`Если собеседник говорит о современных вещах (телефоны, интернет, машины, ОСАГО, страховка, кредиты, соцсети) — реагируй с удивлением и любопытством, переспрашивай. Не делай вид что знаешь. Можешь сказать «у нас такого не было», «расскажи, как это работает у вас». И переводи разговор в свою сферу — то что тебе интересно (см. [Твоя сигнатура]).`);
+  }
+  return lines.join('\n');
+}
+
+/**
  * Собирает финальную persona для отправки на backend simulator.
  * Учитывает базовый persona персонажа, выбранное настроение (mood),
- * пол (gender) и применяет универсальные правила общения.
+ * пол (gender), сигнатуру/убеждения/эпоху и применяет универсальные
+ * правила общения.
+ *
+ * Persona v2 (май 2026) — добавлены поля character.era / signature /
+ * opinions для глубокого immersion в роль. Если не заданы (старые
+ * персонажи или кастомные) — блоки не добавляются, fallback на v1
+ * поведение.
  *
  * Используется в ChatScreen перед отправкой запроса в бэк (POST /chat).
  */
@@ -101,6 +144,7 @@ export function composePersona(
   basePersona: string,
   moodId: string | null,
   gender?: Gender,
+  characterMeta?: Pick<Character, 'era' | 'signature' | 'opinions'>,
 ): string {
   const parts: string[] = [basePersona];
 
@@ -108,6 +152,17 @@ export function composePersona(
     parts.push('Говори от женского рода.');
   } else if (gender === 'male') {
     parts.push('Говори от мужского рода.');
+  }
+
+  // ── Persona v2 блоки (если есть в character) ──────────────────────
+  if (characterMeta?.signature) {
+    parts.push(`[Твоя сигнатура — фирменный ход в разговоре]\n${characterMeta.signature}`);
+  }
+  if (characterMeta?.opinions) {
+    parts.push(`[Твои убеждения — у тебя есть точка зрения]\n${characterMeta.opinions}`);
+  }
+  if (characterMeta?.era) {
+    parts.push(buildEraBlock(characterMeta.era));
   }
 
   if (moodId && MOOD_PROMPTS[moodId]) {

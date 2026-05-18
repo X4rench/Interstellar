@@ -156,7 +156,11 @@ export function ChatPage() {
     })
     setIsTyping(true)
 
-    const persona = composePersona(character.persona, currentMood, character.gender)
+    const persona = composePersona(character.persona, currentMood, character.gender, {
+      era: character.era,
+      signature: character.signature,
+      opinions: character.opinions,
+    })
     const history: ChatMessage[] = [
       ...messages.map((m) => ({ role: m.role, content: m.text })),
       { role: 'user', content: text },
