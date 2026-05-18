@@ -40,6 +40,20 @@
 26. [Кеш Telegram WebView и форс-обновление](#26-кеш-telegram-webview)
 27. [Bot commands (обязательные)](#27-bot-commands)
 28. [Что делать когда что-то пошло не так](#28-troubleshooting)
+29. [iOS Safari / Telegram WebView viewport грабли](#29-ios-safari--telegram-webview--viewport-грабли)
+30. [Telegram WebApp API — обязательные вызовы](#30-telegram-webapp-api--обязательные-вызовы)
+31. [CI/CD через GitHub Actions](#31-cicd-через-github-actions)
+32. [Cost-monitoring LLM (polza.ai)](#32-cost-monitoring-llm-polzaai)
+33. [Конкретный bot-api.js через прокси](#33-конкретный-bot-apijs-через-прокси)
+34. [ЮКасса edge cases (recurring failed, 3DS, partial refund)](#34-юкасса-edge-cases)
+35. [Чеки 54-ФЗ для самозанятого](#35-чеки-54-фз-для-самозанятого)
+36. [Telegram Stars — withdrawal в рубли](#36-telegram-stars--withdrawal-в-рубли)
+37. [Privacy Policy — конкретный скелет](#37-privacy-policy--конкретный-скелет)
+38. [Multi-region fallback / Disaster recovery](#38-multi-region-fallback--disaster-recovery)
+39. [HSTS preload + SRI + WAF rules](#39-hsts-preload--sri--waf-rules)
+40. [Menu Button vs t.me/bot/app deeplink](#40-menu-button-vs-tmebotapp-deeplink)
+41. [i18n даже если стартуете на одном языке](#41-i18n--даже-если-стартуете-на-одном-языке)
+42. [Self-hosted telegram-web-app.js — процесс обновления](#42-self-hosted-telegram-web-appjs--процесс-обновления)
 
 ---
 
@@ -2147,6 +2161,977 @@ git config --global --add safe.directory /home/interstellar/yourapp
 2. Если всё равно — нет ли другого процесса с открытой БД? `lsof | grep .sqlite`
 3. WAL-файл `.sqlite-wal` существует? Если да — нормально (WAL mode)
 4. Если БД действительно зависла — `sqlite3 app.sqlite "PRAGMA wal_checkpoint(FULL); VACUUM;"` (после backup!)
+
+---
+
+## 29. iOS Safari / Telegram WebView — viewport грабли
+
+### 29.1 100vh лжёт на iOS Safari
+
+В iOS Safari `100vh` = высота viewport **БЕЗ** address bar. Когда юзер скроллит и бар прячется — viewport вырастает, контент прыгает. Используй `100dvh` (dynamic viewport height):
+
+```css
+.root {
+  height: 100vh;       /* fallback */
+  height: 100dvh;      /* iOS 15.4+ ловит правильно */
+  overscroll-behavior: contain;   /* блокирует pull-to-refresh всей страницы */
+}
+```
+
+### 29.2 Safe-area для notch и Dynamic Island
+
+```css
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+body {
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+}
+
+/* В index.html */
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+```
+
+Без `viewport-fit=cover` env() возвращает 0px.
+
+### 29.3 visualViewport API для keyboard
+
+Когда юзер тапает в textarea на iOS, появляется клавиатура → viewport уменьшается → input может уехать ВВЕРХ. Лечится:
+
+```js
+function trackKeyboard() {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  function update() {
+    document.documentElement.style.setProperty('--vh', `${vv.height}px`);
+  }
+  vv.addEventListener('resize', update);
+  vv.addEventListener('scroll', update);
+  update();
+}
+trackKeyboard();
+```
+
+В CSS:
+```css
+.chat-page { height: var(--vh, 100dvh); }
+```
+
+### 29.4 Telegram viewportChanged event
+
+Telegram даёт свой event когда меняется размер Mini App (юзер свайпает шторку):
+```js
+const tg = window.Telegram.WebApp;
+tg.onEvent('viewportChanged', ({ isStateStable }) => {
+  if (isStateStable) {
+    document.documentElement.style.setProperty('--tg-vh', `${tg.viewportStableHeight}px`);
+  }
+});
+```
+
+### 29.5 disableVerticalSwipes — против случайного закрытия
+
+iOS юзеры свайпают вниз → Mini App сворачивается. Если страница длинная это раздражает. Можно отключить:
+
+```js
+tg.disableVerticalSwipes();   // SDK 7.7+
+// Юзер всё ещё может закрыть через крестик
+```
+
+### 29.6 touch-action + -webkit-overflow-scrolling
+
+```css
+.scrollable {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;   /* плавный inertia-scroll на iOS */
+  touch-action: pan-y;                  /* запретить horizontal-pan */
+}
+```
+
+---
+
+## 30. Telegram WebApp API — обязательные вызовы
+
+### 30.1 Жизненный цикл
+
+```js
+const tg = window.Telegram.WebApp;
+
+// 1. ОБЯЗАТЕЛЬНО при загрузке — иначе TG показывает loading-spinner навсегда
+tg.ready();
+
+// 2. На полный экран
+tg.expand();
+
+// 3. На прозрачный header (тема)
+tg.setHeaderColor('bg_color');  // или конкретный цвет '#0a0612'
+
+// 4. Theme — реагируй на изменения
+tg.onEvent('themeChanged', () => {
+  // tg.themeParams содержит цвета TG-темы
+});
+```
+
+### 30.2 BackButton — нативная кнопка «назад»
+
+```js
+import { useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+
+function useTelegramBackButton() {
+  const nav = useNavigate();
+  const loc = useLocation();
+  useEffect(() => {
+    const tg = window.Telegram?.WebApp;
+    if (!tg?.BackButton) return;
+
+    const isRoot = loc.pathname === '/' || loc.pathname === '/home';
+    if (isRoot) {
+      tg.BackButton.hide();
+    } else {
+      tg.BackButton.show();
+      const handler = () => nav(-1);
+      tg.BackButton.onClick(handler);
+      return () => tg.BackButton.offClick(handler);
+    }
+  }, [loc.pathname, nav]);
+}
+```
+
+Без этого нативная «назад» закроет Mini App вместо навигации внутри.
+
+### 30.3 MainButton — главный CTA
+
+```js
+tg.MainButton.setText('Купить Premium · 750 ₽');
+tg.MainButton.color = '#7c5cff';
+tg.MainButton.onClick(handlePurchase);
+tg.MainButton.show();
+// Скрываем когда не нужен:
+tg.MainButton.hide();
+```
+
+Полезно для payment-flow — кнопка прибита внизу TG-UI, юзер привычно жмёт.
+
+### 30.4 HapticFeedback — тактильный отклик
+
+```js
+function safeHaptic(type = 'light') {
+  try {
+    window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.(type);
+  } catch { /* iOS-only, в Desktop noop */ }
+}
+
+// При успехе:
+window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('success');
+```
+
+**⚠️ В Desktop Telegram → noop.** Не критично, но guard'и обязательно — без них в Desktop падает.
+
+### 30.5 CloudStorage — синхронизация между девайсами
+
+TG даёт key-value storage синхронизируемый между девайсами юзера (до 1024 keys × 4 KB):
+
+```js
+function cloudSet(key, value) {
+  return new Promise((resolve, reject) => {
+    window.Telegram?.WebApp?.CloudStorage?.setItem(key, value, (err, ok) => {
+      err ? reject(err) : resolve(ok);
+    });
+  });
+}
+
+// Использование:
+await cloudSet('favorites', JSON.stringify([id1, id2, id3]));
+```
+
+Хорошая альтернатива localStorage когда нужна синхронизация.
+
+### 30.6 Список платформ и feature parity
+
+| API | iOS | Android | Desktop (Windows/Linux) | macOS |
+|-----|-----|---------|-------------------------|-------|
+| `ready()` | ✅ | ✅ | ✅ | ✅ |
+| `expand()` | ✅ | ✅ | window-resize | ✅ |
+| `BackButton` | ✅ | ✅ | partial (иногда не показ.) | ✅ |
+| `MainButton` | ✅ | ✅ | ✅ | ✅ |
+| `HapticFeedback` | ✅ | ✅ | noop | noop |
+| `CloudStorage` | ✅ | ✅ | ✅ | ✅ |
+| `BiometricManager` | ✅ | ✅ | ❌ | ❌ |
+| `openInvoice` (Stars) | ✅ | ✅ | ✅ | ✅ |
+| `openLink` external | ✅ | ✅ | ✅ | ✅ |
+
+Принцип: **всегда guard'и через optional-chaining**:
+```js
+tg?.HapticFeedback?.impactOccurred?.('medium');
+```
+
+### 30.7 platform detection
+
+```js
+const platform = window.Telegram?.WebApp?.platform;
+// 'ios' | 'android' | 'tdesktop' | 'macos' | 'web' | 'unknown'
+
+if (platform === 'tdesktop') {
+  // Без haptic, BackButton может не работать
+}
+```
+
+---
+
+## 31. CI/CD через GitHub Actions
+
+### 31.1 Зачем
+
+Ручной `git pull && systemctl restart` через VNC — медленно и легко забыть `npm ci` или миграции. Автоматизируем.
+
+### 31.2 SSH-ключ для деплоя
+
+На локалке:
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/yourapp_deploy -N ""
+# Положи публичный на сервер:
+ssh-copy-id -i ~/.ssh/yourapp_deploy.pub interstellar@MOSCOW_IP
+```
+
+В GitHub → Settings → Secrets and variables → Actions → New secret:
+- `DEPLOY_SSH_KEY` = содержимое `~/.ssh/yourapp_deploy` (приватный ключ)
+- `DEPLOY_HOST` = IP/домен сервера
+- `DEPLOY_USER` = `interstellar`
+
+### 31.3 Workflow `.github/workflows/deploy-backend.yml`
+
+```yaml
+name: Deploy Backend
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'backend/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            cd /home/interstellar/yourapp
+            git pull origin master
+            cd backend
+            npm ci --omit=dev
+            sudo systemctl restart yourapp
+            sleep 3
+            curl -fsS https://api.yourapp.ru/health || (echo "Health failed!" && exit 1)
+```
+
+### 31.4 Frontend деплой = автомат CF Pages
+
+Cloudflare Pages при `git push` сама пересобирает фронт. **Ничего настраивать не надо** — связка GitHub ↔ CF Pages работает сразу после привязки репо.
+
+### 31.5 Pre-commit hook (опционально)
+
+`.husky/pre-commit`:
+```bash
+#!/bin/sh
+cd mini-app && npm run typecheck && npm run lint
+cd ../backend && node -c server.js && node -c yookassa.js
+```
+
+Защищает от пуша с syntax-ошибками.
+
+---
+
+## 32. Cost-monitoring LLM (polza.ai)
+
+### 32.1 Логирование usage в БД
+
+polza.ai возвращает `usage` в каждом ответе:
+```json
+{
+  "usage": {
+    "prompt_tokens": 1234,
+    "completion_tokens": 567,
+    "total_tokens": 1801
+  }
+}
+```
+
+Сохраняй каждый вызов:
+```sql
+CREATE TABLE llm_usage (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  telegram_user_id INTEGER NOT NULL,
+  day_bucket TEXT NOT NULL,        -- 'YYYY-MM-DD'
+  model TEXT NOT NULL,
+  prompt_tokens INTEGER NOT NULL,
+  completion_tokens INTEGER NOT NULL,
+  cost_usd_x1000000 INTEGER NOT NULL,  -- стоимость × 10^6 для целочисленной арифметики
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX idx_llm_usage_user_day ON llm_usage(telegram_user_id, day_bucket);
+```
+
+### 32.2 Calculate cost
+
+```js
+const MODEL_COSTS_PER_1M_TOKENS = {
+  'openai/gpt-4o-mini': { input: 0.15, output: 0.60 },
+  'qwen/qwen3-235b-a22b-2507': { input: 0.071, output: 0.10 },
+  'deepseek/deepseek-chat': { input: 0.32, output: 0.89 },
+};
+
+function calcCost(model, usage) {
+  const m = MODEL_COSTS_PER_1M_TOKENS[model] || { input: 0.30, output: 0.60 };
+  const inputCost = (usage.prompt_tokens / 1_000_000) * m.input;
+  const outputCost = (usage.completion_tokens / 1_000_000) * m.output;
+  return Math.round((inputCost + outputCost) * 1_000_000);  // × 10^6
+}
+```
+
+### 32.3 Алерт при превышении бюджета
+
+Cron каждый час:
+```js
+const yesterdaySpend = db.prepare(`
+  SELECT SUM(cost_usd_x1000000) AS spend
+  FROM llm_usage WHERE day_bucket = ?
+`).get(yesterdayBucket);
+
+const spendUsd = yesterdaySpend.spend / 1_000_000;
+if (spendUsd > DAILY_BUDGET_USD) {
+  // Sentry alert + telegram message админу
+  await tgCall('sendMessage', {
+    chat_id: ADMIN_TELEGRAM_IDS[0],
+    text: `⚠️ LLM spend overrun: $${spendUsd.toFixed(2)} (limit ${DAILY_BUDGET_USD})`,
+  });
+}
+```
+
+### 32.4 Per-user cost limit (anti-abuse)
+
+Один юзер с Premium-подпиской может за ночь сжечь $50+ если делает много запросов. Дополнительно к tier-based rate-limit:
+
+```js
+async function checkUserDailyCost(db, userId) {
+  const today = new Date().toISOString().slice(0, 10);
+  const row = db.prepare(`
+    SELECT SUM(cost_usd_x1000000) AS spend
+    FROM llm_usage WHERE telegram_user_id = ? AND day_bucket = ?
+  `).get(userId, today);
+  const spendUsd = (row.spend || 0) / 1_000_000;
+  // Premium платит $7.5/мес = $0.25/день. Cap на $1/день — anti-abuse.
+  if (spendUsd > 1.0) {
+    throw new ApiError(429, 'COST_LIMIT_EXCEEDED');
+  }
+}
+```
+
+---
+
+## 33. Конкретный bot-api.js через прокси
+
+```js
+// backend/bot-api.js
+import { ProxyAgent, fetch } from 'undici';
+
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const PROXY_URL = process.env.TG_API_PROXY;
+
+if (PROXY_URL) {
+  console.log(`[bot-api] Using proxy: ${PROXY_URL.replace(/:\/\/[^@]+@/, '://***:***@')}`);
+}
+
+const dispatcher = PROXY_URL ? new ProxyAgent(PROXY_URL) : undefined;
+
+export async function tgCall(method, body = {}) {
+  if (!BOT_TOKEN) throw new Error('BOT_TOKEN not configured');
+
+  const url = `https://api.telegram.org/bot${BOT_TOKEN}/${method}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    dispatcher,
+  });
+
+  const data = await res.json();
+  if (!data.ok) {
+    const err = new Error(`TG API: ${data.description}`);
+    err.code = data.error_code;
+    err.parameters = data.parameters;
+    throw err;
+  }
+  return data.result;
+}
+
+// Convenience wrappers
+export function sendMessage({ chatId, text, parseMode, replyMarkup }) {
+  return tgCall('sendMessage', {
+    chat_id: chatId,
+    text,
+    ...(parseMode && { parse_mode: parseMode }),
+    ...(replyMarkup && { reply_markup: replyMarkup }),
+  });
+}
+
+export function answerPreCheckoutQuery({ queryId, ok, errorMessage }) {
+  return tgCall('answerPreCheckoutQuery', {
+    pre_checkout_query_id: queryId,
+    ok,
+    ...(errorMessage && { error_message: errorMessage }),
+  });
+}
+
+export function refundStarPayment({ userId, chargeId }) {
+  return tgCall('refundStarPayment', {
+    user_id: userId,
+    telegram_payment_charge_id: chargeId,
+  });
+}
+```
+
+**Важно:**
+- `undici@^6` (не v8 — требует Node 22+)
+- При логе proxy URL **скрывай credentials**: `replace(/:\/\/[^@]+@/, '://***:***@')`
+
+---
+
+## 34. ЮКасса edge cases
+
+### 34.1 Recurring failed (карта истекла, недостаточно средств)
+
+ЮК шлёт webhook `payment.canceled` с `cancellation_details.reason`:
+- `expired_card` — карта истекла
+- `insufficient_funds` — нет денег на счету
+- `3d_secure_failed_on_authentication` — банк требует SCA, которой нет в recurring
+- `payment_method_restricted` — банк заблокировал recurring-платежи
+
+Поведение:
+```js
+if (event === 'payment.canceled' && row.is_recurring) {
+  // 1. Помечаем подписку как «recurring failed» — auto_renew=0
+  db.prepare('UPDATE subscriptions SET auto_renew = 0 WHERE yk_payment_method_id = ?')
+    .run(row.payment_method_id);
+
+  // 2. Шлём юзеру push через бот: «Не удалось продлить подписку: причина X»
+  await sendMessage({
+    chatId: row.telegram_user_id,
+    text: `❗ Не удалось продлить подписку. Причина: ${REASON_NAMES[reason]}.\n` +
+          `Подписка работает ещё ${daysLeft} дней. Можно обновить карту в Профиле.`,
+  });
+}
+```
+
+### 34.2 3DS на recurring (SCA-mandate ЕС-стиль)
+
+В ЕС с 2024 банки требуют SCA даже на recurring. В РФ пока проще, но **может стать строже** в 2026-2027. Готовь UX:
+
+Если recurring отдаёт `pending` с `confirmation_url`:
+1. Шлёшь юзеру push: «Подтверди продление, тыкни кнопку»
+2. Открывается Mini App → /paywall с пред-заполненным `payment_id`
+3. Юзер тапает «Подтвердить» → opens confirmation_url
+4. После 3DS-успеха → webhook `payment.succeeded`
+
+### 34.3 Partial refund — частичный возврат
+
+Юзер активно пользовался Premium 10 дней из 30, потом передумал. По ЗоЗПП ст. 32 — refund прорейтно:
+
+```js
+// 10/30 = 0.333 уже использовано
+// Возвращаем 20/30 * 750 = 500₽
+const used = (now - startedAt) / (expiresAt - startedAt);
+const refundAmount = totalAmount * (1 - used);
+
+await ykRefund({
+  payment_id: paymentId,
+  amount: refundAmount.toFixed(2),
+  reason: 'Customer requested partial refund (ZoZPP ст. 32)',
+});
+
+// В webhook refund.succeeded — отменяем подписку с экспирацией = СЕЙЧАС
+db.prepare('UPDATE subscriptions SET cancelled_at = ?, expires_at = ? WHERE ...')
+  .run(now, now, ...);
+```
+
+### 34.4 Refund-окно
+
+ЮКасса разрешает refund **в течение 180 дней** с момента платежа. После — нельзя (надо банку напрямую через спор).
+
+---
+
+## 35. Чеки 54-ФЗ для самозанятого
+
+### 35.1 Нужно ли вообще?
+
+**Самозанятый по НПД (422-ФЗ)** обычно использует приложение «Мой налог» для формирования чеков. ЮКасса по умолчанию **не формирует чек**.
+
+**Варианты:**
+1. **Простой вариант:** После каждого `payment.succeeded` webhook'а — вручную формируешь чек через **API Мой налог**:
+   ```
+   POST https://lknpd.nalog.ru/api/v1/income
+   {
+     "operationTime": "2026-05-18T19:00:00",
+     "requestTime": "2026-05-18T19:00:30",
+     "services": [{ "name": "Подписка Premium 30 дней", "amount": 750, "quantity": 1 }],
+     "totalAmount": 750,
+     "client": { "contactPhone": null, "displayName": null, "incomeType": "FROM_INDIVIDUAL" }
+   }
+   ```
+   Авторизация: получить token через `/auth/lkfl` (только если есть телефон, на котором установлен «Мой налог»)
+2. **Полу-ручной:** Формируешь чеки раз в неделю руками через приложение «Мой налог» по выписке ЮКассы
+
+3. **Через ЮКассу:** Передавать `receipt` в createPayment — ЮКасса сама отправит в свой ОФД. Но **это для ОСН/УСН/ЕНВД**, не для самозанятых.
+
+**Совет:** Стартуй с варианта 2, через 6 мес автоматизируй через вариант 1.
+
+### 35.2 Receipt-параметр (если используешь ОФД через ЮКассу)
+
+```js
+const body = {
+  amount: { value: '750.00', currency: 'RUB' },
+  // ...
+  receipt: {
+    customer: {
+      email: 'user@example.com',  // или phone
+    },
+    items: [{
+      description: 'Подписка Premium 30 дней',
+      quantity: '1.00',
+      amount: { value: '750.00', currency: 'RUB' },
+      vat_code: 1,                              // НДС
+      payment_subject: 'service',
+      payment_mode: 'full_prepayment',
+    }],
+  },
+};
+```
+
+`vat_code`:
+- 1 = «без НДС» (для самозанятых, УСН)
+- 2 = 0%
+- 3 = 10%
+- 4 = 20%
+
+---
+
+## 36. Telegram Stars — withdrawal в рубли
+
+### 36.1 Процесс
+
+1. **Hold-период:** Stars поступают на твой бот-баланс, но **21 день hold** перед выводом
+2. **Минимум:** 1000 Stars (~$13)
+3. **BotFather:** `/mybots` → выбери бот → Bot Settings → Payments → Stars Balance → Withdraw to TON
+4. **Получаешь TON** на свой TON-кошелёк (Tonkeeper, Telegram Wallet)
+5. **TON → рубли:** P2P через @wallet в Telegram, или биржи (Bybit, OKX)
+
+### 36.2 Курс
+
+- Telegram продаёт Stars юзерам по ~1.3-1.5 руб/Star
+- Telegram платит тебе при withdrawal ~$0.013/Star = ~1.0 руб/Star (комиссия TG ~30%)
+- TON → RUB: курс плавающий, спред ~2-5% на P2P
+
+Итого с 1000 Stars (~$13) получаешь ~1000₽ на руках. Это **значительно меньше чем ЮКасса** (3.5% комиссия vs 30%+).
+
+### 36.3 Когда использовать Stars
+
+- **Старт:** пока ЮКасса не одобрена (1-2 недели ожидания)
+- **Цифровой контент 18+:** в некоторых юрисдикциях Stars — единственный вариант
+- **Глобальная аудитория:** Stars работают международно, ЮКасса — только РФ
+
+---
+
+## 37. Privacy Policy — конкретный скелет
+
+Минимальный шаблон который проходит модерацию ЮКассы / AppStore:
+
+```
+ПОЛИТИКА КОНФИДЕНЦИАЛЬНОСТИ
+Действует с: 17 мая 2026
+Версия: 1.0
+
+1. ОПЕРАТОР ПЕРСОНАЛЬНЫХ ДАННЫХ
+   ФИО: [Иванов Иван Иванович]
+   Статус: Самозанятый (плательщик НПД), 422-ФЗ
+   ИНН: [123456789012]
+   Контакты: [support@yourapp.ru]
+
+2. КАКИЕ ДАННЫЕ МЫ СОБИРАЕМ
+   Из Telegram (через initData):
+   - telegram_user_id (числовой ID, не email)
+   - username (если у вас публичный, иначе нет)
+   - first_name, last_name (то что вы указали в TG-профиле)
+   - language_code (например 'ru')
+   - photo_url (если публично доступно)
+
+   От вас при использовании:
+   - История чатов с AI-персонажами (хранится в вашем браузере localStorage)
+   - Платёжная информация (через ЮКассу) — мы НЕ видим номер карты,
+     ЮКасса присылает нам только статус платежа и last4 цифр
+
+   Автоматически:
+   - IP-адрес (для антифрод и rate-limit)
+   - User-Agent (тип устройства/браузера)
+   - Timestamps активности
+
+3. ЦЕЛИ ОБРАБОТКИ
+   - Авторизация юзера (HMAC-валидация TG initData)
+   - Биллинг подписки
+   - Анти-фрод (rate-limit, audit-log)
+   - Техподдержка (отвечать на вопросы)
+   - Аналитика использования (агрегированно, без identifiable PII)
+
+4. ПРАВОВОЕ ОСНОВАНИЕ
+   - 152-ФЗ ст.6 ч.1 п.5 — исполнение договора-оферты
+   - Ваше согласие (получаем при первом входе)
+
+5. СРОКИ ХРАНЕНИЯ
+   - Аккаунт и переписка: до удаления вами + 30 дней
+   - Финансовые записи: 5 лет после последнего платежа (402-ФЗ
+     требование для бухучёта)
+   - Логи доступа: 90 дней
+
+6. КОМУ ПЕРЕДАЁМ
+   - ЮКасса (РФ, NBKO group) — для приёма платежей
+   - polza.ai (РФ, LLM-провайдер) — для генерации ответов AI
+   - Cloudflare (США) — хостинг фронтенда + DNS, передача
+     обезличенных метаданных (IP, request headers)
+   - Sentry (Германия) — мониторинг ошибок, обезличенные стеки
+
+7. ТРАНСГРАНИЧНАЯ ПЕРЕДАЧА
+   Передача в США (Cloudflare) и ЕС (Sentry) осуществляется на
+   основании вашего согласия согласно 152-ФЗ ст.12. Эти страны
+   не находятся в списке стран с адекватной защитой ПД по
+   приказу РКН №274 от 22.07.2022, поэтому требуется отдельное
+   согласие при регистрации.
+
+8. ВАШИ ПРАВА (152-ФЗ ст.14)
+   - Получить копию ваших данных: email на [support@yourapp.ru]
+   - Исправить неверные данные: email
+   - Удалить ваши данные: Профиль → Удалить мои данные.
+     Финансовые записи сохраняются 5 лет (402-ФЗ)
+   - Отозвать согласие: email
+
+9. COOKIE И ЛОКАЛЬНОЕ ХРАНИЛИЩЕ
+   Мы используем localStorage браузера для:
+   - Кеширования вашей истории чатов
+   - Сохранения настроек (избранное, mood-стили)
+   Cookie не используются.
+
+10. КОНТАКТЫ
+    Email: [support@yourapp.ru]
+    Telegram: [@YourSupportBot] или команда /paysupport в боте
+    Срок ответа на запросы: 30 дней (152-ФЗ ст.20)
+
+11. ИЗМЕНЕНИЯ В ПОЛИТИКЕ
+    При существенных изменениях запросим повторное согласие.
+    История версий доступна по запросу.
+```
+
+---
+
+## 38. Multi-region fallback / Disaster recovery
+
+### 38.1 Single point of failure
+
+Текущая архитектура:
+- 1 VPS Moscow → если упал = весь backend недоступен
+- 1 VPS Sweden → если упал = TG webhook не доходит
+- SQLite на одном диске → если диск умер = потеря данных
+
+### 38.2 Литstream — SQLite replication в S3
+
+`litestream` непрерывно реплицирует SQLite в S3-compatible (Selectel/Yandex Cloud Storage). Latency replication ~60 сек.
+
+```bash
+# На Moscow VPS:
+wget -O- https://github.com/benbjohnson/litestream/releases/download/v0.3.13/litestream-v0.3.13-linux-amd64.tar.gz | tar -xzC /usr/local/bin
+
+# Конфиг /etc/litestream.yml:
+cat > /etc/litestream.yml <<'YAML'
+dbs:
+  - path: /home/interstellar/yourapp-data/app.sqlite
+    replicas:
+      - type: s3
+        bucket: yourapp-sqlite-replica
+        endpoint: storage.yandexcloud.net
+        region: ru-central1
+        access-key-id: ENV(S3_ACCESS_KEY)
+        secret-access-key: ENV(S3_SECRET_KEY)
+YAML
+
+# Systemd service:
+systemctl enable --now litestream
+```
+
+При катастрофе:
+```bash
+# На новом VPS:
+litestream restore -o /path/to/app.sqlite s3://yourapp-sqlite-replica/app.sqlite
+# Запустить backend как обычно
+```
+
+### 38.3 Standby VPS на другом провайдере
+
+- Закажи **второй VPS** у Selectel/Timeweb (другой провайдер чем AEZA)
+- Заранее установи nginx + Node + clone репо + восстанови `.env`
+- НЕ запускай systemd unit (idle)
+
+При падении AEZA Moscow:
+1. На standby: `litestream restore` свежей БД
+2. Запускаешь backend
+3. В Cloudflare DNS: поменяй A-запись `api.yourapp.ru` на IP standby
+4. Через 1-3 минуты (CF TTL) трафик идёт на standby
+
+### 38.4 Cloudflare Health Check + auto-failover
+
+Premium план CF ($20/мес) даёт Health Check + автоматический failover:
+- CF мониторит `https://api.yourapp.ru/health`
+- При 3 fails → автоматически переключает A-запись на secondary
+- При восстановлении → возвращает обратно
+
+### 38.5 Runbook восстановления (документируй заранее!)
+
+```
+=== RUNBOOK: Восстановление после падения Moscow VPS ===
+
+1. Подтверди что Moscow реально упал:
+   ping <MOSCOW_IP>
+   curl https://api.yourapp.ru/health  # должен timeout
+
+2. Включи Standby VPS:
+   ssh standby
+   cd /home/interstellar/yourapp
+   sudo systemctl start yourapp
+
+3. Восстанови свежую БД:
+   litestream restore -o /home/interstellar/yourapp-data/app.sqlite s3://...
+
+4. Переключи DNS:
+   В CF Dashboard → DNS → api.yourapp.ru → A → <STANDBY_IP>
+   TTL уже 1 мин → через 60 сек юзеры на standby
+
+5. Проверь webhook:
+   curl https://api.yourapp.ru/health
+   В TG → отправь /start боту → должен ответить
+
+6. Мониторинг следующие 2 часа:
+   tail -f /var/log/yourapp/backend.log
+```
+
+---
+
+## 39. HSTS preload + SRI + WAF rules
+
+### 39.1 HSTS preload submission
+
+После HSTS-header в `_headers` (`max-age=31536000; includeSubDomains; preload`):
+
+1. Открой [https://hstspreload.org/](https://hstspreload.org/)
+2. Введи `yourapp.ru`
+3. Подтверди checklist (все поддомены HTTPS, redirect на HTTPS, и т.д.)
+4. Submit → через 12 недель домен в HSTS preload list всех браузеров
+
+После этого **браузеры физически отказываются** делать HTTP-запросы на твой домен — даже первый раз.
+
+### 39.2 Subresource Integrity (SRI) для self-hosted скриптов
+
+Если у тебя `<script src="/telegram-web-app.js">` — добавь integrity hash:
+
+```bash
+# Считаем hash
+HASH=$(openssl dgst -sha384 -binary mini-app/public/telegram-web-app.js | openssl base64 -A)
+echo "sha384-$HASH"
+```
+
+В `index.html`:
+```html
+<script
+  src="/telegram-web-app.js"
+  integrity="sha384-EpRdY1Q...lJ"
+  crossorigin="anonymous"
+></script>
+```
+
+Если кто-то подменит файл — браузер откажется выполнять. Hash обновляешь когда обновляешь скрипт.
+
+### 39.3 Cloudflare WAF rules
+
+CF Dashboard → твой домен → Security → WAF → Custom rules:
+
+**Rule 1: Block country=CN/KP (если не нужен мировой трафик)**
+```
+(ip.geoip.country in {"CN" "KP"}) → Block
+```
+
+**Rule 2: Challenge при высоком threat score**
+```
+(cf.threat_score gt 30) → Managed Challenge
+```
+
+**Rule 3: Rate-limit на auth endpoints**
+Cloudflare → Security → Rate Limiting Rules:
+```
+URL Path = /api/v1/auth/*
+Threshold = 10 requests per 1 min
+Action = Block for 10 min
+```
+
+---
+
+## 40. Menu Button vs t.me/bot/app deeplink
+
+### 40.1 Различия
+
+| | Menu Button (☰) | t.me/bot/app deeplink |
+|---|----------------|----------------------|
+| Где появляется | В чате с ботом, рядом с inputом | Открывается по ссылке из любого чата |
+| Mode | chat-app (привязан к чату) | standalone |
+| Доступ к `chat_instance` | ✅ да | ❌ нет |
+| `startapp` параметр | ❌ нет | ✅ да (deeplink routing) |
+| Inline-режим (в группах) | ❌ нет | ✅ да |
+| Разделение по сценариям | ❌ один URL | ✅ разные через `?startapp=` |
+
+### 40.2 Когда что использовать
+
+**Menu Button**: для постоянных юзеров бота. Они в чате → жмут ☰ → попадают в Mini App.
+
+**Deeplink `t.me/bot/app`**: для распространения. Партнёры публикуют ссылку в каналах/группах. Юзер кликает → попадает прямо в Mini App без захода в чат.
+
+**Deeplink с параметром `?startapp=premium`**: для маркетинга. «Жми кнопку → попадаешь сразу в paywall» — можно так таргетировать рекламу.
+
+### 40.3 Обработка startapp на фронте
+
+```js
+const tg = window.Telegram.WebApp;
+const startParam = tg.initDataUnsafe.start_param;
+
+if (startParam) {
+  // Например, ?startapp=paywall — открыть paywall сразу
+  if (startParam === 'paywall') {
+    navigate('/paywall');
+  } else if (startParam.startsWith('ref_')) {
+    // Партнёрская атрибуция
+    const slug = startParam.slice(4);
+    trackReferral(slug);
+  }
+}
+```
+
+### 40.4 BotFather setup для обоих
+
+```
+# Menu Button (в чате с ботом):
+/mybots → выбери → Bot Settings → Menu Button → Edit URL
+→ https://t.me/YourBot/app   (открывает Web App, не внешний браузер)
+
+# Web App (через /newapp — для deeplink):
+/newapp → выбери → название/описание/фото
+→ Web App URL: https://yourapp.ru
+→ Short name: app   (станет частью URL: t.me/YourBot/app)
+```
+
+---
+
+## 41. i18n — даже если стартуете на одном языке
+
+### 41.1 Почему сразу
+
+Через 6 мес захочется EN/UZ/KZ-локализации. **Без foundation** — переписывать все strings в UI неделю.
+
+### 41.2 Минимальная настройка
+
+```bash
+cd mini-app
+npm install i18next react-i18next i18next-browser-languagedetector
+```
+
+```ts
+// mini-app/src/i18n.ts
+import i18n from 'i18next';
+import { initReactI18next } from 'react-i18next';
+
+import ru from './locales/ru.json';
+import en from './locales/en.json';
+
+i18n.use(initReactI18next).init({
+  resources: { ru: { translation: ru }, en: { translation: en } },
+  lng: window.Telegram?.WebApp?.initDataUnsafe?.user?.language_code || 'ru',
+  fallbackLng: 'ru',
+  interpolation: { escapeValue: false },
+});
+
+export default i18n;
+```
+
+В компонентах:
+```tsx
+import { useTranslation } from 'react-i18next';
+
+function HomePage() {
+  const { t } = useTranslation();
+  return <h1>{t('home.title')}</h1>;
+}
+```
+
+`locales/ru.json`:
+```json
+{
+  "home": { "title": "Каталог" },
+  "paywall": { "buyBasic": "Купить Basic за {{price}} ₽" }
+}
+```
+
+### 41.3 Telegram language_code
+
+`window.Telegram.WebApp.initDataUnsafe.user.language_code` = 'ru' | 'en' | 'es' | etc. — язык TG-клиента юзера. Хорошее начальное значение.
+
+---
+
+## 42. Self-hosted telegram-web-app.js — процесс обновления
+
+### 42.1 Cron-проверка новых версий
+
+`/etc/cron.d/check-tg-sdk`:
+```cron
+0 6 * * 1 /home/interstellar/scripts/check-tg-sdk.sh
+```
+
+`/home/interstellar/scripts/check-tg-sdk.sh`:
+```bash
+#!/bin/bash
+LOCAL_HASH=$(sha256sum /home/interstellar/yourapp/mini-app/public/telegram-web-app.js | awk '{print $1}')
+LIVE_HASH=$(curl -x $TG_API_PROXY -s https://telegram.org/js/telegram-web-app.js | sha256sum | awk '{print $1}')
+
+if [ "$LIVE_HASH" != "$LOCAL_HASH" ]; then
+  # Шлём Telegram-уведомление админу
+  curl -s "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+    -d "chat_id=${ADMIN_ID}" \
+    -d "text=⚠️ Telegram WebApp SDK changed. Update mini-app/public/telegram-web-app.js"
+fi
+```
+
+### 42.2 Процедура обновления
+
+1. Cron уведомил что версия изменилась
+2. На локальном ПК:
+   ```bash
+   curl -x http://user:pass@SWEDEN_IP:3128 -sL \
+     https://telegram.org/js/telegram-web-app.js \
+     -o mini-app/public/telegram-web-app.js
+   ```
+3. **Сравни diff** — что изменилось (есть ли breaking changes)
+4. **Тестируй на DEV** — запусти Mini App, проверь основные сценарии
+5. **Обнови SRI hash** в `index.html` (см. 39.2)
+6. Commit + push → CF Pages автодеплой
 
 ---
 
