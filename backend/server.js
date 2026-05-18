@@ -35,6 +35,16 @@ import {
   manualRecoverPayment,
 } from './payments.js';
 import {
+  createYkPayment,
+  getYkPaymentStatus,
+  handleYkPaymentSucceeded,
+  handleYkPaymentCanceled,
+  handleYkRefundSucceeded,
+  renewSubscriptionsCron,
+  YK_PLAN_PRICES_KOPECKS,
+} from './yk-handlers.js';
+import { isYkEnabled, isYkIp } from './yookassa.js';
+import {
   listUsers as adminListUsers,
   grantPartner,
   listPartners,
@@ -361,6 +371,126 @@ app.get('/api/v1/billing/invoice-status/:payload', requireAuth, (req, res) => {
   const payload = req.params.payload;
   const result = getInvoiceStatus({ db, userId, payload });
   res.json({ ok: true, status: result.status });
+});
+
+// ─── ЮКасса: создание платежа ──────────────────────────────────────────
+// Использует API ЮКассы напрямую (не через Telegram-инвойс). Платёж
+// идёт на сайт ЮК (confirmation_url) — юзер платит картой/СБП/T-Pay,
+// возвращается на наш фронт по return_url. Параллельно прилетает
+// webhook на /api/v1/yookassa-webhook, который активирует подписку.
+//
+// Rate-limit: 5/min — те же что для Stars, защита от двойных кликов.
+app.post(
+  '/api/v1/billing/yk-create-payment',
+  requireAuth,
+  rateLimit({ bucket: 'yk_create_payment', windowMs: 60_000, max: 5 }),
+  async (req, res) => {
+    try {
+      if (!isYkEnabled()) {
+        return res.status(503).json({ ok: false, error: 'YK_NOT_CONFIGURED' });
+      }
+      const userId = req.tgUser.telegram_user_id;
+      const rawPlan = req.body?.plan || 'basic_month';
+      const autoRenew = req.body?.auto_renew !== false; // по умолчанию вкл.
+      const returnUrl = req.body?.return_url;
+
+      if (!YK_PLAN_PRICES_KOPECKS[rawPlan]) {
+        return res.status(400).json({ ok: false, error: 'UNSUPPORTED_PLAN' });
+      }
+      if (typeof returnUrl !== 'string' || !returnUrl.startsWith('https://')) {
+        return res.status(400).json({ ok: false, error: 'BAD_RETURN_URL' });
+      }
+      // Whitelist: return_url должен быть на нашем домене (anti-OAuth).
+      const allowedHosts = ['interstellar-app.ru', 'app.interstellar-app.ru'];
+      try {
+        const host = new URL(returnUrl).hostname;
+        if (!allowedHosts.includes(host)) {
+          return res.status(400).json({ ok: false, error: 'BAD_RETURN_HOST' });
+        }
+      } catch {
+        return res.status(400).json({ ok: false, error: 'BAD_RETURN_URL' });
+      }
+
+      upsertUser(db, req.tgUser);
+      const result = await createYkPayment({
+        db,
+        userId,
+        plan: rawPlan,
+        autoRenew,
+        returnUrl,
+      });
+      res.json({ ok: true, ...result });
+    } catch (err) {
+      console.error('[yk] create-payment failed:', err);
+      res.status(500).json({ ok: false, error: 'INTERNAL_ERROR' });
+    }
+  },
+);
+
+// ─── ЮКасса: polling статуса ───────────────────────────────────────────
+// Клиент после возврата с YK-сайта поллит этот endpoint каждые 1.5s.
+// Возвращает 'succeeded' когда webhook реально пришёл и подписка
+// активирована — до тех пор 'pending'/'unknown'.
+app.get('/api/v1/billing/yk-status/:paymentId', requireAuth, async (req, res) => {
+  try {
+    const userId = req.tgUser.telegram_user_id;
+    const paymentId = req.params.paymentId;
+    if (!/^[a-zA-Z0-9_-]{16,64}$/.test(paymentId)) {
+      return res.status(400).json({ ok: false, error: 'BAD_PAYMENT_ID' });
+    }
+    const result = await getYkPaymentStatus({ db, userId, paymentId });
+    res.json({ ok: true, status: result.status });
+  } catch (err) {
+    console.error('[yk] status poll failed:', err);
+    res.status(500).json({ ok: false, error: 'INTERNAL_ERROR' });
+  }
+});
+
+// ─── ЮКасса webhook ────────────────────────────────────────────────────
+// ЮК шлёт callback при изменении статуса платежа. Защита:
+//   1) IP-whitelist (ЮК публикует список своих исходящих IP)
+//   2) Идемпотентность через UNIQUE(yk_payment_id) и status-check
+// Всегда возвращаем 200 для известных event-типов, чтобы ЮК не ретраил
+// (если упадём с 5xx — ЮК будет долбить нас часами).
+app.post('/api/v1/yookassa-webhook', (req, res) => {
+  // Берём именно req.ip (TRUST_PROXY_HOPS должен быть выставлен)
+  const ip = req.ip || req.connection?.remoteAddress || '';
+  if (!isYkIp(ip)) {
+    console.warn(`[yk-webhook] rejected ip=${ip}`);
+    return res.status(403).json({ ok: false, error: 'IP_NOT_ALLOWED' });
+  }
+
+  const body = req.body;
+  if (!body || body.type !== 'notification') {
+    return res.status(400).json({ ok: false, error: 'BAD_BODY' });
+  }
+
+  try {
+    switch (body.event) {
+      case 'payment.succeeded':
+        handleYkPaymentSucceeded({ db, ykPayment: body.object });
+        break;
+      case 'payment.canceled':
+        handleYkPaymentCanceled({ db, ykPayment: body.object });
+        break;
+      case 'refund.succeeded':
+        handleYkRefundSucceeded({ db, ykRefund: body.object });
+        break;
+      case 'payment.waiting_for_capture':
+        // capture=true в createPayment — этот event не должен приходить.
+        // Если придёт — игнорируем, лог чтоб знать.
+        console.log('[yk-webhook] waiting_for_capture (ignored)');
+        break;
+      default:
+        console.log(`[yk-webhook] unknown event: ${body.event}`);
+    }
+    return res.json({ ok: true });
+  } catch (err) {
+    // НЕ кидаем 5xx — иначе ЮК будет ретраить. Записываем в логи и
+    // отвечаем 200, ручной разбор по логам.
+    console.error('[yk-webhook] handler error:', err);
+    return res.json({ ok: true, internal_error: true });
+  }
 });
 
 // ─── Telegram webhook ──────────────────────────────────────────────────
@@ -1091,4 +1221,27 @@ if (BOT_TOKEN && !DEV_BYPASS) {
   }, intervalMs);
 } else {
   console.log('[backend] reconcile: DISABLED (no BOT_TOKEN or DEV bypass active)');
+}
+
+// ─── YooKassa: cron автопродления ──────────────────────────────────────
+// Каждый час проверяем подписки которые истекают в течение 24h и имеют
+// auto_renew=1 + сохранённый payment_method_id. Делаем recurring-платёж
+// через ЮК → webhook payment.succeeded → продление на 30 дней.
+// Запускается только если ЮК сконфигурирована.
+if (isYkEnabled()) {
+  const YK_RENEW_INTERVAL_MS = 60 * 60 * 1000; // каждый час
+  console.log('[backend] yk-renewal: every 60min');
+
+  // Первый прогон через 5 минут после старта
+  setTimeout(() => {
+    renewSubscriptionsCron({ db }).catch((err) => {
+      console.error('[yk-cron] initial run failed:', err);
+    });
+  }, 5 * 60 * 1000);
+
+  setInterval(() => {
+    renewSubscriptionsCron({ db }).catch((err) => {
+      console.error('[yk-cron] cron run failed:', err);
+    });
+  }, YK_RENEW_INTERVAL_MS);
 }

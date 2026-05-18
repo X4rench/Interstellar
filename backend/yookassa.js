@@ -49,9 +49,12 @@ export function ykMode() {
 
 /** Кидаемое из всех публичных функций при ошибке. */
 export class YkError extends Error {
-  constructor(public httpStatus, public ykCode, public ykDescription, message) {
+  constructor(httpStatus, ykCode, ykDescription, message) {
     super(message || `YK ${httpStatus} ${ykCode}: ${ykDescription}`);
     this.name = 'YkError';
+    this.httpStatus = httpStatus;
+    this.ykCode = ykCode;
+    this.ykDescription = ykDescription;
   }
 }
 

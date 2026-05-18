@@ -91,6 +91,14 @@ ALTER TABLE subscriptions ADD COLUMN auto_renew INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE subscriptions ADD COLUMN yk_payment_method_id TEXT;
 ALTER TABLE subscriptions ADD COLUMN source TEXT NOT NULL DEFAULT 'stars';
 
+-- ────────────────────────────────────────────────────────────────────
+-- day_passes: добавляем source, чтобы различать Stars vs YooKassa.
+-- telegram_payment_charge_id оставляем как есть — для YooKassa туда
+-- пишется yk_payment_id (формально не Stars-charge, но UNIQUE-семантика
+-- сохраняется и поле уже есть в схеме).
+-- ────────────────────────────────────────────────────────────────────
+ALTER TABLE day_passes ADD COLUMN source TEXT NOT NULL DEFAULT 'stars';
+
 -- Индекс для cron: найди подписки которые истекают завтра и имеют
 -- auto_renew + saved card.
 CREATE INDEX IF NOT EXISTS idx_subs_renewal_due
