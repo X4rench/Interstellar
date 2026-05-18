@@ -8,7 +8,10 @@
 .body {
   flex: 1;
   overflow-y: auto;
-  padding: calc(40px + var(--safe-top)) 20px 16px;
+  /* Top: status-bar + хедер. Bottom: 80px под BottomNav (он 64px + gap)
+     плюс safe-bottom для iOS-bezel. Раньше bottom был 16px → последние
+     блоки (Юридическое, версия) уезжали под BottomNav и «наезжало». */
+  padding: calc(40px + var(--safe-top)) 20px calc(80px + var(--safe-bottom));
 }
 
 .headerRow {

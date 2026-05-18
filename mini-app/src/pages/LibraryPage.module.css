@@ -1,7 +1,12 @@
 .root {
   display: flex;
   flex-direction: column;
-  min-height: 100dvh;
+  /* height + overflow:hidden фиксируют viewport — внутри скроллится
+     только .body (с overflow-y:auto). Раньше было min-height и без
+     overflow → весь page скроллился, search-bar и шапка уезжали
+     вместе с контентом. Теперь шапка с поиском остаётся на месте. */
+  height: 100dvh;
+  overflow: hidden;
   background: #000;
 }
 
