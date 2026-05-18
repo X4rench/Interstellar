@@ -28,6 +28,18 @@
 14. [💥 ГРАБЛИ — список всех проблем и решений](#14-грабли)
 15. [Чеклисты перед launch](#15-чеклисты)
 16. [Мониторинг и инциденты](#16-мониторинг-и-инциденты)
+17. [Команды-памятки](#17-команды-памятки)
+18. [Стек технологий](#18-стек-технологий)
+19. [Юридические документы (152-ФЗ, 436-ФЗ, оферта)](#19-юридические-документы)
+20. [База данных и миграции](#20-база-данных-и-миграции)
+21. [Идемпотентность и audit log платежей](#21-идемпотентность-и-audit-log-платежей)
+22. [RBAC и admin-операции](#22-rbac-и-admin-операции)
+23. [Шифрование PII (AES-256-GCM)](#23-шифрование-pii)
+24. [NSFW контент и age-gate (436-ФЗ)](#24-nsfw-контент-и-age-gate)
+25. [DEV-режим и тестирование](#25-dev-режим-и-тестирование)
+26. [Кеш Telegram WebView и форс-обновление](#26-кеш-telegram-webview)
+27. [Bot commands (обязательные)](#27-bot-commands)
+28. [Что делать когда что-то пошло не так](#28-troubleshooting)
 
 ---
 
@@ -1275,6 +1287,880 @@ sqlite3 app.sqlite "UPDATE users SET free_messages_used=0 WHERE telegram_user_id
 - ЮКасса v3 (платежи)
 - Telegram Bot API
 - Sentry (мониторинг)
+
+---
+
+---
+
+## 19. Юридические документы
+
+> **Без этих документов ЮКасса не одобрит, РКН может оштрафовать, AppStore забанит. Юзеры подадут в суд по ЗоЗПП. ОБЯЗАТЕЛЬНО.**
+
+Все документы должны быть **доступны юзеру В Mini App** (не только email/PDF) — это требование модерации платёжных систем.
+
+### 19.1 Список обязательных документов
+
+| Документ | Зачем | Срок чтения |
+|----------|-------|-------------|
+| **Договор-оферта** | ЗоЗПП, GDPR-аналог в РФ. Главный legally binding документ. | Юзер видит ссылку до первой оплаты |
+| **Политика конфиденциальности** | 152-ФЗ. Какие данные собираем, зачем, куда передаём. | Доступна в Profile + при первом старте |
+| **Согласие на обработку ПД** | 152-ФЗ. Чекбокс «соглашаюсь» при первом входе. | Сохраняем факт согласия в БД с timestamp |
+| **Условия подписки** | Условия autorenew, отмена, refund. Можно частью оферты. | До покупки подписки |
+| **Контакты для жалоб** | ЗоЗПП ст. 23. Email + бот-команда /paysupport. | В Profile «Контакты» |
+
+### 19.2 Что обязательно в оферте
+
+```
+1. Полное наименование правообладателя
+   - Самозанятый: «Иванов Иван Иванович, ИНН 123456789012»
+   - ИП: «ИП Иванов И.И., ОГРНИП ..., ИНН ...»
+   - ООО: «ООО "Компания", ОГРН ..., ИНН ...»
+2. Описание услуг (что покупает юзер)
+3. Цены (точно копейка в копейку)
+4. Способы оплаты (карта, СБП, ЮMoney, etc.)
+5. Условия автопродления (явно прописать что recurring)
+6. Порядок отмены — где, как, сроки
+7. Возврат денежных средств:
+   - ЗоЗПП ст. 32: можно отказаться в любой момент с возвратом
+     неиспользованной части. Для digital — обычно прорейтно или нет
+     возврата если услуга оказана.
+   - Day Pass = «расходный» цифровой контент, возврату не подлежит после
+     активации (ПП РФ № 55).
+8. Срок предоставления услуги (30 дней для подписки)
+9. Ответственность сторон
+10. Дата вступления в силу
+```
+
+### 19.3 Структура хранения документов в проекте
+
+В `mini-app/src/utils/legalContent.ts`:
+
+```ts
+export const LEGAL_DOCS = {
+  privacy_policy: {
+    title: 'Политика конфиденциальности',
+    effectiveDate: '17 мая 2026',
+    content: `...полный текст...`,
+  },
+  terms_of_service: {
+    title: 'Условия использования',
+    effectiveDate: '17 мая 2026',
+    content: `...`,
+  },
+  personal_data: {
+    title: 'Обработка персональных данных (152-ФЗ)',
+    effectiveDate: '17 мая 2026',
+    content: `...`,
+  },
+  subscription: {
+    title: 'Условия подписки',
+    effectiveDate: '17 мая 2026',
+    content: `...`,
+  },
+  about: {
+    title: 'О приложении',
+    content: `Правообладатель: ${HOLDER_NAME}\nИНН: ${HOLDER_INN}\n...`,
+  },
+};
+```
+
+### 19.4 Согласие пользователя (152-ФЗ обязательное)
+
+При первом входе показываешь модалку:
+- ☑ «Я подтверждаю что мне 18 лет» (если есть 18+ контент)
+- ☑ «Я согласен с обработкой персональных данных» + ссылка на 152-ФЗ doc
+- ☑ «Я ознакомлен с условиями оферты» + ссылка
+
+В БД храним факт + timestamp + версия документа:
+```sql
+CREATE TABLE legal_consents (
+  telegram_user_id INTEGER,
+  doc_id TEXT,           -- 'privacy_policy', 'age_18', etc.
+  doc_version TEXT,      -- '2026-05-17' — дата вступления в силу
+  consented_at INTEGER,  -- timestamp
+  PRIMARY KEY (telegram_user_id, doc_id)
+);
+```
+
+При изменении документа (новая версия) — **спросить согласие заново**.
+
+### 19.5 РКН-уведомление (152-ФЗ)
+
+Если собираешь ПД (имя, email, ID юзера, IP) — нужно подать **уведомление об обработке ПД** в РКН.
+- Подаётся через [pd.rkn.gov.ru](https://pd.rkn.gov.ru/)
+- Бесплатно
+- Срок рассмотрения 30 дней
+- Без штрафов если просто не подал, но при жалобе РКН может выписать предписание
+
+Для **самозанятого** работающего только с TG initData (publicly visible через клиента) — порог риска низкий. Но **подать уведомление = чистая совесть**.
+
+### 19.6 Контактные данные для покупателей
+
+ЗоЗПП обязывает указывать:
+- **Email поддержки** — отвечаешь в течение 10 рабочих дней
+- **Telegram бот-команда** `/paysupport` — обязательно для платёжных вопросов (требование TG)
+- Реквизиты правообладателя (см. 19.2)
+
+В Mini App → Profile → «Контакты»:
+```
+Email: support@yourapp.ru
+Telegram: @YourSupportBot или команда /paysupport
+Правообладатель: [имя/ИНН]
+```
+
+---
+
+## 20. База данных и миграции
+
+### 20.1 Схема (минимальная для подписочного приложения)
+
+```sql
+-- 001_init.sql
+CREATE TABLE users (
+  telegram_user_id INTEGER PRIMARY KEY,
+  username TEXT,
+  first_name TEXT,
+  last_name TEXT,
+  language_code TEXT,
+  first_seen_at INTEGER NOT NULL,
+  last_seen_at INTEGER NOT NULL,
+  free_messages_used INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE subscriptions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  telegram_user_id INTEGER NOT NULL,
+  plan TEXT NOT NULL CHECK (plan IN ('basic_month', 'premium_month')),
+  started_at INTEGER NOT NULL,    -- ms!
+  expires_at INTEGER NOT NULL,    -- ms!
+  is_trial INTEGER NOT NULL DEFAULT 0,
+  cancelled_at INTEGER,
+  payment_id INTEGER,
+  telegram_payment_charge_id TEXT UNIQUE,  -- идемпотентность
+  auto_renew INTEGER NOT NULL DEFAULT 0,
+  yk_payment_method_id TEXT,
+  source TEXT NOT NULL DEFAULT 'stars',
+  FOREIGN KEY (telegram_user_id) REFERENCES users(telegram_user_id)
+);
+
+CREATE INDEX idx_subscriptions_active
+  ON subscriptions(telegram_user_id, expires_at);
+
+CREATE TABLE day_passes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  telegram_user_id INTEGER NOT NULL,
+  purchased_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  telegram_payment_charge_id TEXT NOT NULL UNIQUE,
+  source TEXT NOT NULL DEFAULT 'stars'
+);
+
+CREATE TABLE chat_usage (
+  telegram_user_id INTEGER NOT NULL,
+  day_bucket TEXT NOT NULL,    -- 'YYYY-MM-DD' UTC
+  count INTEGER NOT NULL DEFAULT 0,
+  last_used_at INTEGER NOT NULL,
+  PRIMARY KEY (telegram_user_id, day_bucket)
+);
+
+CREATE TABLE legal_consents (
+  telegram_user_id INTEGER NOT NULL,
+  doc_id TEXT NOT NULL,
+  doc_version TEXT NOT NULL,
+  consented_at INTEGER NOT NULL,
+  PRIMARY KEY (telegram_user_id, doc_id)
+);
+
+CREATE TABLE audit_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  occurred_at INTEGER NOT NULL,
+  actor_user_id INTEGER,
+  action TEXT NOT NULL,
+  target_resource TEXT,
+  target_id TEXT,
+  payload_json TEXT,
+  ip TEXT,
+  request_id TEXT,
+  prev_hash TEXT,
+  this_hash TEXT NOT NULL
+);
+```
+
+### 20.2 Версионирование миграций
+
+`backend/migrations/00X_description.sql` — файлы пронумерованы:
+```
+001_init.sql
+002_affiliate.sql
+003_chat_usage.sql
+004_pricing_tiers.sql
+005_free_messages_used.sql
+006_yookassa.sql
+```
+
+В `backend/db.js`:
+```js
+function applyMigrations(db) {
+  db.exec(`CREATE TABLE IF NOT EXISTS migrations (
+    name TEXT PRIMARY KEY,
+    applied_at INTEGER NOT NULL
+  )`);
+
+  const files = fs.readdirSync('./migrations').sort();
+  for (const file of files) {
+    const applied = db.prepare('SELECT 1 FROM migrations WHERE name = ?').get(file);
+    if (applied) continue;
+
+    const sql = fs.readFileSync(`./migrations/${file}`, 'utf-8');
+    db.transaction(() => {
+      db.exec(sql);
+      db.prepare('INSERT INTO migrations (name, applied_at) VALUES (?, ?)').run(file, Date.now());
+    })();
+    console.log(`[db] applied migration ${file}`);
+  }
+}
+```
+
+### 20.3 SQLite оптимизация для прода
+
+При открытии БД:
+```js
+db.pragma('journal_mode = WAL');   // Write-Ahead Log — concurrent reads
+db.pragma('synchronous = NORMAL'); // балансе между скоростью и надёжностью
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 5000');  // ВАЖНО! При WAL-конфликтах ждать 5s
+```
+
+**ГРАБЛИ:** Без `busy_timeout` при одновременном webhook-write + reconciliation-scan может бросить `SQLITE_BUSY`. С таймаутом — ждёт.
+
+### 20.4 Бэкапы
+
+```bash
+# Каждые 6 часов в cron
+sqlite3 /path/to/app.sqlite ".backup /backups/app-$(date +%Y%m%d-%H%M).db"
+
+# Через rclone в offsite (Google Drive / Яндекс.Диск / S3)
+rclone copy /backups remote:yourapp-backups
+
+# Очистка локально старше 7 дней
+find /backups -name "app-*.db" -mtime +7 -delete
+```
+
+### 20.5 Восстановление из бэкапа
+
+```bash
+# Остановить бэк
+systemctl stop yourapp
+
+# Восстановить
+cp /backups/app-20260518-1200.db /home/interstellar/yourapp-data/app.sqlite
+
+# Запустить
+systemctl start yourapp
+```
+
+⚠️ Восстановление = потеря всех изменений после бэкапа. Платежи которые прошли webhook но не попали в бэкап — потеряются. Поэтому:
+- Бэкап каждые 6 часов минимум
+- ЮКасса webhook idempotent — повторить можно через ЛК ЮК (см. секцию 21)
+
+---
+
+## 21. Идемпотентность и audit log платежей
+
+### 21.1 UNIQUE charge_id — главная защита от double-spend
+
+```sql
+ALTER TABLE payments ADD COLUMN telegram_payment_charge_id TEXT UNIQUE;
+ALTER TABLE subscriptions ADD COLUMN telegram_payment_charge_id TEXT UNIQUE;
+```
+
+При обработке webhook'а:
+```js
+try {
+  db.prepare(`
+    INSERT INTO subscriptions (telegram_user_id, plan, ..., telegram_payment_charge_id)
+    VALUES (?, ?, ..., ?)
+  `).run(userId, plan, ..., chargeId);
+} catch (err) {
+  if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+    // Replay — этот платёж уже обработан, идемпотентность сработала
+    console.log(`[payments] replay detected for charge ${chargeId}`);
+    return { duplicate: true };
+  }
+  throw err;
+}
+```
+
+### 21.2 Audit log с hash-chain (tamper-evident)
+
+Для финансовой аккуратности — каждое значимое действие пишется в `audit_log` с хешем предыдущей записи (как блокчейн):
+
+```js
+function appendAudit({ db, action, payload }) {
+  const tx = db.transaction(() => {
+    const prev = db.prepare('SELECT this_hash FROM audit_log ORDER BY id DESC LIMIT 1').get();
+    const prevHash = prev?.this_hash || '0000';
+    const now = Date.now();
+    const data = JSON.stringify({ action, payload, prevHash, now });
+    const thisHash = crypto.createHash('sha256').update(data).digest('hex');
+    db.prepare(`
+      INSERT INTO audit_log (occurred_at, action, payload_json, prev_hash, this_hash)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(now, action, JSON.stringify(payload), prevHash, thisHash);
+  });
+  tx();
+}
+
+// Использование:
+appendAudit({ db, action: 'subscription.activated', payload: { user_id, plan, charge_id } });
+appendAudit({ db, action: 'refund.issued', payload: { ... } });
+```
+
+Проверка цепочки (cron каждый день):
+```js
+function verifyAuditChain(db) {
+  const rows = db.prepare('SELECT * FROM audit_log ORDER BY id').all();
+  let prevHash = '0000';
+  for (const row of rows) {
+    const data = JSON.stringify({ /* same fields */ prevHash });
+    const expected = crypto.createHash('sha256').update(data).digest('hex');
+    if (row.this_hash !== expected) {
+      console.error(`AUDIT CHAIN BROKEN at row ${row.id}`);
+      return false;
+    }
+    prevHash = row.this_hash;
+  }
+  return true;
+}
+```
+
+Если кто-то залез в БД и удалил запись о платеже — цепочка сломается, мы это увидим.
+
+### 21.3 Refund logic — отменяем КОНКРЕТНУЮ подписку
+
+**ГРАБЛИ:** Когда юзер делает refund одного платежа, нельзя `UPDATE subscriptions SET cancelled_at = ?` для всех его активных подписок! Если у него Basic + Premium (нестандартно, но возможно), refund Basic не должен убить Premium.
+
+Правильно — отменять только подписку, созданную **после** этого платежа (`started_at >= payment.succeeded_at`):
+
+```js
+db.prepare(`
+  UPDATE subscriptions SET cancelled_at = ?
+  WHERE telegram_user_id = ?
+    AND source = 'yookassa'
+    AND plan = ?               -- тот же план
+    AND started_at >= ?        -- после этого платежа
+    AND cancelled_at IS NULL
+`).run(now, userId, plan, paymentSucceededAt);
+```
+
+### 21.4 Reconciliation cron (защита от потерянных webhook'ов)
+
+Webhook теряется в 0.1-1% случаев. Каждые 5 минут идём в ЮК/TG API и сверяем:
+
+```js
+// Для Telegram Stars
+async function reconcileMissingPayments({ db }) {
+  const transactions = await tgCall('getStarTransactions', { limit: 100 });
+  for (const tx of transactions.transactions) {
+    const charge = tx.id;
+    const exists = db.prepare('SELECT 1 FROM payments WHERE telegram_payment_charge_id = ?').get(charge);
+    if (exists) continue;
+    // Webhook не дошёл — активируем подписку вручную
+    activateSubscription({ db, telegramUserId: tx.source.user.id, charge });
+  }
+}
+
+// Для ЮКассы — сложнее, нет /transactions API. Используем check status одной транзакции:
+// При получении статуса от фронта через poll если status='pending' старше 30 сек — getPayment(id).
+```
+
+---
+
+## 22. RBAC и admin-операции
+
+### 22.1 Роли
+
+```js
+export type UserRole = 'regular' | 'partner' | 'admin';
+
+function loadRole(db, telegramUserId, adminIds) {
+  if (adminIds.includes(telegramUserId)) return 'admin';
+  const partner = db.prepare('SELECT 1 FROM partners WHERE telegram_user_id = ?').get(telegramUserId);
+  return partner ? 'partner' : 'regular';
+}
+```
+
+`ADMIN_TELEGRAM_IDS` хардкодим в `.env` (минимум 1 админ обязателен — иначе никто не может выдать первого partner'а).
+
+### 22.2 Middleware requireRole
+
+```js
+function requireRole(...allowed) {
+  return (req, res, next) => {
+    if (!allowed.includes(req.role)) {
+      return res.status(403).json({ error: 'FORBIDDEN' });
+    }
+    next();
+  };
+}
+
+app.get('/api/v1/admin/users', requireAuth, requireRole('admin'), handler);
+app.get('/api/v1/partner/summary', requireAuth, requireRole('partner', 'admin'), handler);
+```
+
+### 22.3 requireFreshAuth — защита от long-lived initData
+
+initData в TG живёт 24 часа. Для критических операций (refund, grant partner) требуем initData свежий — не старше 1 часа:
+
+```js
+function requireFreshAuth(maxAgeSec) {
+  return (req, res, next) => {
+    const ageSec = Date.now() / 1000 - req.tgUser.auth_date;
+    if (ageSec > maxAgeSec) {
+      return res.status(401).json({ error: 'AUTH_TOO_OLD', max_age: maxAgeSec });
+    }
+    next();
+  };
+}
+
+app.post('/api/v1/admin/partners/:id/revoke',
+  requireAuth, requireRole('admin'), requireFreshAuth(3600), handler);
+```
+
+### 22.4 X-Confirm-Action — phishing-resistant confirmation
+
+Для destructive операций (grant partner, mark payout paid) клиент должен:
+1. Показать confirm-диалог юзеру с деталями
+2. SHA-256 от body запроса → передать как `X-Confirm-Action` header
+3. Бэк проверяет что хеш = sha256(canonical body)
+
+Если злоумышленник украл initData и шлёт другой body — хеш не совпадёт, операция отклонена.
+
+```js
+function canonicalize(obj) {
+  // ОЧЕНЬ ВАЖНО: одинаковая сериализация на фронте и бэке.
+  // Ключи отсортированы, нет лишних пробелов.
+  if (obj === null || typeof obj !== 'object') return JSON.stringify(obj);
+  if (Array.isArray(obj)) return '[' + obj.map(canonicalize).join(',') + ']';
+  const keys = Object.keys(obj).sort();
+  return '{' + keys.map(k => JSON.stringify(k) + ':' + canonicalize(obj[k])).join(',') + '}';
+}
+
+function requireConfirmAction(req, res, next) {
+  const provided = req.headers['x-confirm-action'];
+  if (!provided || provided.length !== 64) return res.status(412).json({ error: 'MISSING_CONFIRM' });
+  const computed = crypto.createHash('sha256').update(canonicalize(req.body || {})).digest('hex');
+  if (!crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(computed))) {
+    return res.status(412).json({ error: 'BAD_CONFIRM' });
+  }
+  next();
+}
+```
+
+На фронте — после `appConfirm` обязательно посылаем хеш.
+
+---
+
+## 23. Шифрование PII
+
+Партнёрская программа требует хранить PII партнёра (ФИО, ИНН, банковский счёт) для выплат. Это персональные данные → 152-ФЗ требует **шифрования**.
+
+### 23.1 AES-256-GCM
+
+```js
+import crypto from 'node:crypto';
+
+const ENCRYPTION_KEY = Buffer.from(process.env.PAYOUT_ENCRYPTION_KEY, 'base64'); // 32 байта
+
+export function encryptPII(plaintext) {
+  const iv = crypto.randomBytes(12);  // GCM uses 12-byte IV
+  const cipher = crypto.createCipheriv('aes-256-gcm', ENCRYPTION_KEY, iv);
+  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf-8'), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  // Хранимое: iv(12) + authTag(16) + ciphertext
+  return Buffer.concat([iv, authTag, encrypted]).toString('base64');
+}
+
+export function decryptPII(encryptedBase64) {
+  const data = Buffer.from(encryptedBase64, 'base64');
+  const iv = data.slice(0, 12);
+  const authTag = data.slice(12, 28);
+  const ciphertext = data.slice(28);
+  const decipher = crypto.createDecipheriv('aes-256-gcm', ENCRYPTION_KEY, iv);
+  decipher.setAuthTag(authTag);
+  return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf-8');
+}
+```
+
+Генерация ключа:
+```bash
+openssl rand -base64 32
+# Положить в .env как PAYOUT_ENCRYPTION_KEY=...
+```
+
+⚠️ **Если потеряешь ключ — расшифровать данные невозможно.** Бэкап ключа в надёжное место (вне сервера).
+
+### 23.2 Что шифровать
+
+- ФИО партнёра
+- Паспортные данные (если запрашиваешь)
+- Банковский счёт + БИК
+- Email + телефон (опционально)
+
+**Что НЕ шифруем** (нужно для query):
+- ИНН (используем для поиска)
+- Telegram user_id
+- Метаданные (statuses, timestamps)
+
+---
+
+## 24. NSFW контент и age-gate
+
+### 24.1 Юридические требования (РФ)
+
+- **ФЗ-436** «О защите детей от информации» — обязательная маркировка 18+
+- Метка **«18+»** в видимом месте интерфейса
+- Возрастной фильтр для гостевого доступа (без подтверждения 18+)
+
+### 24.2 Реализация age-gate
+
+При первом входе в NSFW-режим:
+```tsx
+<AgeGateModal
+  onConfirm={() => {
+    // Сохраняем consent в БД с timestamp
+    saveLegalConsent({ doc_id: 'age_18', version: 'v1', confirmed: true });
+    setNsfwUnlocked(true);
+  }}
+  onCancel={() => {
+    // Возврат назад, NSFW недоступен
+  }}
+>
+  <h2>Внимание: контент 18+</h2>
+  <p>Подтверждая, вы заявляете что вам исполнилось 18 лет...</p>
+</AgeGateModal>
+```
+
+### 24.3 Гейтинг NSFW для платных тиров
+
+Стратегия: NSFW = **только для самого высокого тира** (Premium), не Basic.
+
+```js
+function canOpenCharacter(char, tier) {
+  if (char.isNSFW) return tier === 'premium';
+  return true;
+}
+```
+
+При попытке открыть NSFW персонажа на Free/Basic → paywall с reason='nsfw'.
+
+### 24.4 Скрытие NSFW для не-Premium юзеров
+
+Это **требование модерации платёжных систем** (ЮКасса, App Store). NSFW-контент **не должен быть виден** без активной 18+ подписки.
+
+```ts
+// В HomePage / LibraryPage:
+const visibleCharacters = useMemo(
+  () => characters.filter(c => !c.isNSFW || isPremiumTier),
+  [characters, isPremiumTier],
+);
+```
+
+**Исключение:** **user-created** NSFW-персонажи — юзер ВИДИТ своих собственных (он их создал), но не может их открыть без Premium.
+
+### 24.5 18+ метка в шапке
+
+Если приложение содержит NSFW-контент:
+```tsx
+<span style={{ background: '#7c5cff', padding: '2px 5px', borderRadius: 4 }}>
+  18+
+</span>
+```
+
+В видимом месте (Header) + в landing-странице.
+
+---
+
+## 25. DEV-режим и тестирование
+
+### 25.1 DEV_BYPASS_INITDATA — без bot_token
+
+Для разработки без BOT_TOKEN (или с другим ботом):
+```js
+// backend/auth.js
+if (DEV_BYPASS && process.env.NODE_ENV !== 'production') {
+  // Парсим initData небезопасно, без HMAC
+  const user = JSON.parse(initData.user);
+  return { telegram_user_id: user.id, first_name: user.first_name, /* ... */ };
+}
+```
+
+⚠️ **Защита от случайного использования в проде:**
+```js
+if (DEV_BYPASS && NODE_ENV === 'production') {
+  console.error('[fatal] DEV_BYPASS_INITDATA=1 в production!');
+  process.exit(1);
+}
+```
+
+### 25.2 Eruda — debug-консоль для TG WebView
+
+В TG WebView нет dev-tools. В DEV режиме подключаем eruda:
+
+```js
+// mini-app/src/main.tsx
+if (import.meta.env.DEV) {
+  import('eruda').then(({ default: eruda }) => eruda.init());
+}
+```
+
+Появится floating-кнопка-шарик → клик → консоль/Network/Storage. Минусы: ~200KB бандла. **Только в DEV, в prod НЕ подключать.**
+
+### 25.3 Mock AI для DEV без polza-баланса
+
+`mini-app/src/utils/mockAI.ts`:
+```ts
+const MOCK_RESPONSES = [
+  'Это интересный вопрос. Расскажи подробнее.',
+  'Хм. Я об этом не подумал.',
+  // ...
+];
+export async function getMockResponse() {
+  await new Promise(r => setTimeout(r, 800)); // имитация задержки
+  return MOCK_RESPONSES[Math.floor(Math.random() * MOCK_RESPONSES.length)];
+}
+```
+
+При ошибке backend в DEV → показываем mock вместо «не удалось получить ответ».
+
+### 25.4 Тестовые карты ЮКассы
+
+| Карта | Результат | Use case |
+|-------|-----------|----------|
+| `5555 5555 5555 4477` | succeed | Happy path |
+| `5555 5555 5555 4444` | fail (insufficient funds) | Тест failed-flow |
+| `5555 5555 5555 4485` | requires_3ds | Тест 3DS challenge |
+| `5555 5555 5555 4493` | timeout | Тест поведения при таймауте |
+
+Срок карты: любой будущий (например `12/30`).
+CVC: любой `123`.
+
+### 25.5 3DS test flow
+
+После ввода `4477` юзер видит экран **«Card authentication»** с полем «Any number». Это эмуляция SMS-кода от банка. Введи **любое число** → Confirm → платёж succeed.
+
+В реальной жизни (live-магазин) юзер вводит реальный SMS-код от своего банка.
+
+---
+
+## 26. Кеш Telegram WebView
+
+### 26.1 Проблема
+
+После git push фронта в CF Pages новый билд готов через 2-3 минуты. **НО** Telegram WebView (на iOS особенно) **агрессивно кеширует**. Юзер видит старый код часами или сутками.
+
+### 26.2 Кеш-баст через Vite-хеши
+
+Vite **уже** делает hashing бандла (`index-AbCd1234.js`) — при изменениях имя меняется → кеш сбрасывается.
+
+Но `index.html` не хешится. Поэтому он **обязательно** должен иметь `no-cache`:
+
+```
+# в _headers
+/index.html
+  Cache-Control: no-cache, no-store, must-revalidate
+```
+
+### 26.3 Service Worker — НЕ использовать
+
+Если случайно добавишь `vite-plugin-pwa` — старая версия будет «висеть» в Service Worker до тех пор пока юзер не очистит storage Telegram. **Не подключай PWA для Mini App.**
+
+### 26.4 Принудительный refresh для юзеров
+
+Если нужно срочно — попроси юзера:
+```
+Telegram → Settings → Storage → Clear cache → All
+```
+
+Или показать в UI «Версия v1.2.3» и юзер видит когда обновилось.
+
+### 26.5 Версия в bundle
+
+```ts
+export const APP_VERSION = '0.1.0';
+// В Profile:
+<p>Interstellar Mini App · v{APP_VERSION}</p>
+```
+
+При багрепортах юзер пишет версию → понимаешь устарел ли его клиент.
+
+---
+
+## 27. Bot commands
+
+### 27.1 Обязательные команды (требование Telegram)
+
+| Команда | Зачем | Обязательность |
+|---------|-------|----------------|
+| `/start` | Приветствие + кнопка открыть Mini App | Telegram-стандарт |
+| `/help` | Краткая помощь | Хорошая практика |
+| `/paysupport` | Помощь по платежам (refund, отмена) | **ОБЯЗАТЕЛЬНО** для ботов с платежами |
+
+### 27.2 Регистрация команд в BotFather
+
+```
+/setcommands
+[выбрать бота]
+start - Открыть приложение
+help - Что я умею
+paysupport - Помощь по платежам
+```
+
+Появятся в меню «☰» в чате с ботом.
+
+### 27.3 Welcome-message с inline_keyboard
+
+В handler /start:
+```js
+sendMessage({
+  chat_id: chatId,
+  text:
+    `<b>Привет, ${firstName}!</b> ✨\n\n` +
+    `Это <b>YourApp</b> — твой портал в...\n\n` +
+    `🎁 Первые сообщения — бесплатно.\n\n` +
+    `Жми кнопку ниже чтобы начать ↓`,
+  parse_mode: 'HTML',
+  reply_markup: {
+    inline_keyboard: [
+      [{ text: '🚀 Открыть приложение', url: `https://t.me/${BOT_USERNAME}/app` }],
+      [{ text: '💎 Тарифы', url: `https://t.me/${BOT_USERNAME}/app?startapp=paywall` }],
+    ],
+  },
+});
+```
+
+**ГРАБЛИ:** Не используй хардкод URL типа `https://xxx.pages.dev` — preview-домены CF Pages могут пересоздаваться. Используй `t.me/${BOT_USERNAME}/${BOT_APP_NAME}` — стабильный.
+
+### 27.4 Privacy URL в BotFather
+
+ОБЯЗАТЕЛЬНО для модерации платёжных систем + AppStore.
+
+```
+/mybots → выбрать бота → Bot Settings → Privacy Policy URL → https://yourapp.ru/privacy
+```
+
+Должна быть страница с политикой конфиденциальности (см. секцию 19).
+
+### 27.5 /paysupport handler
+
+Юзер пишет `/paysupport` → возвращаем info про refund:
+```js
+if (text === '/paysupport') {
+  sendMessage({ chat_id: chatId, text:
+    `<b>Помощь по платежам</b>\n\n` +
+    `1. Отмена подписки: Mini App → Профиль → toggle «Автопродление»\n` +
+    `2. Возврат денежных средств: согласно ЗоЗПП ст. 32, отправь email на ${SUPPORT_EMAIL}\n` +
+    `3. Day Pass возврату не подлежит после активации (ПП РФ № 55)\n\n` +
+    `Email поддержки: ${SUPPORT_EMAIL}\n` +
+    `Срок ответа: 1-3 рабочих дня`,
+    parse_mode: 'HTML',
+  });
+}
+```
+
+---
+
+## 28. Troubleshooting
+
+### 28.1 «Webhook от Telegram не приходит»
+
+1. `getWebhookInfo` → проверь `last_error_date` и `last_error_message`
+2. Если `last_error_date != null`: смотри `last_error_message` — обычно SSL/connect-fail
+3. `tail /var/log/nginx/access.log | grep webhook` — приходит ли вообще запрос?
+4. `nginx -t` — конфиг ок?
+5. SSL валидный? `curl -vI https://api.yourapp.ru/health`
+6. Проверь `secret_token` совпадает между TG-stored и backend `.env`
+7. Если webhook URL изменился — `setWebhook` заново с `ip_address`
+
+### 28.2 «Webhook от ЮКассы не приходит»
+
+1. ЛК ЮКассы → Интеграция → HTTP-уведомления → **История** → проверь записи и коды ответа
+2. Если код 403 — IP-фильтр блокирует. Смотри `[yk-webhook] rejected ip=...` в логах
+3. Если код 5xx — проблема на бэке, смотри `[yk-webhook]` логи
+4. Если истории нет вообще — webhook URL неправильный (вероятно вписал `https://yourapp.ru` без `/api/v1/yookassa-webhook`)
+
+### 28.3 «Платёж прошёл, подписка не активировалась»
+
+1. `grep '[yk-webhook] activated' /var/log/yourapp/backend.log` — есть строка?
+2. Если есть `activated` но `getActiveSubscription` возвращает null — проверь единицы времени (ms vs seconds, см. ГРАБЛИ #12)
+3. Если нет `activated` — webhook не дошёл, см. 28.2
+4. В ЛК ЮКассы: Операции → платёж → есть ли кнопка «Повторить уведомление»? Если есть — нажми, повторно протолкнёт
+
+### 28.4 «LLM возвращает 502 UPSTREAM_ERROR»
+
+1. Проверь `POLZA_API_KEY` валиден: `curl -H "Authorization: Bearer $KEY" https://api.polza.ai/api/v1/models` → 200
+2. Проверь `POLZA_MODEL` в каталоге: `... | jq '.data[].id' | grep $MODEL`
+3. Если модель есть, ключ ок — возможно polza upstream проблема. Retry уже встроен, попробуй позже
+4. Если модель **deprecated** — поменяй на актуальную (см. секцию 9.2)
+
+### 28.5 «CORS-ошибка в браузере»
+
+1. F12 → Console → копируй точный текст
+2. Origin в ошибке должен быть в `CORS_ALLOWED_ORIGINS` backend `.env`
+3. На бэке: `grep CORS_ALLOWED_ORIGINS .env` → если нет нужного origin → добавь
+4. `systemctl restart yourapp`
+
+### 28.6 «Юзер видит старый фронт после deploy»
+
+1. Подожди 2-3 минуты — CF Pages билд может ещё идти
+2. CF Dashboard → Pages → твой проект → Deployments → должен быть свежий «Success»
+3. Юзер: Telegram → Settings → Storage → Clear cache
+4. Hard refresh: закрыть Mini App полностью (свайпнуть закрыть бот) → открыть заново
+
+### 28.7 «Magazin заблокирован в ЮКассе»
+
+1. **СРОЧНО** — открой email где ЮКасса прислала уведомление, изучи причину
+2. Типичные причины: chargeback >5-10%, fraudulent activity, нарушение оферты ЮК
+3. Подай заявление в саппорт ЮК с объяснением
+4. **Параллельно** — переключись на Telegram Stars как fallback (код у нас гибкий, нужно только включить)
+
+### 28.8 «Сервер AEZA недоступен»
+
+1. AEZA панель → статус VPS — running?
+2. Если running но не пингуется — открой VNC, посмотри что
+3. `journalctl -xe | tail -50` — что в системных логах
+4. `df -h` — диск не забился?
+5. `free -m` — RAM есть?
+6. Если ничего не помогло — Reboot через AEZA панель
+
+### 28.9 «git pull: dubious ownership»
+
+```
+git config --global --add safe.directory /home/interstellar/yourapp
+```
+
+Один раз. Дальше `git pull` работает.
+
+### 28.10 «SQLite database is locked»
+
+1. Бэк должен иметь `db.pragma('busy_timeout = 5000')` (см. секцию 20.3)
+2. Если всё равно — нет ли другого процесса с открытой БД? `lsof | grep .sqlite`
+3. WAL-файл `.sqlite-wal` существует? Если да — нормально (WAL mode)
+4. Если БД действительно зависла — `sqlite3 app.sqlite "PRAGMA wal_checkpoint(FULL); VACUUM;"` (после backup!)
+
+---
+
+## 🎓 ПОСЛЕ всего этого
+
+После того как всё развёрнуто:
+
+1. **Запусти на 10 друзьях** — попроси протестировать
+2. **Следи за логами 24 часа** — `tail -f` в screen-сессии
+3. **Проверяй chargeback-rate ЮК ежедневно** (должно быть <2%)
+4. **Спрашивай юзеров что не работает** — багрепорты через бот-команду
+5. **Не пиши новые feature** пока эти 4 пункта не проверены неделю
+
+И **ОБНОВЛЯЙ ЭТОТ ДОКУМЕНТ** каждый раз когда находишь новую грабли — это инвестиция в скорость следующих проектов.
 
 ---
 
