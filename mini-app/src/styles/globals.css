@@ -47,15 +47,10 @@ body,
   color: var(--tg-theme-text-color);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   /* dvh — динамический viewport, корректно работает с iOS-bar. */
-  height: 100vh;
-  height: 100dvh;
+  min-height: 100vh;
+  min-height: 100dvh;
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
-  /* Фиксируем viewport — overall page-scroll запрещён.
-     Скроллятся только внутренние divs с overflow-y:auto (например .body
-     на HomePage). Иначе при скролле контента уезжал и header/search
-     потому что TG-WebView интерпретировал жест как page-scroll. */
-  overflow: hidden;
 }
 
 body {

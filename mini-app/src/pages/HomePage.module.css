@@ -54,6 +54,10 @@
   padding: 0 14px;
   height: 42px;
   gap: 10px;
+  /* Search-bar и header находятся вне .body (scroll-container) — они
+     не должны двигаться. Это уже было так структурно, но раньше у нас
+     был fallback на global overflow:hidden что ломало другие страницы.
+     Теперь .root имеет overflow:hidden, и search физически вне scroll. */
 }
 
 .searchInput {
