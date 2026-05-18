@@ -41,6 +41,10 @@ export interface Subscription {
   expiresAt: string
   isTrial: boolean
   cancelledAt?: string | null
+  /** Для yookassa-подписок: включено ли автопродление (cron спишет через 30 дней). */
+  autoRenew?: boolean
+  /** Источник подписки. Кнопка отмены автопродления нужна только для 'yookassa'. */
+  source?: 'stars' | 'yookassa'
 }
 
 // Free-tier лимиты — точка истины. Тюнить отсюда.
@@ -182,6 +186,8 @@ function fromMeSubscription(s: MeSubscription | null): Subscription | null {
     expiresAt: s.expires_at,
     isTrial: s.is_trial,
     cancelledAt: s.cancelled_at,
+    autoRenew: s.auto_renew,
+    source: s.source,
   }
 }
 

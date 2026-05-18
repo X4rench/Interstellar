@@ -451,6 +451,40 @@ app.get('/api/v1/billing/yk-status/:paymentId', requireAuth, async (req, res) =>
   }
 });
 
+// ─── ЮКасса: вкл/выкл автопродления подписки ───────────────────────────
+// Юзер может в Профиле отключить recurring без отмены подписки —
+// подписка останется активна до expires_at, но cron больше не списывает.
+// Также можно включить обратно (если юзер передумал и сохранённая карта
+// ещё валидна).
+// Rate-limit 10/min — на случай странного дёргания toggle на фронте.
+app.post(
+  '/api/v1/billing/yk-toggle-auto-renew',
+  requireAuth,
+  rateLimit({ bucket: 'yk_toggle_renew', windowMs: 60_000, max: 10 }),
+  (req, res) => {
+    try {
+      const userId = req.tgUser.telegram_user_id;
+      // По умолчанию интерпретируем body.enabled === false как «выключить».
+      const enabled = req.body?.enabled !== false;
+      const now = Date.now();
+      const result = db
+        .prepare(`
+          UPDATE subscriptions
+          SET auto_renew = ?
+          WHERE telegram_user_id = ?
+            AND expires_at > ?
+            AND cancelled_at IS NULL
+            AND source = 'yookassa'
+        `)
+        .run(enabled ? 1 : 0, userId, now);
+      res.json({ ok: true, updated_rows: result.changes, auto_renew: enabled });
+    } catch (err) {
+      console.error('[yk] toggle-auto-renew failed:', err);
+      res.status(500).json({ ok: false, error: 'INTERNAL_ERROR' });
+    }
+  },
+);
+
 // ─── ЮКасса webhook ────────────────────────────────────────────────────
 // ЮК шлёт callback при изменении статуса платежа. Защита:
 //   1) IP-whitelist (ЮК публикует список своих исходящих IP)

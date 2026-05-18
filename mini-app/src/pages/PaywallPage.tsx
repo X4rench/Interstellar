@@ -182,6 +182,12 @@ export function PaywallPage() {
   const [busyPlan, setBusyPlan] = useState<PlanCode | null>(null)
   const [errorDetail, setErrorDetail] = useState<string>('')
   const [pollCount, setPollCount] = useState(0)
+  // Чекбокс автопродления. Включён по умолчанию (industry standard для
+  // подписочных сервисов), но юзер ВИДИТ его при покупке и может снять.
+  // Это критично для ФЗ-2300-1 ст.10 (юзер должен явно согласиться на
+  // recurring) и для репутации. Hidden auto-renew = blokировка магазина
+  // в ЮКассе после chargeback >5%.
+  const [autoRenewEnabled, setAutoRenewEnabled] = useState(true)
 
   const currentPayloadRef = useRef<string | null>(null)
   const pollTimerRef = useRef<number | null>(null)
@@ -292,7 +298,10 @@ export function PaywallPage() {
     // Бэк whitelist'ит только наш домен и t.me — другие хосты не пройдут.
     const returnUrl = `https://t.me/InterstellarAiBot/app?startapp=yk`
     try {
-      const res = await ykCreatePayment(plan, returnUrl, plan !== 'day_pass')
+      // autoRenew: для Day Pass всегда false (разовая покупка),
+      // для подписок — то что выбрал юзер чекбоксом.
+      const autoRenew = plan !== 'day_pass' && autoRenewEnabled
+      const res = await ykCreatePayment(plan, returnUrl, autoRenew)
       if (res.confirmation_url) {
         currentPayloadRef.current = res.yk_payment_id
         setState('opening')
@@ -443,6 +452,48 @@ export function PaywallPage() {
             )}
           </div>
         )}
+
+        {/* Auto-renew чекбокс — обязателен для прозрачности.
+            Юзер ЯВНО видит что подписка будет recurring (или может снять).
+            Day Pass не подписка — для него чекбокс не имеет смысла,
+            он не повлияет (handleBuy сам игнорирует autoRenew для DP). */}
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 10,
+            margin: '0 16px 14px',
+            padding: '12px 14px',
+            background: 'rgba(124, 92, 255, 0.06)',
+            border: '1px solid rgba(124, 92, 255, 0.2)',
+            borderRadius: 12,
+            cursor: 'pointer',
+            userSelect: 'none',
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={autoRenewEnabled}
+            onChange={(e) => setAutoRenewEnabled(e.target.checked)}
+            style={{
+              marginTop: 2,
+              width: 16,
+              height: 16,
+              accentColor: '#7c5cff',
+              cursor: 'pointer',
+              flexShrink: 0,
+            }}
+          />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#fff' }}>
+              Автоматически продлевать подписку
+            </p>
+            <p style={{ margin: '3px 0 0', fontSize: 11, color: '#a89cd8', lineHeight: 1.4 }}>
+              Через 30 дней спишем плату автоматически. Отменить в Профиле в один клик.
+              Для Day Pass — разовая покупка без продления.
+            </p>
+          </div>
+        </label>
 
         {/* 3 tier cards */}
         <div className={styles.tiers}>

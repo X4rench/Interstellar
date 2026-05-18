@@ -5,10 +5,133 @@ import { useSignal, initData } from '@telegram-apps/sdk-react'
 import { useApp } from '../context/AppContext'
 import { ChevronRightIcon } from '../icons'
 import { BottomNav } from '../components/BottomNav'
-import { appConfirm } from '../components/AppDialogs'
+import { appConfirm, appAlert } from '../components/AppDialogs'
+import { ykToggleAutoRenew } from '../utils/api'
 import invertLogo from '../icons/invertLogo.png'
 
 import styles from './ProfilePage.module.css'
+
+/**
+ * Переключатель автопродления подписки.
+ * Видим только юзерам с активной yookassa-подпиской.
+ * Логика:
+ *  - Если включаешь — без подтверждения (юзер хочет, чтобы списали).
+ *  - Если выключаешь — confirm-диалог («подписка останется до X»).
+ *  - После успеха — refreshSubscription чтобы UI обновился.
+ */
+function AutoRenewToggle({
+  enabled,
+  expiresAt,
+  onChanged,
+}: {
+  enabled: boolean
+  expiresAt: string
+  onChanged: () => void
+}) {
+  const [busy, setBusy] = useState(false)
+  const [localEnabled, setLocalEnabled] = useState(enabled)
+
+  // Синхронизируем local-state с props если subscription обновилась снаружи.
+  useEffect(() => {
+    setLocalEnabled(enabled)
+  }, [enabled])
+
+  const handleToggle = async () => {
+    if (busy) return
+    const newValue = !localEnabled
+
+    // При ВЫКЛЮЧЕНИИ — confirm-диалог. Это legal requirement и хорошая
+    // практика чтобы юзер не «случайно» убил автопродление.
+    if (!newValue) {
+      const expiresStr = new Date(expiresAt).toLocaleDateString('ru')
+      const ok = await appConfirm({
+        title: 'Отключить автопродление?',
+        message: `Подписка останется активной до ${expiresStr}. После этой даты доступ к Premium закроется.`,
+        confirmLabel: 'Отключить',
+        danger: true,
+      })
+      if (!ok) return
+    }
+
+    setBusy(true)
+    setLocalEnabled(newValue) // оптимистично
+
+    try {
+      await ykToggleAutoRenew(newValue)
+      onChanged() // refreshSubscription из родителя
+    } catch (err) {
+      // Откатываем оптимистичное обновление.
+      setLocalEnabled(!newValue)
+      await appAlert({
+        title: 'Ошибка',
+        message: 'Не удалось изменить настройку. Попробуй ещё раз позже.',
+      })
+      // eslint-disable-next-line no-console
+      console.error('[profile] toggleAutoRenew failed', err)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <button
+      onClick={handleToggle}
+      disabled={busy}
+      style={{
+        margin: '12px 20px 0',
+        padding: '14px 16px',
+        background: '#131313',
+        border: '1px solid #232323',
+        borderRadius: 14,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        width: 'calc(100% - 40px)',
+        cursor: busy ? 'wait' : 'pointer',
+        fontFamily: 'inherit',
+        textAlign: 'left',
+        opacity: busy ? 0.6 : 1,
+      }}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#fff' }}>
+          Автопродление
+        </p>
+        <p style={{ margin: '3px 0 0', fontSize: 11, color: '#888', lineHeight: 1.4 }}>
+          {localEnabled
+            ? 'Подписка автоматически продлевается через 30 дней. Можно отключить в любой момент.'
+            : 'Подписка истечёт без продления. Включи если хочешь продолжать.'}
+        </p>
+      </div>
+      {/* iOS-style toggle. Цвет фона зависит от состояния. */}
+      <span
+        style={{
+          width: 42,
+          height: 26,
+          borderRadius: 13,
+          background: localEnabled ? 'linear-gradient(135deg, #7c5cff, #ff5cdb)' : '#3a3a3a',
+          position: 'relative',
+          transition: 'background 0.2s ease',
+          flexShrink: 0,
+        }}
+      >
+        <span
+          style={{
+            position: 'absolute',
+            top: 3,
+            left: localEnabled ? 19 : 3,
+            width: 20,
+            height: 20,
+            borderRadius: 10,
+            background: '#fff',
+            transition: 'left 0.2s ease',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+          }}
+        />
+      </span>
+    </button>
+  )
+}
 
 const LEGAL_LINKS: { id: 'privacy_policy' | 'terms_of_service' | 'personal_data' | 'subscription' | 'about'; label: string }[] = [
   { id: 'privacy_policy', label: 'Конфиденциальность' },
@@ -297,6 +420,17 @@ export function ProfilePage() {
               </p>
             </div>
           </div>
+        )}
+
+        {/* Автопродление: переключатель только для yookassa-подписок
+            (Stars-подписки одноразовые, не recurring). При выключении —
+            confirm через appConfirm, потом /yk-toggle-auto-renew. */}
+        {isPremium && subscription?.source === 'yookassa' && (
+          <AutoRenewToggle
+            enabled={subscription.autoRenew ?? false}
+            expiresAt={subscription.expiresAt}
+            onChanged={refreshSubscription}
+          />
         )}
 
         {/* Партнёрство (видно только partner'у) */}

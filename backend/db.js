@@ -141,7 +141,8 @@ export function upsertUser(db, tgUser) {
 export function getActiveSubscription(db, telegram_user_id) {
   const row = db
     .prepare(
-      `SELECT plan, started_at, expires_at, is_trial, cancelled_at, telegram_payment_charge_id
+      `SELECT plan, started_at, expires_at, is_trial, cancelled_at,
+              telegram_payment_charge_id, auto_renew, source
        FROM subscriptions
        WHERE telegram_user_id = ? AND expires_at > ?
        ORDER BY expires_at DESC
@@ -157,6 +158,11 @@ export function getActiveSubscription(db, telegram_user_id) {
     expires_at: new Date(row.expires_at).toISOString(),
     is_trial: !!row.is_trial,
     cancelled_at: row.cancelled_at ? new Date(row.cancelled_at).toISOString() : null,
+    // Auto-renew флаг — фронт показывает toggle в Profile.
+    // Только yookassa-подписки могут быть recurring; Stars-подписки всегда
+    // одноразовые → auto_renew = false для них.
+    auto_renew: !!row.auto_renew,
+    source: row.source || 'stars',
   };
 }
 

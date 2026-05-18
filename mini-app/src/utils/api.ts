@@ -107,6 +107,17 @@ export interface MeSubscription {
   expires_at: string
   is_trial: boolean
   cancelled_at: string | null
+  /** Для yookassa-подписок: true если включено автопродление. */
+  auto_renew?: boolean
+  /** 'stars' (legacy Telegram-инвойсы) | 'yookassa' (новая ЮК через карту). */
+  source?: 'stars' | 'yookassa'
+}
+
+export function ykToggleAutoRenew(enabled: boolean): Promise<{ ok: true; updated_rows: number; auto_renew: boolean }> {
+  return fetchAuthed('/billing/yk-toggle-auto-renew', {
+    method: 'POST',
+    body: JSON.stringify({ enabled }),
+  })
 }
 
 export interface MeBot {
