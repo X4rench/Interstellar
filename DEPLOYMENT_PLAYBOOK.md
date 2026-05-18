@@ -4,8 +4,39 @@
 > Собран из опыта развёртывания «Интерстеллар» (AI-чат с историческими личностями).
 > Покрывает все грабли которые мы прошли. Используй для следующих проектов чтобы их не повторить.
 
-**Версия:** 1.0 (май 2026)
+**Версия:** 3.0 (май 2026, после triple-аудита)
 **Стек:** Node.js + Express + better-sqlite3 + Vite/React + Cloudflare Pages + AEZA VPS + ЮКасса + Telegram Bot API
+
+---
+
+## ⚠️ КРИТИЧНОЕ ПРЕДУПРЕЖДЕНИЕ — прочитай ПЕРЕД деплоем
+
+Этот playbook покрывает **технологию**. Но запуск платного сервиса в РФ имеет **юридические риски**, которые могут стоить **уголовной ответственности или штрафов до миллионов рублей**. Перед запуском обязательно прочитай раздел **44** ("Legal CRITICAL gaps").
+
+**Самые опасные риски** (детально в разделе 44):
+
+| Риск | Закон | Возможное наказание |
+|------|-------|---------------------|
+| 🔴 LLM генерит контент с несовершеннолетними (CSAM) даже фикшн | УК ст. 242.1 | **До 15 лет лишения свободы** |
+| 🔴 LLM генерит порнографические описания (даже взрослых) | УК ст. 242 | До 6 лет |
+| 🔴 Хранение ПД россиян за пределами РФ (CF US, Sentry DE) | 152-ФЗ ст. 18 ч. 5 | Штраф **до 18 млн ₽** + блокировка домена |
+| 🔴 Трансграничная передача ПД без уведомления РКН | 152-ФЗ ст. 12 | До 6 млн ₽ |
+| 🔴 Партнёрские выплаты как самозанятый | 422-ФЗ ст. 4 ч. 2 п. 5 | Снятие с НПД, пересчёт под НДФЛ 13% |
+| 🔴 Немаркированная реклама без `erid` через ОРД | 38-ФЗ + ст. 14.3 КоАП | До 500 тыс ₽ **за каждое нарушение** |
+| 🟠 AI выдаёт мнения за реальных людей (Эйнштейн, Фрейд, и т.п.) | ст. 152.1 ГК | Иск от наследников + моральный вред |
+
+**Минимальные защитные меры:**
+1. **Pre-filter и post-filter на LLM** — блокировать запросы с возрастными маркерами (<18) рядом с сексуальным контекстом
+2. **Self-host Sentry на VPS в РФ** (вместо sentry.io в DE)
+3. **Первичное хранение всех ПД на VPS в РФ**, CF Pages — только как CDN-кеш
+4. **Подать уведомления в РКН** перед запуском (об обработке ПД + о трансграничной передаче)
+5. **Whitelist персонажей**: только умершие >70 лет назад + публичные фигуры античности
+6. **Партнёрскую программу — только на ИП/УСН**, не на НПД
+7. **Маркировать всю рекламу через ОРД** (Яндекс, ВК, Сбер) и получать erid
+
+Если что-то из этого кажется сложным — **проконсультируйся с юристом до запуска**. Один час юриста дешевле одного штрафа.
+
+---
 
 ---
 
@@ -54,6 +85,8 @@
 40. [Menu Button vs t.me/bot/app deeplink](#40-menu-button-vs-tmebotapp-deeplink)
 41. [i18n даже если стартуете на одном языке](#41-i18n--даже-если-стартуете-на-одном-языке)
 42. [Self-hosted telegram-web-app.js — процесс обновления](#42-self-hosted-telegram-web-appjs--процесс-обновления)
+43. [DevOps hardening (fail2ban, swap, mTLS, SQLCipher, env-validation)](#43-devops-hardening-production-maturity)
+44. **[🔴 Legal CRITICAL gaps — РФ-законодательство](#44-legal-critical-gaps--рф-законодательство)** ⚠️ читать обязательно
 
 ---
 
@@ -3132,6 +3165,873 @@ fi
 4. **Тестируй на DEV** — запусти Mini App, проверь основные сценарии
 5. **Обнови SRI hash** в `index.html` (см. 39.2)
 6. Commit + push → CF Pages автодеплой
+
+---
+
+## 43. DevOps hardening (production maturity)
+
+### 43.1 fail2ban — защита SSH от brute-force
+
+```bash
+apt install fail2ban
+cat > /etc/fail2ban/jail.local <<'EOF'
+[sshd]
+enabled = true
+maxretry = 3
+bantime = 86400
+findtime = 600
+EOF
+systemctl enable --now fail2ban
+fail2ban-client status sshd  # проверка
+```
+
+### 43.2 Swap для VPS 2GB RAM
+
+OOM-killer убивает Node под нагрузкой если нет swap:
+```bash
+fallocate -l 2G /swapfile && chmod 600 /swapfile
+mkswap /swapfile && swapon /swapfile
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
+sysctl vm.swappiness=10  # минимизировать swap-usage пока RAM хватает
+```
+
+### 43.3 chmod 600 на `.env`
+
+Дефолтный umask = 022 (читаемо всем). `.env` содержит секреты:
+```bash
+chmod 600 /home/interstellar/yourapp/backend/.env
+chown interstellar:interstellar /home/interstellar/yourapp/backend/.env
+```
+
+Проверка:
+```bash
+ls -la backend/.env
+# Должно быть -rw------- 1 interstellar interstellar
+```
+
+### 43.4 systemd hardening
+
+```ini
+[Service]
+# ... основные настройки ...
+TimeoutStopSec=45
+StartLimitIntervalSec=300
+StartLimitBurst=5
+# Защита от crashloop — если 5 рестартов за 5 мин → systemd перестаёт пытаться
+
+# Sandbox
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+ReadWritePaths=/home/interstellar/yourapp-data /var/log/yourapp
+LimitNOFILE=65536
+MemoryMax=1500M
+TasksMax=512
+
+# Heap snapshots для memory-leak debug
+Environment=NODE_OPTIONS=--heapsnapshot-near-heap-limit=3 --max-old-space-size=1024
+```
+
+### 43.5 sysctl tuning
+
+`/etc/sysctl.d/99-yourapp.conf`:
+```
+net.core.somaxconn = 4096
+net.ipv4.tcp_max_syn_backlog = 4096
+net.ipv4.tcp_fin_timeout = 20
+net.ipv4.ip_local_port_range = 1024 65535
+fs.file-max = 200000
+```
+
+`sysctl --system`
+
+### 43.6 nginx production-ready config (полный)
+
+```nginx
+# /etc/nginx/sites-available/api.yourapp.ru
+limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+limit_req_zone $binary_remote_addr zone=webhook:10m rate=30r/s;
+limit_req_zone $binary_remote_addr zone=auth:10m rate=2r/s;
+
+server {
+    listen 443 ssl http2;
+    listen 443 quic reuseport;        # HTTP/3 для мобильных
+    server_name api.yourapp.ru;
+    
+    ssl_certificate /etc/letsencrypt/live/api.yourapp.ru/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/api.yourapp.ru/privkey.pem;
+    
+    # SSL hardening
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_stapling on;
+    ssl_stapling_verify on;
+    resolver 1.1.1.1 8.8.8.8 valid=300s;
+    
+    add_header Alt-Svc 'h3=":443"; ma=86400';
+    
+    # mTLS — только Cloudflare может ходить на origin
+    ssl_client_certificate /etc/ssl/cloudflare-origin-pull.pem;
+    ssl_verify_client on;
+    
+    # Compression
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 256;
+    gzip_types application/json application/javascript text/css text/plain;
+    brotli on;          # требует nginx-brotli модуль
+    brotli_types application/json application/javascript text/css text/plain;
+    
+    # Timeouts (защита от slow-loris)
+    client_body_timeout 10s;
+    client_header_timeout 10s;
+    client_max_body_size 256k;
+    send_timeout 30s;
+    keepalive_timeout 65s;
+    
+    # Webhook от ЮКассы — отдельный rate-limit (выше)
+    location /api/v1/yookassa-webhook {
+        limit_req zone=webhook burst=50 nodelay;
+        proxy_pass http://127.0.0.1:3001;
+        include /etc/nginx/proxy_params;
+    }
+    
+    # Auth — самый строгий
+    location ~ ^/api/v1/(auth|users/me) {
+        limit_req zone=auth burst=5 nodelay;
+        proxy_pass http://127.0.0.1:3001;
+        include /etc/nginx/proxy_params;
+    }
+    
+    # Остальное
+    location / {
+        limit_req zone=api burst=20 nodelay;
+        proxy_pass http://127.0.0.1:3001;
+        include /etc/nginx/proxy_params;
+        proxy_read_timeout 60s;
+        proxy_send_timeout 30s;
+    }
+}
+```
+
+`/etc/nginx/proxy_params`:
+```nginx
+proxy_set_header Host $host;
+proxy_set_header X-Real-IP $remote_addr;
+proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+proxy_set_header X-Forwarded-Proto $scheme;
+proxy_set_header CF-Connecting-IP $http_cf_connecting_ip;
+proxy_http_version 1.1;
+```
+
+### 43.7 Cloudflare mTLS origin pull (КРИТИЧНО)
+
+Без этого любой кто узнал твой IP (через crt.sh — там видны все LE-сертификаты) **обходит CF WAF**.
+
+1. CF Dashboard → SSL/TLS → Origin Server → Authenticated Origin Pulls → ON
+2. Скачай CF Origin Pull CA: `https://developers.cloudflare.com/ssl/static/authenticated_origin_pull_ca.pem`
+3. Положи на сервер `/etc/ssl/cloudflare-origin-pull.pem`
+4. В nginx: `ssl_client_certificate /etc/ssl/cloudflare-origin-pull.pem; ssl_verify_client on;`
+
+Теперь прямой запрос на IP сервера (минуя CF) получит 400 Bad Certificate.
+
+### 43.8 Cloudflare Tunnel — альтернатива nginx+LE
+
+Если не хочешь возиться с Let's Encrypt + mTLS — используй cloudflared:
+```bash
+curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+dpkg -i cloudflared.deb
+cloudflared tunnel login
+cloudflared tunnel create yourapp
+cloudflared tunnel route dns yourapp api.yourapp.ru
+
+# /etc/cloudflared/config.yml
+tunnel: yourapp
+credentials-file: /root/.cloudflared/<UUID>.json
+ingress:
+  - hostname: api.yourapp.ru
+    service: http://localhost:3001
+  - service: http_status:404
+
+systemctl enable --now cloudflared
+```
+
+Преимущества: origin полностью скрыт, не нужен открытый 443 наружу, нет certbot.
+Недостаток: vendor lock-in на CF.
+
+### 43.9 SQLite оптимизации (которые не были раньше)
+
+```js
+db.pragma('mmap_size = 268435456');  // 256MB memory-mapped — read speedup 30-50%
+db.pragma('cache_size = -64000');    // 64MB page cache
+db.pragma('temp_store = MEMORY');
+db.pragma('busy_timeout = 5000');    // ждать 5s при WAL-конфликтах
+```
+
+### 43.10 SQLite VACUUM + integrity check (cron)
+
+`/etc/cron.d/sqlite-maintenance`:
+```cron
+# WAL checkpoint + optimize каждое воскресенье в 04:00
+0 4 * * 0 root sqlite3 /home/interstellar/yourapp-data/app.sqlite "PRAGMA wal_checkpoint(TRUNCATE); PRAGMA optimize; ANALYZE;"
+
+# VACUUM ежемесячно (освобождает место)
+0 4 1 * * root sqlite3 /home/interstellar/yourapp-data/app.sqlite "VACUUM;"
+
+# Integrity check — каждое утро в 06:30
+30 6 * * * root sqlite3 /backups/app-latest.db "PRAGMA integrity_check;" | grep -v "^ok$" && curl -s "https://api.telegram.org/bot$TOKEN/sendMessage?chat_id=$ADMIN&text=BACKUP_INTEGRITY_FAIL"
+```
+
+### 43.11 Backup через VACUUM INTO (не блокирует writers)
+
+```bash
+# .backup — блокирует writers
+# VACUUM INTO — не блокирует
+sqlite3 /home/interstellar/yourapp-data/app.sqlite "VACUUM INTO '/backups/app-$(date +%Y%m%d-%H%M).db'"
+```
+
+### 43.12 Шифрование БД at-rest (SQLCipher)
+
+PII шифруется на app-level (раздел 23). Но дамп БД через `.backup` или украденный snapshot диска = всё открыто. Решение — **SQLCipher**:
+
+```bash
+npm install @journeyapps/sqlcipher
+```
+
+```js
+import sqlite from '@journeyapps/sqlcipher';
+const db = sqlite.verbose();
+const conn = new db.Database('app.encrypted.sqlite');
+conn.run(`PRAGMA key = '${process.env.DB_ENCRYPTION_KEY}'`);
+```
+
+Минусы: чуть медленнее (5-10%), `better-sqlite3` несовместим, нужна миграция.
+
+### 43.13 Env validation на старте (fail-fast)
+
+```js
+// backend/env-validation.js
+import { z } from 'zod';
+
+const envSchema = z.object({
+  BOT_TOKEN: z.string().min(20),
+  POLZA_API_KEY: z.string().startsWith('pza_'),
+  TELEGRAM_WEBHOOK_SECRET: z.string().min(32),
+  DB_PATH: z.string(),
+  YK_SHOP_ID: z.string().optional(),
+  YK_SECRET_KEY: z.string().optional(),
+  PAYOUT_ENCRYPTION_KEY: z.string().length(44),  // base64 of 32 bytes
+  TG_API_PROXY: z.string().url(),
+});
+
+export const env = envSchema.parse(process.env);
+// Если переменной не хватает — крашится со внятной ошибкой, systemd
+// уважает StartLimitBurst и не маскирует bad config бесконечными рестартами.
+```
+
+### 43.14 Structured JSON logging (pino)
+
+Не `console.log("text")`, а:
+```js
+import pino from 'pino';
+const log = pino({
+  level: 'info',
+  formatters: { level: (l) => ({ level: l }) },
+});
+
+log.info({ user_id, charge_id, route: 'payment.webhook' }, 'payment received');
+```
+
+Можно фильтровать в Grafana Loki / parser в Sentry / grep по полям.
+
+### 43.15 Correlation IDs (request_id)
+
+```js
+app.use((req, _res, next) => {
+  req.id = req.headers['cf-ray'] || crypto.randomUUID();  // CF даёт cf-ray
+  req.log = log.child({ req_id: req.id });
+  next();
+});
+
+// В обработчиках:
+req.log.info({ user_id }, 'fetching user');
+```
+
+При багрепорте юзер шлёт cf-ray → ты находишь весь его трейс в логах.
+
+### 43.16 unhandled rejection + uncaught exception
+
+Node 18+ по дефолту крашится при unhandled, но без логирования причины:
+```js
+process.on('unhandledRejection', (err) => {
+  Sentry?.captureException(err);
+  log.fatal({ err }, 'unhandledRejection');
+  process.exit(1);
+});
+process.on('uncaughtException', (err) => {
+  Sentry?.captureException(err);
+  log.fatal({ err }, 'uncaughtException');
+  process.exit(1);
+});
+```
+
+### 43.17 LLM AbortController timeout
+
+Без этого зависший polza.ai держит worker:
+```js
+const ac = new AbortController();
+const timer = setTimeout(() => ac.abort(), 30_000);
+try {
+  const res = await fetch(POLZA_URL, { signal: ac.signal, ... });
+  // ...
+} finally {
+  clearTimeout(timer);
+}
+```
+
+### 43.18 undici ProxyAgent pool settings
+
+```js
+new ProxyAgent({
+  uri: PROXY_URL,
+  connections: 50,           // дефолт 10 — мало для burst webhook'ов
+  keepAliveTimeout: 30_000,
+  pipelining: 1,
+});
+```
+
+### 43.19 BOT_TOKEN compromise runbook
+
+```
+1. BotFather → /revoke (revokes current token, генерирует новый)
+2. systemctl stop yourapp
+3. Обнови backend/.env: BOT_TOKEN=<новый>
+4. curl POST setWebhook с новым URL + новый secret_token
+5. systemctl start yourapp
+6. Проверь: getWebhookInfo → last_error_date=null
+7. Опционально: уведоми юзеров если был долгий downtime
+```
+
+### 43.20 SQLite corruption recovery
+
+```bash
+# 1. Останови backend
+systemctl stop yourapp
+
+# 2. Попробуй recover
+sqlite3 broken.db ".recover" > recovered.sql
+sqlite3 recovered.db < recovered.sql
+
+# 3. Сравни схему с миграциями, восстанови missing FK
+sqlite3 recovered.db ".schema" | diff - expected_schema.sql
+
+# 4. Перенеси на место БД
+mv broken.db corrupted-$(date +%s).db
+mv recovered.db app.sqlite
+
+# 5. Запусти backend, проверь /health
+systemctl start yourapp
+```
+
+### 43.21 Cloudflare-down runbook
+
+CF blocked РКН (как было в июне 2024 на 24h):
+1. На NS-уровне регистратора: переключи NS обратно с CF на дефолтные регистратора (reg.ru)
+2. В DNS регистратора заведи прямые A-записи на VPS IP (без CF proxy)
+3. У юзера: SSL может ругаться — выпусти серт на origin через `certbot` если ещё не выпущен
+4. Когда CF restored → переключи NS обратно на CF, верни proxy mode
+
+Подготовь NS-резерв заранее!
+
+### 43.22 Status page
+
+Простой `status.yourapp.ru` (отдельная статика на BunnyCDN, не на CF):
+- Embed [UptimeRobot status badge](https://uptimerobot.com)
+- Список сервисов: API, Bot, Payments, LLM
+- Текущие инциденты + history
+
+Юзеры идут туда когда «не работает» — снимает нагрузку с саппорта.
+
+### 43.23 Per-incident runbook'и
+
+Не один общий troubleshooting, а **папка** `runbooks/`:
+```
+runbooks/
+  polza-down.md
+  yk-not-responding.md
+  webhook-429.md
+  db-locked.md
+  bot-token-leaked.md
+  cf-incident.md
+```
+
+Каждый файл = чёткие шаги для on-call.
+
+### 43.24 Post-mortem template
+
+`incidents/2026-05-18-yk-webhook-fail.md`:
+```markdown
+## Incident: YK webhook IP-filter blocking
+Date: 2026-05-18
+Impact: 6 hours, ~100 users couldn't activate paid subscriptions
+Severity: P1
+
+### Timeline (UTC)
+- 14:20 — deploy commit ac4f7da (CF-Connecting-IP fix)
+- 14:35 — first paid sub activated successfully
+
+### Root cause
+isYkIp() smотрел req.ip (CF edge), не настоящий IP YK через CF-Connecting-IP
+
+### Action items
+- [x] 2026-05-18: deploy fix (ac4f7da)
+- [ ] 2026-06-01: add e2e-test for webhook IP check
+- [ ] 2026-06-01: monitoring alert if [yk-webhook] rejected ip rate > 1/min
+```
+
+### 43.25 Index health check
+
+После каждой миграции `idx_*` — убедиться что планировщик использует индекс:
+```bash
+sqlite3 app.sqlite "EXPLAIN QUERY PLAN SELECT * FROM subscriptions WHERE telegram_user_id=? AND expires_at > ?"
+# Должно: SEARCH ... USING INDEX idx_subscriptions_active
+# НЕ должно: SCAN TABLE subscriptions
+```
+
+Если `SCAN TABLE` — индекс не выбран, нужна оптимизация запроса или схемы.
+
+---
+
+## 44. Legal CRITICAL gaps — РФ-законодательство
+
+> ⚠️ **Эта секция — НЕ юридическая консультация.** Она поднимает риски о которых нужно знать. Перед запуском — обратись к практикующему юристу по IT/защите ПД.
+
+### 44.1 🔴 КРИТИЧНО: Локализация ПД в РФ (152-ФЗ ст. 18 ч. 5)
+
+**Закон требует:** запись, систематизация, накопление, хранение, уточнение, извлечение ПД граждан РФ — **первично в БД на территории РФ**. Зарубежные сервисы только как **копия**.
+
+**Что нарушаем сейчас:**
+- **Cloudflare Pages (US)** — frontend хостится в США, edge-сервера логируют IP/headers/fingerprints юзеров
+- **Cloudflare DNS (US)** — все DNS-запросы логируются в США
+- **Sentry (DE)** — error-tracking хранит stack-trace + user-context
+- **Polza.ai** — формально в РФ, но проверить что у них есть локализация
+
+**Штраф:** ст. 13.11 КоАП — 1-6 млн ₽ за первое нарушение, 6-18 млн ₽ за повторное + блокировка домена РКН.
+
+**Что делать:**
+1. **Self-host Sentry** → GlitchTip на AEZA Moscow (open-source совместимый с Sentry SDK):
+   ```bash
+   git clone https://gitlab.com/glitchtip/glitchtip
+   docker compose up -d
+   ```
+2. **Первичное хранение ПД** — в SQLite на AEZA VPS (это и так у нас)
+3. **CF Pages — только статический фронт** без логирования ПД (отключить CF Web Analytics если был)
+4. **Уведомить юзеров** в Privacy Policy что данные хранятся в РФ (Москва), копии — в США (CF) с согласия
+
+### 44.2 🔴 КРИТИЧНО: Уведомление РКН об обработке ПД
+
+**С 1 сентября 2022 (ФЗ-266 поправки)** — уведомление РКН **обязательно** для любого оператора ПД кроме узких исключений (ст. 22 ч. 2 152-ФЗ). Подписочный сервис в исключения **не попадает**.
+
+**Действие:** Подать через [pd.rkn.gov.ru](https://pd.rkn.gov.ru/) **ДО запуска**:
+- Категории ПД (TG ID, имя, email, IP)
+- Цели (биллинг, аутентификация)
+- Трансграничная передача (см. 44.3)
+- Срок рассмотрения 30 дней — учесть в timeline
+
+**Штраф за непредставление:** ст. 19.7 КоАП — 3-5 тыс ₽. Не катастрофа, но маркер риска для последующих проверок.
+
+### 44.3 🔴 КРИТИЧНО: Уведомление о трансграничной передаче
+
+**Отдельное уведомление РКН** должно быть подано **за 10 рабочих дней до начала** передачи в страны не из «адекватной защиты» (Приказ РКН №274 от 22.07.2022). **США и Германия — НЕ в списке адекватных**.
+
+**Кому передаём:**
+- Cloudflare (US) — frontend + DNS
+- Sentry (DE) — errors
+- Telegram FZ-LLC (UAE/Ireland) — все сообщения юзера ↔ бота
+
+**Действие:**
+1. Подать форму «Уведомление о намерении осуществлять трансграничную передачу ПД» через ЕПГУ
+2. РКН может **запретить** передачу → план B (self-host Sentry, использовать только РФ-CDN)
+3. **Дождаться решения** перед запуском
+
+**Штраф:** ст. 13.11 ч. 8 КоАП — 1-6 млн ₽.
+
+### 44.4 🔴 КРИТИЧНО: LLM может сгенерить CSAM (УК ст. 242.1)
+
+**Самый страшный риск.** Юзер пишет:
+> «Опиши как 17-летняя школьница...»
+
+LLM послушно генерит описание. **Это CSAM (child sexual abuse material) по российскому УК**, даже если это фикшн, даже если AI, даже если юзер был инициатор.
+
+**УК ст. 242.1:** изготовление и оборот порнографических материалов с несовершеннолетними — **до 6 лет лишения свободы**. Ст. 242.2 (с использованием интернета) — **до 15 лет**.
+
+**Защита:**
+
+1. **Pre-filter на INPUT юзера** — детекция возрастных маркеров:
+```js
+const AGE_BLOCKERS = [
+  /(школь(ник|ниц|ный|ом)|детс(ад|кий|кая)|подрост(ок|ков|ков)|малол(етк|етн))/i,
+  /\b(\d{1,2})\s*(лет|года?|годик)\b/i,  // числа возраста
+  /\b(семнадцат|шестнадцат|пятнадцат|четырнадцат)/i,
+];
+
+const SEX_MARKERS = [
+  /(секс|половой|интим|эрот|оргазм|трах|обнаж|раздел|голая?)/i,
+];
+
+function isCsamRisk(text) {
+  let foundAge = false, foundSex = false;
+  for (const re of AGE_BLOCKERS) if (re.test(text)) foundAge = true;
+  for (const re of SEX_MARKERS) if (re.test(text)) foundSex = true;
+  if (foundAge && foundSex) {
+    // Дополнительно проверь число < 18
+    const m = text.match(/\b(\d{1,2})\s*(лет|года?)/i);
+    if (m && Number(m[1]) < 18) return true;
+    return true;  // словесные маркеры школьник/etc
+  }
+  return false;
+}
+
+// В /chat handler:
+if (isCsamRisk(userMessage)) {
+  logSecurityEvent('csam_blocked', { user_id, text_hash: sha256(text) });
+  return res.status(400).json({ ok: false, error: 'CONTENT_POLICY' });
+}
+```
+
+2. **Post-filter на OUTPUT LLM** — те же regex по ответу модели:
+```js
+const llmResponse = await callPolza(messages);
+if (isCsamRisk(llmResponse)) {
+  logSecurityEvent('csam_in_llm_output', { user_id, response_hash: sha256(llmResponse) });
+  return { ok: false, error: 'CONTENT_POLICY' };
+}
+```
+
+3. **System prompt — жёсткие запреты**:
+```
+КРИТИЧНЫЕ ОГРАНИЧЕНИЯ (нарушение = немедленный отказ):
+- Не описывай сексуальные сцены с несовершеннолетними
+  (под 18 лет — даже фикшн, даже метафорически).
+- Не используй слова «школьник/школьница» с эротическим контекстом.
+- Не описывай детальные сцены изнасилования.
+- Не описывай детальные сцены детальной демонстрации половых органов.
+- При запросе на это — отвечай в роли с твёрдым отказом.
+```
+
+4. **Audit-log** всех заблокированных запросов с хешем + timestamp + user_id (для аудита при иске).
+
+5. **Bug bounty / red team** — попроси кого-то JAILbreak'нуть фильтр перед запуском.
+
+**Без этих мер NSFW-feature нельзя запускать в РФ.**
+
+### 44.5 🔴 КРИТИЧНО: Порнография запрещена в РФ (УК ст. 242)
+
+**Даже взрослая** порнография в РФ запрещена в обороте (изготовление, хранение, перевозка, распространение). Граница между «эротикой» (легально с 18+) и «порнографией» (запрещено):
+
+| Эротика | Порнография |
+|---------|-------------|
+| Намёки, флирт, обнажённость | Детальная демонстрация половых актов |
+| Художественное изображение | Натуралистичная описательность гениталий |
+| Чувственность как часть истории | Сцены изнасилования с подробностями |
+| Сексуальное напряжение | Инцест, БДСМ с реальным насилием |
+
+**УК ст. 242:** до 2 лет, ст. 242 ч. 3 (через интернет с использованием организованной группы) — до 6 лет.
+
+**Защита:** LLM system-prompt должен **жёстко** запрещать перечисленные категории. Output-фильтр блокирует детальные описания половых актов даже если юзер не был инициатором (LLM иногда сама уходит туда).
+
+### 44.6 🔴 КРИТИЧНО: AI-генерация с известными именами (ст. 152.1 ГК)
+
+«AI-чат с Эйнштейном» — **ст. 152.1 ГК РФ** требует согласия гражданина на использование его изображения/имени. После смерти — согласия наследников. Право автора **бессрочно** для наследников.
+
+**Whitelist персонажей:**
+- ✅ Античность, средневековье (Клеопатра, Цезарь, и т.п.)
+- ✅ Умершие >70 лет назад с давно умершими наследниками (Эйнштейн 1955, Фрейд 1939 — пограничные, низкий риск)
+- ⚠️ Умершие 30-70 лет назад (Сталин, Хичкок) — высокий риск
+- 🚫 Современные / недавно умершие — **полный бан**
+
+**В оферте — оговорка:**
+```
+Все персонажи представлены как художественная интерпретация
+исторических личностей. Ответы AI не отражают реальное мнение
+этих лиц, не претендуют на достоверное воспроизведение их
+взглядов и являются развлекательным контентом.
+```
+
+**Иск от наследников:** компенсация морального вреда + 10K-5M ₽ по ст. 1252 ГК.
+
+### 44.7 🔴 Партнёрская программа НЕСОВМЕСТИМА с НПД
+
+**422-ФЗ ст. 4 ч. 2 п. 5:** самозанятый не может заниматься агентской/комиссионной деятельностью.
+
+Если ты выплачиваешь партнёрам % от продаж — **это агентская схема** (ты получаешь деньги от юзеров, оставляешь часть, отдаёшь часть партнёру). **Запрещено для НПД**.
+
+**Последствия:** ФНС снимает с НПД с даты первого «нарушения» → пересчитывает весь доход за период под НДФЛ 13% + страховые. Может быть **миллионы рублей** доначисления.
+
+**Что делать:**
+- Партнёрскую программу запустить **только после перехода на ИП/УСН 6%**
+- В playbook'е раздел 22 (RBAC partners) — добавить **предупреждение**
+- До запуска affiliate — открыть ИП (онлайн через банк, 1 день)
+
+### 44.8 🔴 Лимит самозанятого 2.4 млн ₽/год — автомониторинг
+
+При превышении НПД **автоматически прекращается**. Следующие платежи облагаются НДФЛ 13%. Если игнорить — ФНС доначислит за весь год.
+
+**Решение** — cron на бэке:
+```js
+async function checkNpdLimit() {
+  const year = new Date().getFullYear();
+  const yearStart = new Date(year, 0, 1).getTime();
+  const totalRub = db.prepare(`
+    SELECT SUM(amount_kopecks) / 100.0 AS total
+    FROM yk_payments WHERE status = 'succeeded' AND created_at >= ?
+  `).get(yearStart).total || 0;
+
+  if (totalRub > 2_000_000) {
+    await sendAdminAlert(`⚠️ NPD limit approach: ${totalRub} / 2.4M ₽`);
+  }
+  if (totalRub > 2_300_000) {
+    // Автоматически отключаем приём новых платежей
+    db.prepare('UPDATE config SET value = ? WHERE key = ?').run('1', 'payments_paused');
+    await sendAdminAlert(`🔴 NPD pause activated`);
+  }
+}
+```
+
+**Заранее зарегистрировать ИП на УСН 6%** как «горячий резерв».
+
+### 44.9 🔴 Чеки «Мой налог» — мгновенно, не «раз в неделю»
+
+**422-ФЗ ст. 14 ч. 3:** чек формируется в момент расчёта. Раздел 35 playbook'а предлагал «вариант 2: раз в неделю» — **это нарушение**.
+
+**Штраф ст. 129.13 НК:** 20% от суммы за неотражение (мин. 1000 ₽ за чек), повторно — 100%.
+
+**Решение** — автоматизировать с самого старта через [API ЛК НПД](https://npd.nalog.ru/). При получении `payment.succeeded` webhook от ЮКассы:
+```js
+async function emitNpdReceipt({ userId, amountRub, description }) {
+  const token = await getNpdToken();  // login через личный кабинет
+  const receipt = await fetch('https://lknpd.nalog.ru/api/v1/income', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      operationTime: new Date().toISOString(),
+      requestTime: new Date().toISOString(),
+      services: [{ name: description, amount: amountRub, quantity: 1 }],
+      totalAmount: amountRub,
+      client: { contactPhone: null, displayName: null, incomeType: 'FROM_INDIVIDUAL' },
+    }),
+  });
+  return receipt.json();  // { receiptId, receiptUri }
+}
+```
+
+Сохрани `receiptUri` в БД для аудита.
+
+### 44.10 🔴 ПД-локализация финансовых записей
+
+ПД пользователя после удаления аккаунта (запрос юзера) — **уничтожаем в течение 30 дней** (152-ФЗ ст. 21 ч. 4). НО в финансовых записях оставляем **обезличенную** ссылку (403-ФЗ + 402-ФЗ требуют 5 лет хранить первичные документы).
+
+**Процедура:**
+1. Юзер: «удалить меня» → API call
+2. В `users`: `UPDATE users SET first_name='deleted', username=NULL, last_seen_at=NULL WHERE telegram_user_id=?`
+3. В `payments`/`subscriptions`: **оставляем** charge_id, amount, ts. Ссылка на user_id остаётся (это технический ID, не PII)
+4. В audit-log: добавляем запись `user_deletion_requested`
+5. Письмо юзеру: «Данные удалены в течение 30 дней, финансовая история сохранена 5 лет per 402-ФЗ»
+
+### 44.11 🔴 Маркировка рекламы (38-ФЗ + erid)
+
+**С 1 сентября 2022** любая интернет-реклама в РФ маркируется через ОРД (Яндекс, ВК, Сбер, OZON) и получает токен `erid`. Без erid — **штраф 500 тыс ₽ за каждое нарушение**.
+
+**Что считается рекламой:**
+- Любое продвижение в TG-каналах, чатах, инфлюенсеров
+- Партнёрские ссылки (см. 44.7)
+- Яндекс.Директ, ВК-реклама
+- Размещения у блогеров
+
+**Что делать:**
+1. Заключить договор с ОРД (бесплатно — Яндекс или ВК)
+2. Перед каждым креативом — отправить в ОРД → получить erid
+3. Размещать с меткой: «Реклама. ИНН рекламодателя. erid: XXX»
+4. Если есть партнёры — автоматизировать в их кабинете (создание креатива → erid → выдача ссылки)
+
+### 44.12 🔴 ПП РФ № 1830 от 04.11.2022 — подписочные сервисы
+
+**Дополнительно к чекбоксу автопродления:**
+- Перед каждым автосписанием — UI с суммой и датой следующего списания
+- Отдельное уведомление **за 24 часа** до списания (push в боте)
+- Возможность отменить **в один клик** без захода в саппорт
+
+**Штраф ст. 14.8 ч. 1 КоАП:** 5-10 тыс ₽ для ИП за нарушение требований к информации.
+
+В UI Profile добавить:
+```
+Premium активна до 17.06.2026
+Следующее списание: 18.06.2026 — 750 ₽
+[Отменить автопродление]
+```
+
+### 44.13 🟠 DPO (Data Protection Officer)
+
+**ст. 22.1 152-ФЗ:** оператор обязан назначить ответственное лицо за обработку ПД. Самозанятый = сам себе DPO, но это должно быть **формализовано**.
+
+**Действие:**
+- Внутренний документ-приказ «о назначении ответственного» (для самозанятого — просто документ)
+- В Privacy Policy указать: «Ответственное лицо за обработку ПД: [ФИО], email: dpo@yourapp.ru» (можно тот же email что общий support)
+
+### 44.14 🟠 Разделение согласий (152-ФЗ ст. 9)
+
+**Согласие должно быть конкретным** — нельзя одним чекбоксом «согласен со всем». Нужно:
+
+| Согласие | Обязательное | Зачем |
+|----------|--------------|-------|
+| Принимаю оферту | да | договор |
+| Согласие на обработку ПД для оказания услуги | да | биллинг, аутентификация |
+| Согласие на аналитику/маркетинг | **опционально**, default OFF | retargeting, push-уведомления о новинках |
+| Согласие на трансграничную передачу | да (если используешь CF/Sentry) | США, ЕС |
+
+Отказ от опционального не должен блокировать сервис.
+
+### 44.15 🟠 Реквизиты исполнителя (ЗоЗПП ст. 9)
+
+**До покупки** юзер должен видеть:
+- ФИО (Иванов Иван Иванович)
+- ИНН
+- Адрес регистрации (по паспорту)
+- ОГРНИП (если ИП)
+- Email + телефон поддержки
+- Режим работы поддержки
+
+Сейчас «контакты» в Profile — недостаточно. Должно быть в **paywall** до кнопки «Оплатить».
+
+### 44.16 🟠 Telegram = трансграничная передача
+
+Telegram FZ-LLC (UAE/Ireland) — все сообщения юзера ↔ бота проходят через их серверы. Это **автоматическая трансграничная передача** дополнительно к Cloudflare/Sentry.
+
+В Privacy Policy и уведомлении РКН **обязательно** указать Telegram как получателя ПД с указанием страны.
+
+### 44.17 🟠 Возврат денежных средств — 10 дней
+
+**ЗоЗПП ст. 22:** возврат денег — **в течение 10 календарных дней** с момента предъявления требования. Раздел 27.5 playbook'а говорит «срок ответа 1-3 рабочих дня» — это про ответ, не про деньги.
+
+**Штраф ст. 23 ЗоЗПП:** пеня 1% в день за просрочку. Кумулятивно: за месяц = 30% от суммы.
+
+В админке — алерт на refund-запросы старше 7 дней (чтобы успеть в 10 дней).
+
+### 44.18 🟠 ст. 10 ЗоЗПП — детальная информация перед оплатой
+
+Сейчас paywall показывает «Premium 750 ₽» без разбивки. Перед формой оплаты обязательно:
+- Что включено (200 сообщений/день, NSFW, и т.д.)
+- Срок действия (30 дней)
+- Условия автопродления (возобновится по той же цене)
+- Условия отмены (в Профиле, 1 клик, работает до конца оплаченного периода)
+
+### 44.19 🟠 Расчётный счёт — уведомить банк
+
+ЦБ РФ разрешает самозанятому приём НПД-выручки на личную дебетовую карту. **Но банк по 115-ФЗ** (антиотмывка) может **заблокировать счёт** за «нетипичные операции».
+
+**Действие до запуска:**
+- Уведоми банк через ЛК письмом: «ИНН XXX, статус самозанятого, ожидаются регулярные поступления от ЮКассы / агрегатора платежей, источник — оплата за digital-услуги»
+- Лучше — открыть **отдельную карту** только под бизнес (упрощает учёт)
+
+### 44.20 🟠 Запрет на найм сотрудников (НПД)
+
+Если планируешь нанимать модераторов NSFW — **только по ГПХ на разовые задачи**, не на постоянку. Трудовой договор = снятие с НПД.
+
+### 44.21 🟠 Sweden-прокси и 276-ФЗ
+
+Прокси для api.telegram.org **формально** под действие 276-ФЗ (не реестр VPN, но «средство обхода блокировок»). Использование сервисом — grey zone, **но реклама обхода блокировок запрещена**.
+
+В Privacy Policy и публичных материалах **формулируй нейтрально**: «используем прокси-сервер в Швеции для обеспечения отказоустойчивости связи с Telegram API». Без слов «обход блокировок».
+
+### 44.22 🟠 Аннулирование чека НПД при refund
+
+При возврате юзеру деньги — самозанятый должен **аннулировать чек** через API «Мой налог». Сейчас playbook упоминает refund в ЮКассе, но не аннулирование.
+
+**Следствие:** ФНС видит доход без расхода → переплата налога.
+
+**Решение:** в refund-handler после успешного ЮК-refund:
+```js
+await fetch('https://lknpd.nalog.ru/api/v1/cancel', {
+  method: 'POST',
+  body: JSON.stringify({
+    receiptId: receiptIdFromDB,
+    cancelReason: 'Возврат по требованию покупателя (ЗоЗПП ст.32)',
+  }),
+});
+```
+
+### 44.23 🟠 Terms of Service URL в BotFather
+
+С октября 2024 Telegram требует Terms URL для ботов с платежами:
+```
+BotFather → /mybots → Bot Settings → Terms of Service URL → https://yourapp.ru/terms
+```
+
+Без этого Telegram может **ограничить функции бота** (lockdown на новые платежи).
+
+### 44.24 🟠 Bug bounty / red team на NSFW-фильтр
+
+Перед запуском NSFW — попроси нескольких людей попытаться **jailbreak'нуть** фильтр (запросы которые обходят защиту от CSAM). Логируй удачные jailbreak'и → дополняй фильтр.
+
+Это **необходимый шаг** — без него NSFW-feature нельзя запускать.
+
+### 44.25 🟠 Ответственность за оскорбительный AI-контент
+
+Если AI сгенерит клевету в адрес реального лица (ст. 152 ГК), оператор = ответчик.
+
+**Защита:**
+- Output-фильтр блокирует имена реальных современников в негативном контексте
+- В оферте: «контент генерируется AI, не отражает позицию правообладателя, юзер использует на свой риск»
+- Логирование всех генераций для audit-trail при иске
+
+### 44.26 🟡 Cloudflare блокируется РКН (план B)
+
+CF Pages + DNS на CF = single point of failure. РКН периодически блокирует диапазоны CF (последний — июнь 2024 на 24 часа).
+
+**План B:**
+- Резервный CDN на РФ-провайдере (Selectel CDN, BunnyCDN РФ)
+- DNS-fallback у регистратора домена (не CF)
+- Документированная процедура переключения NS (см. 43.21)
+
+### 44.27 🟡 Корпоративные клиенты vs самозанятый
+
+Самозанятый принимает оплату только от **физлиц**. Если хочешь B2B (корпоративные подписки от юрлиц) — **нужно ИП + ККТ**.
+
+В оферте указать: «Сервис предназначен для физических лиц. Юридические лица обращаются в индивидуальном порядке.»
+
+### 44.28 🔴 Регистрация в реестре «организаторов распространения информации» (149-ФЗ ст. 10.1)
+
+**Если** приложение позволяет UGC-публикацию (юзеры делятся персонажами публично) — это ОРИ → регистрация в реестре РКН → хранение данных 1 год → выдача ФСБ по запросу.
+
+**Текущая архитектура** (1:1 чат с AI, custom persona только у автора) — **НЕ ОРИ**. Но если добавишь «поделиться моим персонажем» → попадаешь в категорию.
+
+**Документировать в playbook явно:**
+```
+❌ НЕ включать без юр. консультации:
+- Публичный каталог user-created персонажей
+- Шаринг персонажей между юзерами
+- Любая UGC-публикация
+```
+
+---
+
+## 🔴 SUMMARY РИСКОВ ПО УБЫВАНИЮ
+
+1. **CSAM от LLM** (УК 242.1/242.2) — до 15 лет → раздел 44.4
+2. **Порнография в LLM** (УК 242) — до 6 лет → раздел 44.5
+3. **Локализация ПД** (152-ФЗ 18.5 + КоАП 13.11) — до 18 млн ₽ + блокировка → раздел 44.1
+4. **Трансграничная без РКН** (152-ФЗ 12) — до 6 млн ₽ → раздел 44.3
+5. **Реклама без erid** (38-ФЗ) — до 500 тыс/каждое → раздел 44.11
+6. **AI-генерация с известными лицами** (152.1 ГК) → раздел 44.6
+7. **Партнёры при НПД** (422-ФЗ) — снятие с режима + НДФЛ за весь год → раздел 44.7
+
+**Минимум для запуска без уголовки:** разделы 44.4, 44.5, 44.6 — это **технические защиты в коде**, не «бумаги».
+
+**Минимум для запуска без админ-штрафов:** разделы 44.1, 44.2, 44.3, 44.11 — это **архитектурные изменения** (self-host Sentry, подача уведомлений РКН, ОРД).
 
 ---
 
