@@ -257,6 +257,49 @@ export function getInvoiceStatus(payload: string): Promise<InvoiceStatusResponse
   return fetchAuthed<InvoiceStatusResponse>(`/billing/invoice-status/${encodeURIComponent(payload)}`)
 }
 
+// ─── ЮКасса (API напрямую) ──────────────────────────────────────────────
+
+export interface YkCreatePaymentResponse {
+  ok: true
+  yk_payment_id: string
+  confirmation_url: string | null
+  status: 'pending' | 'succeeded' | 'canceled' | string
+  /** 'test' — тестовый магазин (карты 5555 5555 5555 4477), 'live' — боевой. */
+  mode: 'test' | 'live'
+}
+
+/**
+ * Создаёт платёж в ЮКассе и возвращает URL для редиректа юзера.
+ * Бэк проверит plan, создаст YK payment с save_payment_method=auto_renew
+ * (для подписок) и вернёт confirmation_url. Юзер уходит на сайт ЮК,
+ * платит, возвращается на returnUrl. Параллельно YK шлёт webhook —
+ * подписка активируется на бэке.
+ *
+ * После открытия confirmation_url фронт начинает поллить
+ * /billing/yk-status/:id пока не получит 'succeeded'.
+ */
+export function ykCreatePayment(
+  plan: PlanCode,
+  returnUrl: string,
+  autoRenew: boolean = true,
+): Promise<YkCreatePaymentResponse> {
+  return fetchAuthed<YkCreatePaymentResponse>('/billing/yk-create-payment', {
+    method: 'POST',
+    body: JSON.stringify({ plan, return_url: returnUrl, auto_renew: autoRenew }),
+  })
+}
+
+export interface YkStatusResponse {
+  ok: true
+  status: 'pending' | 'succeeded' | 'canceled' | 'unknown' | string
+}
+
+export function ykGetPaymentStatus(paymentId: string): Promise<YkStatusResponse> {
+  return fetchAuthed<YkStatusResponse>(
+    `/billing/yk-status/${encodeURIComponent(paymentId)}`,
+  )
+}
+
 // ─── /auth/validate-init-data: smoke-test ─────────────────────────────────
 
 export interface ValidateInitDataResponse {

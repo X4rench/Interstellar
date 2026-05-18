@@ -1,11 +1,13 @@
 import { useMemo, useRef, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { openInvoice } from '@telegram-apps/sdk-react'
+import { openInvoice, openLink } from '@telegram-apps/sdk-react'
 
 import { useApp, type PaywallReason } from '../context/AppContext'
 import {
   createInvoice as apiCreateInvoice,
   getInvoiceStatus as apiGetInvoiceStatus,
+  ykCreatePayment,
+  ykGetPaymentStatus,
   PLANS,
   type PlanCode,
   ApiError,
@@ -229,6 +231,47 @@ export function PaywallPage() {
     pollTimerRef.current = window.setTimeout(tick, 1500)
   }
 
+  // YK status polling: после возврата с YK-сайта поллим до succeeded.
+  // Отдельная функция от Stars-polling — другой endpoint, другая семантика
+  // status ('succeeded' вместо 'paid', plus 'pending'/'canceled').
+  const startYkPolling = (paymentId: string) => {
+    setState('paying')
+    setPollCount(0)
+    let attempts = 0
+    const maxAttempts = 60 // 60 × 2s = 2 минуты
+    const tick = async () => {
+      attempts++
+      setPollCount(attempts)
+      try {
+        const res = await ykGetPaymentStatus(paymentId)
+        if (res.status === 'succeeded') {
+          setState('success')
+          refreshSubscription()
+          window.setTimeout(closePaywall, 2000)
+          return
+        }
+        if (res.status === 'canceled') {
+          setState('cancelled')
+          return
+        }
+        if (attempts >= maxAttempts) {
+          setState('polling_timeout')
+          setErrorDetail('Платёж обрабатывается. Подписка появится в Profile через минуту.')
+          return
+        }
+        pollTimerRef.current = window.setTimeout(tick, 2000)
+      } catch {
+        if (attempts < maxAttempts) {
+          pollTimerRef.current = window.setTimeout(tick, 3000)
+        } else {
+          setState('error')
+          setErrorDetail('Сеть нестабильна. Проверь Pro в Profile через минуту.')
+        }
+      }
+    }
+    pollTimerRef.current = window.setTimeout(tick, 2000)
+  }
+
   const handleBuy = async (plan: PlanCode) => {
     if (state !== 'idle' && state !== 'failed' && state !== 'cancelled' && state !== 'error' && state !== 'rate_limited' && state !== 'polling_timeout') {
       return
@@ -237,6 +280,53 @@ export function PaywallPage() {
     setBusyPlan(plan)
     setErrorDetail('')
 
+    // ── Попытка №1: ЮКасса (если настроена на бэке) ──
+    // Авто-продление включаем по умолчанию для подписок (Day Pass — не имеет
+    // смысла). На бэке save_payment_method=true → ЮК запомнит карту юзера
+    // и cron каждый час продлит подписку без участия юзера.
+    const returnUrl = `${window.location.origin}/?yk_return=${plan}`
+    try {
+      const res = await ykCreatePayment(plan, returnUrl, plan !== 'day_pass')
+      if (res.confirmation_url) {
+        currentPayloadRef.current = res.yk_payment_id
+        setState('opening')
+        // tg.openLink открывает в браузере, а не в WebView.
+        // Юзер заплатит → ЮК редиректит на returnUrl → юзер вернётся
+        // в TG → mini-app может пересоздаться, но мы уже поллим тут.
+        // На случай нативного браузера — fallback на window.open.
+        try {
+          openLink(res.confirmation_url, { tryInstantView: false })
+        } catch {
+          window.open(res.confirmation_url, '_blank')
+        }
+        startYkPolling(res.yk_payment_id)
+        return
+      }
+      // confirmation_url нет — статус succeeded сразу (recurring сценарий)?
+      if (res.status === 'succeeded') {
+        setState('success')
+        refreshSubscription()
+        window.setTimeout(closePaywall, 2000)
+        return
+      }
+    } catch (err) {
+      // 503 YK_NOT_CONFIGURED → fallback на Stars.
+      // Остальные ошибки (429, 500) — показываем юзеру.
+      if (err instanceof ApiError && err.code === 'YK_NOT_CONFIGURED') {
+        console.warn('[paywall] YK not configured, falling back to Stars')
+        // Provod ниже на Stars flow
+      } else if (err instanceof ApiError && err.status === 429) {
+        setState('rate_limited')
+        setErrorDetail('Слишком часто. Подожди минуту.')
+        setBusyPlan(null)
+        return
+      } else {
+        // Любая другая ошибка — пробуем Stars как fallback
+        console.warn('[paywall] YK failed, falling back to Stars:', err)
+      }
+    }
+
+    // ── Попытка №2: Telegram Stars (legacy fallback) ──
     let invoiceLink: string
     let payload: string
     try {
@@ -250,7 +340,7 @@ export function PaywallPage() {
         setErrorDetail('Слишком часто. Подожди минуту.')
       } else {
         setState('error')
-        setErrorDetail(err instanceof Error ? err.message : 'Не удалось создать инвойс')
+        setErrorDetail(err instanceof Error ? err.message : 'Не удалось создать платёж')
       }
       setBusyPlan(null)
       return
