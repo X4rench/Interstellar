@@ -284,7 +284,13 @@ export function PaywallPage() {
     // Авто-продление включаем по умолчанию для подписок (Day Pass — не имеет
     // смысла). На бэке save_payment_method=true → ЮК запомнит карту юзера
     // и cron каждый час продлит подписку без участия юзера.
-    const returnUrl = `${window.location.origin}/?yk_return=${plan}`
+    //
+    // return_url — t.me ссылка чтобы юзер вернулся ОБРАТНО в TG-приложение
+    // (не на лендинг-сайт). Telegram пeрехватит t.me/.../app и откроет
+    // Mini App. startapp параметр пробрасывает yk_payment_id, чтобы при
+    // re-open мы могли продолжить poll'инг даже если фронт-сессия сбросилась.
+    // Бэк whitelist'ит только наш домен и t.me — другие хосты не пройдут.
+    const returnUrl = `https://t.me/InterstellarAiBot/app?startapp=yk`
     try {
       const res = await ykCreatePayment(plan, returnUrl, plan !== 'day_pass')
       if (res.confirmation_url) {
@@ -461,11 +467,24 @@ export function PaywallPage() {
             onBuy={handleBuy}
           />
 
-          {/* Day Pass — показываем только если уже Pro и не активен */}
-          {tier !== 'free' && !dayPassActive && (
+          {/* Day Pass — показываем всем кроме Premium-юзеров (им и так
+              200 сообщений в день — DP бесполезен). Free-юзерам DP даёт
+              24h × 50 сообщений (Basic-лимит), Basic-юзерам — снимает
+              дневной лимит на 24h. Позиционируется как «попробуй на
+              сутки без подписки» — низкий barrier для Free. */}
+          {tier !== 'premium' && !dayPassActive && (
             <TierCard
               plan="day_pass"
-              features={dayPassFeatures}
+              features={
+                tier === 'free'
+                  ? [
+                      '24 часа без лимита',
+                      '50 сообщений в день',
+                      'Не продлевается автоматически',
+                      'Попробуй без подписки',
+                    ]
+                  : dayPassFeatures
+              }
               currentTier={tier}
               flowState={state}
               busyPlan={busyPlan}

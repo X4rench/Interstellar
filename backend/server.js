@@ -400,8 +400,13 @@ app.post(
       if (typeof returnUrl !== 'string' || !returnUrl.startsWith('https://')) {
         return res.status(400).json({ ok: false, error: 'BAD_RETURN_URL' });
       }
-      // Whitelist: return_url должен быть на нашем домене (anti-OAuth).
-      const allowedHosts = ['interstellar-app.ru', 'app.interstellar-app.ru'];
+      // Whitelist: return_url должен быть на нашем домене ИЛИ t.me
+      // (для возврата в Mini App после оплаты на сайте ЮК).
+      const allowedHosts = [
+        'interstellar-app.ru',
+        'app.interstellar-app.ru',
+        't.me', // Telegram deep-link на наш бот/Mini App
+      ];
       try {
         const host = new URL(returnUrl).hostname;
         if (!allowedHosts.includes(host)) {
@@ -453,10 +458,19 @@ app.get('/api/v1/billing/yk-status/:paymentId', requireAuth, async (req, res) =>
 // Всегда возвращаем 200 для известных event-типов, чтобы ЮК не ретраил
 // (если упадём с 5xx — ЮК будет долбить нас часами).
 app.post('/api/v1/yookassa-webhook', (req, res) => {
-  // Берём именно req.ip (TRUST_PROXY_HOPS должен быть выставлен)
-  const ip = req.ip || req.connection?.remoteAddress || '';
+  // Берём IP клиента. Приоритет:
+  // 1) CF-Connecting-IP — Cloudflare кладёт сюда настоящий IP клиента
+  //    (без проксирования через CF этого header нет)
+  // 2) X-Forwarded-For — обычный proxy-header, первый IP = original
+  // 3) req.ip / remoteAddr — fallback если за nginx без CF
+  // Без этого webhook ловил CF IP (162.158.x.x) вместо YK IP — все
+  // вебхуки отвергались с IP_NOT_ALLOWED → подписки не активировались.
+  const cfIp = req.headers['cf-connecting-ip'];
+  const xff = req.headers['x-forwarded-for'];
+  const firstXff = typeof xff === 'string' ? xff.split(',')[0].trim() : null;
+  const ip = cfIp || firstXff || req.ip || req.connection?.remoteAddress || '';
   if (!isYkIp(ip)) {
-    console.warn(`[yk-webhook] rejected ip=${ip}`);
+    console.warn(`[yk-webhook] rejected ip=${ip} (cf=${cfIp || 'none'}, xff=${xff || 'none'})`);
     return res.status(403).json({ ok: false, error: 'IP_NOT_ALLOWED' });
   }
 
