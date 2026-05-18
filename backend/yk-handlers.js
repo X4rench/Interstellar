@@ -30,11 +30,15 @@ export const YK_PLAN_PRICES_KOPECKS = {
   day_pass:       7500,  // 75 ₽
 };
 
-// Длительность активации по plan (дни). day_pass — только 1 день.
-const PLAN_DURATION_DAYS = {
-  basic_month: 30,
-  premium_month: 30,
-  day_pass: 1,
+// Длительность активации в МИЛЛИСЕКУНДАХ (важно — все timestamp'ы в проекте
+// в Date.now()-формате: миллисекунды от epoch, не секунды). Раньше я писал
+// в секундах — getActiveSubscription с `expires_at > Date.now()` (ms) не
+// находил подписку, и юзер видел Free даже после успешной активации.
+const DAY_MS = 86400 * 1000;
+const PLAN_DURATION_MS = {
+  basic_month: 30 * DAY_MS,
+  premium_month: 30 * DAY_MS,
+  day_pass: 1 * DAY_MS,
 };
 
 // Описание для чека ЮК (отображается юзеру).
@@ -81,7 +85,7 @@ export async function createYkPayment({ db, userId, plan, autoRenew, returnUrl }
 
   // Идемпотентность: INSERT OR IGNORE — если webhook успел прийти ДО того
   // как мы дошли сюда (маловероятно, но возможно при retry), не перезапишем.
-  const now = Math.floor(Date.now() / 1000);
+  const now = Date.now();
   db.prepare(`
     INSERT OR IGNORE INTO yk_payments
       (yk_payment_id, telegram_user_id, plan, amount_kopecks, status,
@@ -123,8 +127,8 @@ export async function getYkPaymentStatus({ db, userId, paymentId }) {
 
   // Если pending и старше 3 сек — освежаем из YK
   // (на случай race: юзер уже оплатил, но webhook задержался).
-  const now = Math.floor(Date.now() / 1000);
-  if (row.status === 'pending' && now - row.updated_at > 3) {
+  const now = Date.now();
+  if (row.status === 'pending' && now - row.updated_at > 3000) {
     try {
       const yk = await ykGetPayment(paymentId);
       if (yk.status !== row.status) {
@@ -153,7 +157,7 @@ export async function getYkPaymentStatus({ db, userId, paymentId }) {
  */
 export function handleYkPaymentSucceeded({ db, ykPayment }) {
   const paymentId = ykPayment.id;
-  const now = Math.floor(Date.now() / 1000);
+  const now = Date.now();
 
   // Найдём наш row. Если его НЕТ — это означает payment создан не нами
   // (или таблица грохнута). Логируем и игнорируем — не активируем
@@ -197,8 +201,8 @@ export function handleYkPaymentSucceeded({ db, ykPayment }) {
     autoRenew = Boolean(meta.auto_renew) && savedMethodId !== null;
   } catch { /* malformed metadata — игнорируем */ }
 
-  const durationDays = PLAN_DURATION_DAYS[row.plan];
-  const expiresAt = now + durationDays * 86400;
+  const durationMs = PLAN_DURATION_MS[row.plan];
+  const expiresAt = now + durationMs;
   // Для day_pass — не подписка, а Day Pass-запись (отдельная таблица).
   // Для basic/premium — пишем в subscriptions.
   const planKey = row.plan === 'day_pass' ? 'day_pass' : row.plan;
@@ -280,7 +284,7 @@ export function handleYkPaymentSucceeded({ db, ykPayment }) {
 export function handleYkPaymentCanceled({ db, ykPayment }) {
   const paymentId = ykPayment.id;
   const reason = ykPayment.cancellation_details?.reason || 'unknown';
-  const now = Math.floor(Date.now() / 1000);
+  const now = Date.now();
 
   db.prepare(`
     UPDATE yk_payments SET
@@ -308,7 +312,7 @@ export function handleYkPaymentCanceled({ db, ykPayment }) {
  */
 export function handleYkRefundSucceeded({ db, ykRefund }) {
   const paymentId = ykRefund.payment_id;
-  const now = Math.floor(Date.now() / 1000);
+  const now = Date.now();
 
   const row = db.prepare(`
     SELECT telegram_user_id, plan, succeeded_at
@@ -357,8 +361,8 @@ export function handleYkRefundSucceeded({ db, ykRefund }) {
  * и шлём юзеру уведомление через бот.
  */
 export async function renewSubscriptionsCron({ db, returnUrl }) {
-  const now = Math.floor(Date.now() / 1000);
-  const cutoff = now + 86400; // подписки которые истекают в течение 24h
+  const now = Date.now();
+  const cutoff = now + DAY_MS; // подписки которые истекают в течение 24h
 
   const due = db.prepare(`
     SELECT id, telegram_user_id, plan, yk_payment_method_id, expires_at
