@@ -6,12 +6,16 @@
 set -e
 export DEBIAN_FRONTEND=noninteractive
 
-# ── Конфиг (заполнено для interstellar-app.ru, IP 77.110.105.156) ──
-POLZA_KEY="pza_3WwCiKq4iHk0_x7ZLo2beYwq8qy-TU35"
-ADMIN_IDS="794285476,1920476158"
-DOMAIN="api.interstellar-app.ru"
-GH_REPO="https://github.com/X4rench/Interstellar.git"
-TG_PROXY="http://interstellar:JXq2kAXVREqoiQLgh28v@176.124.207.161:3128"
+# ── Конфиг ──
+# Секреты НЕ хардкодим в скрипт (он в публичном репо). Передаём через env:
+#   POLZA_KEY=pza_xxx TG_PROXY=http://user:pass@... ./setup-aeza-backend.sh
+# Старый ключ pza_3WwCiKq4iHk0_x7ZLo2beYwq8qy-TU35 был засвечен в git
+# history + скриншоте — РОТИРОВАТЬ через polza.ai dashboard перед запуском.
+: "${POLZA_KEY:?POLZA_KEY env-var required (получи новый ключ на polza.ai)}"
+: "${TG_PROXY:?TG_PROXY env-var required (формат http://user:pass@host:port)}"
+ADMIN_IDS="${ADMIN_IDS:-794285476,1920476158}"
+DOMAIN="${DOMAIN:-api.interstellar-app.ru}"
+GH_REPO="${GH_REPO:-https://github.com/X4rench/Interstellar.git}"
 
 echo "=== Interstellar Backend Setup Started ==="
 

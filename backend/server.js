@@ -456,7 +456,12 @@ app.post('/api/v1/telegram/webhook', verifyTelegramWebhook, async (req, res) => 
             `Жми кнопку ниже, чтобы начать ↓`,
           replyMarkup: {
             inline_keyboard: [
-              [{ text: '🚀 Открыть приложение', web_app: { url: 'https://interstellar-2s4.pages.dev' } }],
+              // Открыть Mini App через t.me — единая точка входа.
+              // Раньше тут был хардкод https://interstellar-2s4.pages.dev —
+              // preview-домен CF Pages, который мог быть пересоздан/удалён
+              // в любой момент → все новые юзеры улетали бы в никуда.
+              // Теперь через t.me/$bot/$app — линк управляется в BotFather.
+              [{ text: '🚀 Открыть приложение', url: webAppUrl }],
               [{ text: '💎 Тарифы и подписка', url: webAppUrl }],
             ],
           },
@@ -937,38 +942,62 @@ app.post(
     .digest('hex')
     .slice(0, 32);
 
-  try {
-    const upstream = await fetch(POLZA_API_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${POLZA_KEY}`,
-        'Content-Type': 'application/json',
-        // Безвредный для OpenAI (игнорят), полезный для xAI если переключимся.
-        'x-grok-conv-id': convId,
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: aiMessages,
-        // 0.75 — баланс между живостью и контролем. Слишком высокая
-        // (>0.85) гонит модель в «литературщину» (искусственные
-        // метафоры, поэтичность), слишком низкая (<0.6) делает речь
-        // суховатой.
-        temperature: 0.75,
-        max_tokens: LLM_MAX_OUTPUT_TOKENS,
-        // Penalty в умеренных значениях. Раньше было 0.4/0.3 — это
-        // слишком агрессивно для русского, модель уходила в синонимы
-        // и звучала странно. 0.2/0.1 — мягко режет повторяющиеся
-        // зачины («Интересный...») без ущерба естественности.
-        frequency_penalty: 0.2,
-        presence_penalty: 0.1,
-      }),
-      signal: controller.signal,
-    });
+  // Retry-логика. polza.ai (как любой proxy-провайдер) периодически
+  // отдаёт 502/503 на transient flake. Без retry юзер видит «нейросеть
+  // недоступна» при обычном hiccup'е. С retry — большинство мерцаний
+  // лечатся прозрачно (полная задержка ≈ 350+750 мс в худшем случае).
+  const POLZA_RETRY_DELAYS = [350, 750]; // 2 retries; первая попытка + 2 retry = 3
+  const bodyJson = JSON.stringify({
+    model: MODEL,
+    messages: aiMessages,
+    // 0.75 — баланс между живостью и контролем. Слишком высокая
+    // (>0.85) гонит модель в «литературщину», низкая (<0.6) сушит речь.
+    temperature: 0.75,
+    max_tokens: LLM_MAX_OUTPUT_TOKENS,
+    // 0.2/0.1 — мягкие penalty, гонят зачины-шаблоны но не ломают речь.
+    frequency_penalty: 0.2,
+    presence_penalty: 0.1,
+  });
 
-    if (!upstream.ok) {
-      const text = await upstream.text().catch(() => '');
-      console.error('[polza] upstream error', upstream.status, text.slice(0, 500));
-      return res.status(502).json({ ok: false, error: 'UPSTREAM_ERROR', status: upstream.status });
+  let upstream;
+  let lastError = '';
+  let lastStatus = 0;
+  try {
+    for (let attempt = 0; attempt <= POLZA_RETRY_DELAYS.length; attempt++) {
+      try {
+        upstream = await fetch(POLZA_API_URL, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${POLZA_KEY}`,
+            'Content-Type': 'application/json',
+            'x-grok-conv-id': convId,
+          },
+          body: bodyJson,
+          signal: controller.signal,
+        });
+        // Retry-able: только 5xx и 429 (rate-limit на upstream).
+        // 4xx (кроме 429) = клиентская ошибка → нет смысла retry'ить.
+        if (upstream.ok || (upstream.status < 500 && upstream.status !== 429)) {
+          break;
+        }
+        lastStatus = upstream.status;
+        lastError = await upstream.text().catch(() => '');
+        console.warn(`[polza] retry ${attempt + 1}/${POLZA_RETRY_DELAYS.length + 1}, status=${upstream.status}`);
+      } catch (fetchErr) {
+        // Network error — тоже retry'абельно (TCP reset, DNS hiccup).
+        // AbortError (наш timeout) — кидаем дальше, retry не имеет смысла.
+        if (fetchErr?.name === 'AbortError') throw fetchErr;
+        lastError = String(fetchErr);
+        console.warn(`[polza] network err retry ${attempt + 1}: ${fetchErr.message}`);
+      }
+      if (attempt < POLZA_RETRY_DELAYS.length) {
+        await new Promise((r) => setTimeout(r, POLZA_RETRY_DELAYS[attempt]));
+      }
+    }
+
+    if (!upstream || !upstream.ok) {
+      console.error('[polza] upstream error after retries', lastStatus, lastError.slice(0, 500));
+      return res.status(502).json({ ok: false, error: 'UPSTREAM_ERROR', status: lastStatus });
     }
 
     const data = await upstream.json();
@@ -995,7 +1024,7 @@ app.use((_req, res) => {
   res.status(404).json({ ok: false, error: 'NOT_FOUND' });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`[backend] listening on http://localhost:${PORT}`);
   console.log(`[backend] model:    ${MODEL}`);
   console.log(`[backend] upstream: ${POLZA_API_URL}`);
@@ -1007,6 +1036,39 @@ app.listen(PORT, () => {
     }`,
   );
 });
+
+// ─── Graceful shutdown ──────────────────────────────────────────────────
+// При systemctl restart/stop systemd шлёт SIGTERM. Без обработчика Node
+// просто умирает, обрывая in-flight /chat (60s timeout) → юзеры видят
+// сбой. С graceful: даём текущим запросам доработать, потом закрываем
+// listener + БД.
+let shuttingDown = false;
+function gracefulShutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[backend] received ${signal}, shutting down gracefully...`);
+
+  // Перестаём принимать новые соединения. Существующие — даём доработать.
+  server.close(() => {
+    console.log('[backend] HTTP server closed');
+    try {
+      db.close();
+      console.log('[backend] DB closed');
+    } catch (err) {
+      console.error('[backend] DB close error', err);
+    }
+    process.exit(0);
+  });
+
+  // Hard-exit через 30 сек если кто-то завис (защита от вечной висимости).
+  // systemd TimeoutStopSec по дефолту 90s, так что 30s даёт буфер.
+  setTimeout(() => {
+    console.error('[backend] graceful shutdown timed out, forcing exit');
+    process.exit(1);
+  }, 30_000).unref();
+}
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // ─── Reconciliation cron ───────────────────────────────────────────────
 // Каждые N минут догоняем потерянные webhook'и через getStarTransactions.
