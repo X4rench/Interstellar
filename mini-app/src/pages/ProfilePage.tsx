@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useState } from 'react'
+import { useMemo, useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSignal, initData } from '@telegram-apps/sdk-react'
 
@@ -6,7 +6,7 @@ import { useApp } from '../context/AppContext'
 import { ChevronRightIcon } from '../icons'
 import { BottomNav } from '../components/BottomNav'
 import { appConfirm, appAlert } from '../components/AppDialogs'
-import { ykToggleAutoRenew } from '../utils/api'
+import { ykToggleAutoRenew, getReferralStats, type ReferralStatsResponse } from '../utils/api'
 import invertLogo from '../icons/invertLogo.png'
 
 import styles from './ProfilePage.module.css'
@@ -161,6 +161,215 @@ function formatRuDate(iso: string | null): string {
   const d = new Date(iso)
   return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`
 }
+
+// ─── Реферальный блок ────────────────────────────────────────────────────────
+
+function ReferralBlock() {
+  const [stats, setStats] = useState<ReferralStatsResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [copied, setCopied] = useState(false)
+
+  const load = useCallback(async () => {
+    try {
+      const data = await getReferralStats()
+      setStats(data)
+    } catch {
+      // non-fatal — просто не показываем статистику
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const handleCopy = async () => {
+    const link = stats?.referral_link
+    if (!link) return
+    try {
+      await navigator.clipboard.writeText(link)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // fallback — prompt
+      window.prompt('Скопируй ссылку:', link)
+    }
+  }
+
+  const handleShare = () => {
+    const link = stats?.referral_link
+    if (!link) return
+    const text = 'Попробуй Интерстеллар — чат с историческими персонажами на ИИ!'
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`
+    try {
+      // Используем Telegram openLink если доступен
+      window.Telegram?.WebApp?.openTelegramLink?.(shareUrl)
+    } catch {
+      window.open(shareUrl, '_blank')
+    }
+  }
+
+  return (
+    <div
+      style={{
+        margin: '12px 20px 0',
+        background: '#0e0e0e',
+        border: '1px solid #232323',
+        borderRadius: 16,
+        overflow: 'hidden',
+      }}
+    >
+      {/* Заголовок */}
+      <div
+        style={{
+          padding: '14px 16px 12px',
+          borderBottom: '1px solid #1a1a1a',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+        }}
+      >
+        <span
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 10,
+            background: 'linear-gradient(135deg, #7c5cff, #ff5cdb)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            fontSize: 17,
+          }}
+        >
+          🎁
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#fff' }}>
+            Пригласи друга
+          </p>
+          <p style={{ margin: '2px 0 0', fontSize: 11, color: '#888', lineHeight: 1.3 }}>
+            Друг купит Basic → ты получаешь <b style={{ color: '#c9b8ff' }}>3 дня Basic</b>
+            {' · '}купит Premium → <b style={{ color: '#ff9ee6' }}>3 дня Premium</b>
+          </p>
+        </div>
+      </div>
+
+      {/* Ссылка + кнопки */}
+      <div style={{ padding: '12px 16px' }}>
+        {loading ? (
+          <p style={{ margin: 0, fontSize: 12, color: '#555', textAlign: 'center', padding: '8px 0' }}>
+            Загрузка…
+          </p>
+        ) : stats?.referral_link ? (
+          <>
+            {/* Поле со ссылкой */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                background: '#161616',
+                border: '1px solid #2a2a2a',
+                borderRadius: 10,
+                padding: '8px 10px 8px 12px',
+                marginBottom: 10,
+              }}
+            >
+              <span
+                style={{
+                  flex: 1,
+                  fontSize: 11,
+                  color: '#888',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  fontFamily: 'monospace',
+                }}
+              >
+                {stats.referral_link}
+              </span>
+              <button
+                onClick={handleCopy}
+                style={{
+                  flexShrink: 0,
+                  background: copied ? '#1a3a1a' : '#1e1e1e',
+                  border: `1px solid ${copied ? 'rgba(61,186,111,0.4)' : '#333'}`,
+                  borderRadius: 7,
+                  padding: '5px 10px',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: copied ? '#3DBA6F' : '#aaa',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  transition: 'all 0.2s ease',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {copied ? '✓ Скопировано' : 'Копировать'}
+              </button>
+            </div>
+
+            {/* Кнопка поделиться */}
+            <button
+              onClick={handleShare}
+              style={{
+                width: '100%',
+                padding: '11px',
+                background: 'linear-gradient(135deg, #7c5cff 0%, #b455e8 50%, #ff5cdb 100%)',
+                border: 0,
+                borderRadius: 10,
+                fontSize: 13,
+                fontWeight: 700,
+                color: '#fff',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                boxShadow: '0 3px 12px rgba(124, 92, 255, 0.3)',
+              }}
+            >
+              📤 Поделиться в Telegram
+            </button>
+
+            {/* Статистика */}
+            <div
+              style={{
+                display: 'flex',
+                gap: 8,
+                marginTop: 10,
+              }}
+            >
+              {[
+                { val: stats.invited_count, lbl: 'Приглашено' },
+                { val: stats.paid_count,    lbl: 'Оплатили' },
+                { val: stats.paid_count * 3, lbl: 'Дней получено' },
+              ].map(({ val, lbl }) => (
+                <div
+                  key={lbl}
+                  style={{
+                    flex: 1,
+                    background: '#161616',
+                    border: '1px solid #222',
+                    borderRadius: 10,
+                    padding: '8px 4px',
+                    textAlign: 'center',
+                  }}
+                >
+                  <p style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#fff' }}>{val}</p>
+                  <p style={{ margin: '2px 0 0', fontSize: 10, color: '#666' }}>{lbl}</p>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p style={{ margin: 0, fontSize: 12, color: '#555', textAlign: 'center', padding: '8px 0' }}>
+            Не удалось загрузить реферальную ссылку
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function ProfilePage() {
   const nav = useNavigate()
@@ -433,6 +642,9 @@ export function ProfilePage() {
             onChanged={refreshSubscription}
           />
         )}
+
+        {/* Реферальный блок — виден всем юзерам */}
+        <ReferralBlock />
 
         {/* ── Секции — все завёрнуты в контейнер с отступом сверху,
               чтобы между последней карточкой (подписка / autorenew)

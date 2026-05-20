@@ -12,6 +12,7 @@
  *      сохранённому payment_method_id
  */
 
+import { giveReferralReward } from './db.js';
 import {
   createPayment as ykCreatePayment,
   createRecurringPayment as ykCreateRecurring,
@@ -269,6 +270,14 @@ export function handleYkPaymentSucceeded({ db, ykPayment }) {
     }
   });
   tx();
+
+  // Реферальная награда (идемпотентна: UNIQUE(referred_user_id) не даст
+  // начислить дважды, даже если вебхук прилетит повторно или при авторенью).
+  try {
+    giveReferralReward(db, row.telegram_user_id, row.plan)
+  } catch (e) {
+    console.error('[referral] YK reward error:', e)
+  }
 
   console.log(
     `[yk-webhook] activated user=${row.telegram_user_id} plan=${row.plan} ` +

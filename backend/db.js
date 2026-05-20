@@ -130,6 +130,23 @@ export function upsertUser(db, tgUser) {
 
   if (tgUser.start_param) {
     upsertAttributionStmt(db).run(tgUser.telegram_user_id, tgUser.start_param, now);
+
+    // User-referral attribution: start_param = 'ref_XXXXXXXX'
+    // Записываем referred_by_user_id только один раз (если ещё не установлен).
+    // Самореферал блокируется проверкой telegram_user_id ≠ referrer.telegram_user_id.
+    if (tgUser.start_param.startsWith('ref_')) {
+      const code = tgUser.start_param.slice(4)
+      if (code) {
+        const referrer = db
+          .prepare('SELECT telegram_user_id FROM users WHERE referral_code = ?')
+          .get(code)
+        if (referrer && referrer.telegram_user_id !== tgUser.telegram_user_id) {
+          db.prepare(
+            'UPDATE users SET referred_by_user_id = ? WHERE telegram_user_id = ? AND referred_by_user_id IS NULL',
+          ).run(referrer.telegram_user_id, tgUser.telegram_user_id)
+        }
+      }
+    }
   }
 }
 
@@ -329,6 +346,147 @@ export function checkAndIncrementChatUsage(db, telegramUserId) {
   tx.immediate();
   return result;
 }
+
+// ─── Referral system ─────────────────────────────────────────────────────────
+
+// No 0/O/I/1 — ambiguous in fonts. 32^8 ≈ 1 трлн вариантов,
+// коллизии практически невозможны при нашем масштабе.
+const REFERRAL_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+
+function _generateReferralCode() {
+  let code = ''
+  for (let i = 0; i < 8; i++) {
+    code += REFERRAL_CODE_CHARS[Math.floor(Math.random() * REFERRAL_CODE_CHARS.length)]
+  }
+  return code
+}
+
+/**
+ * Возвращает реферальный код юзера, создавая его при первом обращении.
+ * Повторяет попытку при редкой UNIQUE-коллизии (до 10 раз).
+ */
+export function getOrCreateReferralCode(db, userId) {
+  const row = db.prepare('SELECT referral_code FROM users WHERE telegram_user_id = ?').get(userId)
+  if (row?.referral_code) return row.referral_code
+
+  const stmt = db.prepare(
+    'UPDATE users SET referral_code = ? WHERE telegram_user_id = ? AND referral_code IS NULL',
+  )
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const code = _generateReferralCode()
+    try {
+      const info = stmt.run(code, userId)
+      if (info.changes === 1) return code
+      // changes === 0: параллельный запрос уже записал код
+      const fresh = db.prepare('SELECT referral_code FROM users WHERE telegram_user_id = ?').get(userId)
+      if (fresh?.referral_code) return fresh.referral_code
+    } catch (e) {
+      if (e?.code === 'SQLITE_CONSTRAINT_UNIQUE') continue // коллизия, retry
+      throw e
+    }
+  }
+  throw new Error('Failed to generate unique referral code after 10 attempts')
+}
+
+/**
+ * Начисляет награду пригласившему юзеру после первой оплаты
+ * приглашённого. Вызывается после Stars- и YK-вебхуков.
+ *
+ * Защита от фрода:
+ *  • UNIQUE(referred_user_id) в referral_rewards → награда платится 1 раз
+ *    за всё время, сколько бы раз invited user ни продлевал подписку.
+ *  • Только basic_month / premium_month → Day Pass не триггерит награду.
+ *  • Самореферал блокирован в upsertUser при первом open app.
+ *  • referred_by_user_id записывается один раз — не перезаписывается.
+ */
+export function giveReferralReward(db, referredUserId, planPurchased) {
+  if (!['basic_month', 'premium_month'].includes(planPurchased)) return false
+
+  const user = db
+    .prepare('SELECT referred_by_user_id FROM users WHERE telegram_user_id = ?')
+    .get(referredUserId)
+  if (!user?.referred_by_user_id) return false
+
+  const referrerId = user.referred_by_user_id
+  const rewardTier = planPurchased === 'premium_month' ? 'premium' : 'basic'
+  const rewardPlan = planPurchased === 'premium_month' ? 'premium_month' : 'basic_month'
+  const rewardDays = 3
+  const rewardMs = rewardDays * 24 * 60 * 60 * 1000
+  const now = Date.now()
+
+  const didReward = db.transaction(() => {
+    // INSERT OR IGNORE: UNIQUE(referred_user_id) гарантирует 0 или 1 изменение
+    const insertInfo = db.prepare(`
+      INSERT OR IGNORE INTO referral_rewards
+        (referrer_user_id, referred_user_id, plan_purchased, reward_tier, reward_days, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(referrerId, referredUserId, planPurchased, rewardTier, rewardDays, now)
+
+    if (insertInfo.changes === 0) return false // уже начислено, пропускаем
+
+    // Продлеваем активную подписку пригласившего (самую дальнюю)
+    const activeSub = db.prepare(`
+      SELECT id, expires_at FROM subscriptions
+      WHERE telegram_user_id = ? AND expires_at > ? AND cancelled_at IS NULL
+      ORDER BY expires_at DESC LIMIT 1
+    `).get(referrerId, now)
+
+    if (activeSub) {
+      // Продлеваем существующую подписку на 3 дня
+      db.prepare('UPDATE subscriptions SET expires_at = expires_at + ? WHERE id = ?')
+        .run(rewardMs, activeSub.id)
+    } else {
+      // Создаём новую 3-дневную подписку как подарок
+      db.prepare(`
+        INSERT INTO subscriptions (telegram_user_id, plan, started_at, expires_at, is_trial, source)
+        VALUES (?, ?, ?, ?, 0, 'referral')
+      `).run(referrerId, rewardPlan, now, now + rewardMs)
+    }
+
+    return true
+  })()
+
+  if (didReward) {
+    console.log(
+      `[referral] rewarded user=${referrerId} +${rewardDays}d ${rewardTier}` +
+      ` (referred=${referredUserId} plan=${planPurchased})`,
+    )
+  }
+  return didReward
+}
+
+/**
+ * Статистика рефералов для ProfilePage и /referral/stats эндпоинта.
+ */
+export function getReferralStats(db, userId) {
+  const referralCode = db
+    .prepare('SELECT referral_code FROM users WHERE telegram_user_id = ?')
+    .get(userId)?.referral_code ?? null
+
+  const invitedCount = db
+    .prepare('SELECT COUNT(*) AS c FROM users WHERE referred_by_user_id = ?')
+    .get(userId)?.c ?? 0
+
+  const rewards = db.prepare(`
+    SELECT plan_purchased, reward_tier, reward_days, created_at
+    FROM referral_rewards WHERE referrer_user_id = ?
+    ORDER BY created_at DESC
+  `).all(userId)
+
+  return {
+    referral_code: referralCode,
+    invited_count: invitedCount,
+    paid_count: rewards.length,
+    rewards: rewards.map((r) => ({
+      plan_purchased: r.plan_purchased,
+      reward_tier: r.reward_tier,
+      reward_days: r.reward_days,
+      created_at: new Date(r.created_at).toISOString(),
+    })),
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Возвращает атрибуцию юзера (start_param, first_seen_at) или null.

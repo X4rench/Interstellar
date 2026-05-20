@@ -311,6 +311,40 @@ export function ykGetPaymentStatus(paymentId: string): Promise<YkStatusResponse>
   )
 }
 
+// ─── Referral ─────────────────────────────────────────────────────────────
+
+export interface ReferralCodeResponse {
+  ok: true
+  referral_code: string
+  referral_link: string | null
+}
+
+export interface ReferralRewardItem {
+  plan_purchased: string
+  reward_tier: string   // 'basic' | 'premium'
+  reward_days: number
+  created_at: string   // ISO
+}
+
+export interface ReferralStatsResponse {
+  ok: true
+  referral_code: string
+  referral_link: string | null
+  invited_count: number  // зарегистрировались по ссылке
+  paid_count: number     // из них оплатили (= кол-во наград)
+  rewards: ReferralRewardItem[]
+}
+
+/** Возвращает (и создаёт при необходимости) реферальный код + ссылку. */
+export function getReferralCode(): Promise<ReferralCodeResponse> {
+  return fetchAuthed<ReferralCodeResponse>('/referral/code')
+}
+
+/** Полная статистика: приглашённые, оплаты, список наград. */
+export function getReferralStats(): Promise<ReferralStatsResponse> {
+  return fetchAuthed<ReferralStatsResponse>('/referral/stats')
+}
+
 // ─── /auth/validate-init-data: smoke-test ─────────────────────────────────
 
 export interface ValidateInitDataResponse {

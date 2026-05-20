@@ -7,6 +7,7 @@ import {
   editUserStarSubscription,
 } from './bot-api.js';
 import { logAction } from './audit.js';
+import { giveReferralReward } from './db.js';
 
 /**
  * Бизнес-логика Stars-платежей.
@@ -566,6 +567,17 @@ export function handleSuccessfulPayment({ db, message, source = 'webhook' }) {
   });
 
   const result = tx();
+
+  // Реферальная награда — только при первой оплате, не при recurring-продлениях.
+  // is_recurring = true значит Telegram уже снял повторный платёж по подписке.
+  if (!result.replay && !sp.is_recurring) {
+    try {
+      giveReferralReward(db, userId, purchasePlan)
+    } catch (e) {
+      // Не-фатально: оплата уже прошла, награда — бонус.
+      console.error('[referral] Stars reward error:', e)
+    }
+  }
 
   return {
     ok: true,

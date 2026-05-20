@@ -15,6 +15,8 @@ import {
   getFreeMessagesRemaining,
   TIER_HISTORY_WINDOW,
   FREE_LIFETIME_MESSAGES,
+  getOrCreateReferralCode,
+  getReferralStats,
 } from './db.js';
 import {
   loadRole,
@@ -323,6 +325,52 @@ app.get('/api/v1/users/me', requireAuth, roleLoader, (req, res) => {
     },
   });
 });
+
+// ─── referral: код и статистика ──────────────────────────────────────────
+
+/**
+ * GET /api/v1/referral/code
+ * Возвращает реферальный код текущего юзера (создаёт при первом запросе).
+ * Фронт показывает его в ProfilePage и строит deep-link.
+ */
+app.get('/api/v1/referral/code', requireAuth, (req, res) => {
+  try {
+    upsertUser(db, req.tgUser)
+    const code = getOrCreateReferralCode(db, req.tgUser.telegram_user_id)
+    const botUsername = process.env.BOT_USERNAME || ''
+    const botAppName  = process.env.BOT_APP_NAME  || 'app'
+    const referralLink = botUsername
+      ? `https://t.me/${botUsername}/${botAppName}?startapp=ref_${code}`
+      : null
+    res.json({ ok: true, referral_code: code, referral_link: referralLink })
+  } catch (err) {
+    console.error('[referral] code failed:', err)
+    res.status(500).json({ ok: false, error: 'INTERNAL_ERROR' })
+  }
+})
+
+/**
+ * GET /api/v1/referral/stats
+ * Статистика для ProfilePage: сколько пригласил, сколько оплатили, награды.
+ */
+app.get('/api/v1/referral/stats', requireAuth, (req, res) => {
+  try {
+    upsertUser(db, req.tgUser)
+    const stats = getReferralStats(db, req.tgUser.telegram_user_id)
+    const botUsername = process.env.BOT_USERNAME || ''
+    const botAppName  = process.env.BOT_APP_NAME  || 'app'
+    // Если код ещё не создан — создаём сразу, чтобы link был доступен
+    const code = stats.referral_code
+      ?? getOrCreateReferralCode(db, req.tgUser.telegram_user_id)
+    const referralLink = botUsername
+      ? `https://t.me/${botUsername}/${botAppName}?startapp=ref_${code}`
+      : null
+    res.json({ ok: true, ...stats, referral_code: code, referral_link: referralLink })
+  } catch (err) {
+    console.error('[referral] stats failed:', err)
+    res.status(500).json({ ok: false, error: 'INTERNAL_ERROR' })
+  }
+})
 
 // ─── billing: создание Stars-инвойса ───────────────────────────────────
 // Rate-limit: 5 инвойсов в минуту на юзера. Защита от спама и от двойных
