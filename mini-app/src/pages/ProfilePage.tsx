@@ -334,7 +334,7 @@ function ReferralBlock() {
     const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`
     try {
       // Используем Telegram openLink если доступен
-      window.Telegram?.WebApp?.openTelegramLink?.(shareUrl)
+      ;(window as any).Telegram?.WebApp?.openTelegramLink?.(shareUrl)
     } catch {
       window.open(shareUrl, '_blank')
     }
@@ -513,7 +513,7 @@ export function ProfilePage() {
     subscription,
     openPaywall,
     clearAllChats, deleteAccountFully,
-    refreshSubscription, subscriptionLoading,
+    refreshSubscription, subscriptionLoading, subscriptionError,
     isAdmin, isPartner, partnerInfo,
     favorites, setLibraryFilter,
   } = useApp()
