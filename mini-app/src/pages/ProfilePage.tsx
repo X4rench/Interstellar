@@ -349,6 +349,7 @@ export function ProfilePage() {
             className={styles.banner}
             onClick={() => openPaywall('manual')}
             style={{
+              marginTop: 12,
               background: 'linear-gradient(160deg, #1d1538 0%, #14102a 55%, #0f0a1e 100%)',
               border: '1.5px solid rgba(124, 92, 255, 0.45)',
               boxShadow:
@@ -432,6 +433,11 @@ export function ProfilePage() {
             onChanged={refreshSubscription}
           />
         )}
+
+        {/* ── Секции — все завёрнуты в контейнер с отступом сверху,
+              чтобы между последней карточкой (подписка / autorenew)
+              и первым заголовком секции был зазор. ── */}
+        <div style={{ marginTop: 24 }}>
 
         {/* Партнёрство (видно только partner'у) */}
         {isPartner && partnerInfo && (
@@ -652,6 +658,8 @@ export function ProfilePage() {
             ))}
           </div>
         </div>
+
+        </div>{/* end sections wrapper */}
 
         <p className={styles.versionText}>Interstellar Mini App · v0.1.0</p>
       </div>
