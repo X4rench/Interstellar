@@ -284,14 +284,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // На возврате focus (например, юзер вышел оплатить Stars и вернулся) —
   // пере-поллим, чтобы поймать свежий subscription.
+  // Debounce 600ms: iOS/Telegram WebView может стрельнуть несколько событий
+  // подряд при возврате из браузера → без debounce множественные
+  // refreshSubscription() вызывают каскад setState и мигание PaywallPage.
   useEffect(() => {
+    let debounceTimer: number | undefined
     const onVisibility = () => {
       if (document.visibilityState === 'visible') {
-        refreshSubscription()
+        clearTimeout(debounceTimer)
+        debounceTimer = window.setTimeout(() => {
+          refreshSubscription()
+        }, 600)
       }
     }
     document.addEventListener('visibilitychange', onVisibility)
-    return () => document.removeEventListener('visibilitychange', onVisibility)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      clearTimeout(debounceTimer)
+    }
   }, [refreshSubscription])
 
   // ─── Characters ─────────────────────────────────────────────────────
