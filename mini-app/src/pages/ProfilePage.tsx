@@ -523,23 +523,10 @@ export function ProfilePage() {
             <span className={styles.statVal}>{totalMessages}</span>
             <span className={styles.statLbl}>Всего</span>
           </div>
-          <button
-            className={styles.statBox}
-            onClick={() => {
-              setLibraryFilter('mine')
-              nav('/library')
-            }}
-            style={{
-              background: 'inherit',
-              border: 0,
-              padding: 0,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-            }}
-          >
+          <div className={styles.statBox}>
             <span className={styles.statVal}>{myCharsCount}</span>
             <span className={styles.statLbl}>Свои</span>
-          </button>
+          </div>
         </div>
 
         {/* Быстрый доступ к Избранному. Видим всегда (даже если 0 — это
