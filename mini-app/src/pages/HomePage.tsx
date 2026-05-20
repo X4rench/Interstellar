@@ -124,36 +124,36 @@ export function HomePage() {
         </button>
       </header>
 
-      {/* AI Disclaimer — компактная плашка под header */}
-      <div
-        style={{
-          margin: '14px 16px 10px',
-          padding: '10px 14px',
-          background: 'rgba(124,92,255,0.08)',
-          border: '1px solid rgba(124,92,255,0.2)',
-          borderRadius: 10,
-          fontSize: 11,
-          color: '#a89cff',
-          lineHeight: 1.4,
-          textAlign: 'center',
-        }}
-      >
-        Ответы персонажей сгенерированы ИИ и носят развлекательный характер. Не используй для медицинских, юридических или финансовых решений.
-      </div>
-
-      {/* Search */}
-      <div className={styles.searchBar}>
-        <SearchIcon />
-        <input
-          className={styles.searchInput}
-          placeholder="Найти персонажа или кумира..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
-
       {/* Body */}
       <div className={styles.body}>
+        {/* AI Disclaimer — компактная плашка под header */}
+        <div
+          style={{
+            margin: '14px 16px 10px',
+            padding: '10px 14px',
+            background: 'rgba(124,92,255,0.08)',
+            border: '1px solid rgba(124,92,255,0.2)',
+            borderRadius: 10,
+            fontSize: 11,
+            color: '#a89cff',
+            lineHeight: 1.4,
+            textAlign: 'center',
+          }}
+        >
+          Ответы персонажей сгенерированы ИИ и носят развлекательный характер. Не используй для медицинских, юридических или финансовых решений.
+        </div>
+
+        {/* Search */}
+        <div className={styles.searchBar}>
+          <SearchIcon />
+          <input
+            className={styles.searchInput}
+            placeholder="Найти персонажа или кумира..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
         {/* Категории — пилюли всегда видимы. Тап на категорию = фильтрация.
             Показываем только те категории где реально есть персонажи.
             paddingTop добавляет дыхание между search и пилюлями (важно на Android
