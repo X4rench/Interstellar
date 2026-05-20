@@ -462,6 +462,53 @@ export function ProfilePage() {
           </div>
         </div>
 
+        {/* Ошибка загрузки подписки (401 или сеть) — показываем баннер с
+            кнопкой «Повторить», чтобы юзер не видел «Free тариф» без объяснений.
+            subscriptionError появляется когда /users/me вернул ошибку. */}
+        {subscriptionError && !subscriptionLoading && (
+          <div
+            style={{
+              margin: '10px 20px 0',
+              padding: '10px 14px',
+              background: 'rgba(255, 80, 80, 0.08)',
+              border: '1px solid rgba(255, 80, 80, 0.25)',
+              borderRadius: 12,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+            }}
+          >
+            <span style={{ fontSize: 16, flexShrink: 0 }}>⚠️</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ margin: 0, fontSize: 12, color: '#ff8888', fontWeight: 600 }}>
+                Не удалось загрузить подписку
+              </p>
+              <p style={{ margin: '2px 0 0', fontSize: 11, color: '#aa6666', lineHeight: 1.3 }}>
+                {subscriptionError === 'INVALID_INIT_DATA' || subscriptionError === 'BAD_INIT_DATA'
+                  ? 'Сессия устарела — закрой и переоткрой бота'
+                  : 'Проверь подключение к сети'}
+              </p>
+            </div>
+            <button
+              onClick={refreshSubscription}
+              style={{
+                background: 'rgba(255,80,80,0.15)',
+                border: '1px solid rgba(255,80,80,0.3)',
+                borderRadius: 8,
+                padding: '5px 10px',
+                fontSize: 11,
+                fontWeight: 600,
+                color: '#ff8888',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                flexShrink: 0,
+              }}
+            >
+              Повторить
+            </button>
+          </div>
+        )}
+
         {/* Stats */}
         <div className={styles.statsRow}>
           <div className={styles.statBox}>
