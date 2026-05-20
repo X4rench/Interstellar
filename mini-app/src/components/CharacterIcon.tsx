@@ -231,20 +231,26 @@ interface CharacterIconProps {
    * чтобы img обрезался по его borderRadius.
    */
   avatarUri?: string
+  /**
+   * HTTP(S) URL фото из бэкенда (для персонажей из админки).
+   * Приоритет выше чем у avatarUri.
+   */
+  photoUrl?: string
 }
 
-export function CharacterIcon({ iconType, size = 20, color, avatarUri }: CharacterIconProps) {
+export function CharacterIcon({ iconType, size = 20, color, avatarUri, photoUrl }: CharacterIconProps) {
   const [imageError, setImageError] = useState(false)
+  const effectiveUri = photoUrl || avatarUri
 
-  // При смене avatarUri (юзер выбрал новое фото) сбрасываем флаг ошибки.
+  // При смене avatarUri/photoUrl (юзер выбрал новое фото) сбрасываем флаг ошибки.
   useEffect(() => {
     setImageError(false)
-  }, [avatarUri])
+  }, [effectiveUri])
 
-  if (avatarUri && !imageError) {
+  if (effectiveUri && !imageError) {
     return (
       <img
-        src={avatarUri}
+        src={effectiveUri}
         alt=""
         style={{
           position: 'absolute',

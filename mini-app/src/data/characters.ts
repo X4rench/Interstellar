@@ -57,6 +57,9 @@ export interface Character {
   // Личные убеждения. Делают персонажа НЕ зеркалом — он может не
   // согласиться, спорить, защищать свою точку зрения.
   opinions?: string
+  // URL фото из бэкенда (для персонажей, добавленных через админку).
+  // Абсолютный HTTP(S) URL. Если задан — отображается вместо SVG-иконки.
+  photo_url?: string
 }
 
 export const BUILT_IN_CHARACTERS: Character[] = [

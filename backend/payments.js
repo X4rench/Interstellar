@@ -450,6 +450,14 @@ export function handleSuccessfulPayment({ db, message, source = 'webhook' }) {
   const purchasePlan = planFromOutstanding || 'basic_month';
   const planCfg = getPlanConfig(purchasePlan);
 
+  // Рублёвый эквивалент партнёрской доли. Подписки продаются в рублях,
+  // поэтому бизнес-логика проще: доля = цена_тарифа_руб * share_bps / 10000.
+  // Не зависит от курса Stars → рублей (который нестабилен и нам неизвестен).
+  const PLAN_PRICES_RUB = { basic_month: 300, premium_month: 750, day_pass: 75 };
+  const partnerRevenueRub = shareBps !== null && attributedPartnerId !== null
+    ? Math.round(((PLAN_PRICES_RUB[purchasePlan] || 0) * shareBps) / 10000 * 100) / 100
+    : 0;
+
   // Активация в транзакции
   const tx = db.transaction(() => {
     try {
@@ -457,12 +465,12 @@ export function handleSuccessfulPayment({ db, message, source = 'webhook' }) {
         `INSERT INTO payments (
            telegram_user_id, telegram_payment_charge_id, provider_payment_charge_id,
            invoice_payload, amount_stars, currency, status,
-           attributed_partner_id, revenue_share_bps_snapshot, partner_revenue_stars,
+           attributed_partner_id, revenue_share_bps_snapshot, partner_revenue_stars, partner_revenue_rub,
            is_first_recurring, is_recurring, paid_at, raw_update_json, source, plan
          ) VALUES (
            @telegram_user_id, @charge_id, @provider_charge_id,
            @payload, @amount, @currency, 'paid',
-           @partner_id, @share_bps, @partner_revenue,
+           @partner_id, @share_bps, @partner_revenue, @partner_revenue_rub,
            @is_first_recurring, @is_recurring, @paid_at, @raw, @source, @plan
          )`,
       );
@@ -476,6 +484,7 @@ export function handleSuccessfulPayment({ db, message, source = 'webhook' }) {
         partner_id: attributedPartnerId,
         share_bps: shareBps,
         partner_revenue: partnerRevenue,
+        partner_revenue_rub: partnerRevenueRub,
         is_first_recurring: sp.is_first_recurring ? 1 : 0,
         is_recurring: sp.is_recurring ? 1 : 0,
         paid_at: Date.now(),

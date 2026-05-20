@@ -87,7 +87,7 @@ function getTgApiBaseUrl() {
   return base.replace(/\/$/, '');
 }
 
-async function tgCall(method, params = {}) {
+export async function tgCall(method, params = {}) {
   const token = getBotToken();
   const url = `${getTgApiBaseUrl()}/bot${token}/${method}`;
 

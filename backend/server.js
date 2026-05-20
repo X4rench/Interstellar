@@ -3,6 +3,8 @@ import cors from 'cors';
 import 'dotenv/config';
 
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 
 import { authMiddleware } from './auth.js';
 import {
@@ -27,6 +29,7 @@ import {
   requireFreshAuth,
 } from './roles.js';
 import { isCryptoConfigured } from './crypto.js';
+import { sendMessage, escapeHtml } from './bot-api.js';
 import {
   createInvoice as paymentsCreateInvoice,
   handlePreCheckoutQuery,
@@ -59,6 +62,22 @@ import {
   rejectPayout,
   listAudit,
 } from './admin.js';
+import { getAnalyticsSummary, getUsersChart, getRevenueChart } from './analytics.js';
+import {
+  createBroadcast,
+  startBroadcastAsync,
+  cancelBroadcast,
+  listBroadcasts,
+  getBroadcast,
+} from './broadcast.js';
+import {
+  listCharacters,
+  getCharacter,
+  createCharacter,
+  updateCharacter,
+  deactivateCharacter,
+  updateCharacterPhoto,
+} from './characters-db.js';
 import {
   getPartnerSummary,
   getPartnerProfile,
@@ -256,6 +275,12 @@ if (CORS_ORIGINS.length > 0) {
 
 app.use(express.json({ limit: '512kb' }));
 
+// ─── Static uploads (character photos) ───────────────────────────────────
+// Admin uploads go to ./data/uploads/characters/ and are served as /uploads/...
+const UPLOADS_DIR = path.join(process.cwd(), 'data', 'uploads');
+fs.mkdirSync(path.join(UPLOADS_DIR, 'characters'), { recursive: true });
+app.use('/uploads', express.static(UPLOADS_DIR));
+
 // ─── health ───────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
   res.json({
@@ -282,7 +307,12 @@ app.get('/api/v1/users/me', requireAuth, roleLoader, (req, res) => {
   const u = req.tgUser;
 
   // Upsert юзера + регистрация атрибуции (если start_param впервые).
-  upsertUser(db, u);
+  const { newPartnerReferral } = upsertUser(db, u);
+  if (newPartnerReferral) {
+    const { partnerUserId, firstName, username } = newPartnerReferral;
+    const displayName = username ? `@${escapeHtml(username)}` : escapeHtml(firstName || 'пользователь');
+    sendMessage({ chatId: partnerUserId, text: `👤 У вас новый реферал: ${displayName}` });
+  }
 
   const subscription = getActiveSubscription(db, u.telegram_user_id);
   const tier = getUserTier(db, u.telegram_user_id);
@@ -1032,7 +1062,7 @@ app.post(
       const result = createPartnerPayout({
         db,
         ...partnerContext(req),
-        amountStars: req.body?.amount_stars ? Number(req.body.amount_stars) : undefined,
+        amountRub: req.body?.amount_rub ? Number(req.body.amount_rub) : undefined,
       });
       if (!result.ok) return res.status(400).json(result);
       res.json(result);
@@ -1245,6 +1275,266 @@ app.post(
   }
   },
 );
+
+// ─── admin: analytics ──────────────────────────────────────────────────
+
+/**
+ * GET /api/v1/admin/analytics/summary
+ * Сводные метрики: пользователи, подписки, доход.
+ */
+app.get('/api/v1/admin/analytics/summary', ...requireAdmin, (_req, res) => {
+  try {
+    const summary = getAnalyticsSummary(db);
+    res.json({ ok: true, ...summary });
+  } catch (err) {
+    console.error('[admin] analytics/summary failed:', err);
+    res.status(500).json({ ok: false, error: 'INTERNAL_ERROR' });
+  }
+});
+
+/**
+ * GET /api/v1/admin/analytics/users?days=30
+ * График регистраций по дням.
+ */
+app.get('/api/v1/admin/analytics/users', ...requireAdmin, (req, res) => {
+  try {
+    const days = Math.min(90, Math.max(7, Number(req.query.days) || 30));
+    const data = getUsersChart(db, days);
+    res.json({ ok: true, days, ...data });
+  } catch (err) {
+    console.error('[admin] analytics/users failed:', err);
+    res.status(500).json({ ok: false, error: 'INTERNAL_ERROR' });
+  }
+});
+
+/**
+ * GET /api/v1/admin/analytics/revenue?days=30
+ * График дохода (Stars + ЮКасса) по дням.
+ */
+app.get('/api/v1/admin/analytics/revenue', ...requireAdmin, (req, res) => {
+  try {
+    const days = Math.min(90, Math.max(7, Number(req.query.days) || 30));
+    const data = getRevenueChart(db, days);
+    res.json({ ok: true, days, ...data });
+  } catch (err) {
+    console.error('[admin] analytics/revenue failed:', err);
+    res.status(500).json({ ok: false, error: 'INTERNAL_ERROR' });
+  }
+});
+
+// ─── admin: broadcast ──────────────────────────────────────────────────
+
+/**
+ * GET /api/v1/admin/broadcast
+ * Список рассылок (история).
+ */
+app.get('/api/v1/admin/broadcast', ...requireAdmin, (req, res) => {
+  try {
+    const result = listBroadcasts(db, {
+      limit:  Number(req.query.limit)  || 20,
+      offset: Number(req.query.offset) || 0,
+    });
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error('[admin] broadcast list failed:', err);
+    res.status(500).json({ ok: false, error: 'INTERNAL_ERROR' });
+  }
+});
+
+/**
+ * POST /api/v1/admin/broadcast
+ * Создать и запустить рассылку.
+ * Body: { text, parse_mode?, button_text?, button_url? }
+ */
+app.post(
+  '/api/v1/admin/broadcast',
+  ...requireAdminConfirm,
+  rateLimit({ bucket: 'admin_broadcast', windowMs: 60_000, max: 3 }),
+  async (req, res) => {
+    try {
+      const { text, parse_mode, button_text, button_url } = req.body || {};
+      if (!text || typeof text !== 'string' || !text.trim()) {
+        return res.status(400).json({ ok: false, error: 'BAD_TEXT' });
+      }
+      if (text.length > 4096) {
+        return res.status(400).json({ ok: false, error: 'TEXT_TOO_LONG' });
+      }
+      if (button_text && (!button_url || !/^https?:\/\//.test(button_url))) {
+        return res.status(400).json({ ok: false, error: 'BAD_BUTTON_URL' });
+      }
+
+      const { id, total_users } = createBroadcast(db, {
+        adminUserId: req.tgUser.telegram_user_id,
+        text:        text.trim(),
+        parseMode:   ['HTML', 'Markdown', 'MarkdownV2'].includes(parse_mode) ? parse_mode : 'HTML',
+        buttonText:  button_text || null,
+        buttonUrl:   button_url  || null,
+      });
+
+      // Запускаем в фоне — HTTP-ответ уходит немедленно
+      await startBroadcastAsync(db, id);
+
+      res.json({ ok: true, broadcast_id: id, total_users });
+    } catch (err) {
+      console.error('[admin] broadcast create failed:', err);
+      res.status(500).json({ ok: false, error: 'INTERNAL_ERROR' });
+    }
+  },
+);
+
+/**
+ * GET /api/v1/admin/broadcast/:id
+ * Статус конкретной рассылки (для polling прогресса).
+ */
+app.get('/api/v1/admin/broadcast/:id', ...requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ ok: false, error: 'BAD_ID' });
+  try {
+    const bc = getBroadcast(db, id);
+    if (!bc) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    res.json({ ok: true, broadcast: bc });
+  } catch (err) {
+    console.error('[admin] broadcast get failed:', err);
+    res.status(500).json({ ok: false, error: 'INTERNAL_ERROR' });
+  }
+});
+
+/**
+ * POST /api/v1/admin/broadcast/:id/cancel
+ * Отменить текущую рассылку.
+ */
+app.post('/api/v1/admin/broadcast/:id/cancel', ...requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ ok: false, error: 'BAD_ID' });
+  try {
+    const result = cancelBroadcast(db, id);
+    if (!result.ok) return res.status(400).json(result);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[admin] broadcast cancel failed:', err);
+    res.status(500).json({ ok: false, error: 'INTERNAL_ERROR' });
+  }
+});
+
+// ─── Public: characters ────────────────────────────────────────────────
+// No auth — all users (including unauthenticated) may fetch the character list.
+// Only active characters are returned.
+app.get('/api/v1/characters', (req, res) => {
+  try {
+    const result = listCharacters(db, {
+      activeOnly: true,
+      limit: Number(req.query.limit) || 200,
+      offset: Number(req.query.offset) || 0,
+    });
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error('[characters] list failed:', err);
+    res.status(500).json({ ok: false, error: 'INTERNAL_ERROR' });
+  }
+});
+
+// ─── Admin: characters CRUD ────────────────────────────────────────────
+
+app.get('/api/v1/admin/characters', ...requireAdmin, (req, res) => {
+  try {
+    const result = listCharacters(db, {
+      activeOnly: false,
+      limit: Number(req.query.limit) || 200,
+      offset: Number(req.query.offset) || 0,
+    });
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error('[admin] characters list failed:', err);
+    res.status(500).json({ ok: false, error: 'INTERNAL_ERROR' });
+  }
+});
+
+app.get('/api/v1/admin/characters/:id', ...requireAdmin, (req, res) => {
+  const char = getCharacter(db, req.params.id);
+  if (!char) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  res.json({ ok: true, character: char });
+});
+
+app.post('/api/v1/admin/characters', ...requireAdmin, (req, res) => {
+  try {
+    const result = createCharacter(db, req.body || {}, req.tgUser.telegram_user_id);
+    if (!result.ok) return res.status(400).json(result);
+    const char = getCharacter(db, result.id);
+    res.status(201).json({ ok: true, character: char });
+  } catch (err) {
+    console.error('[admin] character create failed:', err);
+    res.status(500).json({ ok: false, error: 'INTERNAL_ERROR' });
+  }
+});
+
+app.patch('/api/v1/admin/characters/:id', ...requireAdmin, (req, res) => {
+  try {
+    const result = updateCharacter(db, req.params.id, req.body || {});
+    if (!result.ok) return res.status(result.error === 'NOT_FOUND' ? 404 : 400).json(result);
+    const char = getCharacter(db, req.params.id);
+    res.json({ ok: true, character: char });
+  } catch (err) {
+    console.error('[admin] character update failed:', err);
+    res.status(500).json({ ok: false, error: 'INTERNAL_ERROR' });
+  }
+});
+
+app.delete('/api/v1/admin/characters/:id', ...requireAdminConfirm, (req, res) => {
+  try {
+    const result = deactivateCharacter(db, req.params.id);
+    if (!result.ok) return res.status(404).json(result);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[admin] character delete failed:', err);
+    res.status(500).json({ ok: false, error: 'INTERNAL_ERROR' });
+  }
+});
+
+/**
+ * PATCH /api/v1/admin/characters/:id/photo
+ * Body: { photo_data: "data:image/jpeg;base64,..." }
+ * Saves the file under data/uploads/characters/ and stores the path in DB.
+ */
+app.patch('/api/v1/admin/characters/:id/photo', ...requireAdmin, async (req, res) => {
+  const charId = req.params.id;
+  if (!getCharacter(db, charId)) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+
+  const { photo_data } = req.body || {};
+  if (!photo_data || typeof photo_data !== 'string') {
+    return res.status(400).json({ ok: false, error: 'MISSING_PHOTO_DATA' });
+  }
+
+  // Expect "data:<mime>;base64,<data>"
+  const match = photo_data.match(/^data:(image\/(?:jpeg|png|webp|gif));base64,(.+)$/);
+  if (!match) {
+    return res.status(400).json({ ok: false, error: 'INVALID_DATA_URL' });
+  }
+  const mimeType = match[1];
+  const base64   = match[2];
+  const rawExt   = mimeType.split('/')[1]; // jpeg, png, webp, gif
+  const ext      = rawExt === 'jpeg' ? 'jpg' : rawExt;
+
+  // Validate base64 size (~5MB after decode = ~6.7MB base64)
+  if (base64.length > 7_000_000) {
+    return res.status(413).json({ ok: false, error: 'PHOTO_TOO_LARGE' });
+  }
+
+  try {
+    const buf      = Buffer.from(base64, 'base64');
+    const filename = `${charId}-${Date.now()}.${ext}`;
+    const filepath = path.join(UPLOADS_DIR, 'characters', filename);
+    fs.writeFileSync(filepath, buf);
+
+    const photoUrl = `/uploads/characters/${filename}`;
+    const result   = updateCharacterPhoto(db, charId, photoUrl);
+    if (!result.ok) return res.status(404).json(result);
+
+    res.json({ ok: true, photo_url: photoUrl });
+  } catch (err) {
+    console.error('[admin] photo upload failed:', err);
+    res.status(500).json({ ok: false, error: 'INTERNAL_ERROR' });
+  }
+});
 
 app.use((_req, res) => {
   res.status(404).json({ ok: false, error: 'NOT_FOUND' });

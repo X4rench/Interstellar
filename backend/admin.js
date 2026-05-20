@@ -210,13 +210,17 @@ export function grantPartner({
 
   tx();
 
-  // Уведомление партнёру в TG (fire-and-forget). slug escape'им хотя
-  // validateSlug допускает только [\w-] — но escape дешёвый, defense-in-depth.
+  // Уведомление партнёру в TG (fire-and-forget).
+  const botUsername = process.env.BOT_USERNAME || '';
+  const botAppName = process.env.BOT_APP_NAME || 'app';
+  const refLink = botUsername
+    ? `https://t.me/${botUsername}/${botAppName}?startapp=${bloggerSlug}`
+    : bloggerSlug;
   sendMessage({
     chatId: targetUserId,
     text:
       `🎉 <b>Тебя пригласили в партнёрскую программу Interstellar!</b>\n\n` +
-      `Твой реферальный slug: <code>${escapeHtml(bloggerSlug)}</code>\n` +
+      `Твоя реферальная ссылка:\n<code>${escapeHtml(refLink)}</code>\n\n` +
       `Доля: ${(revenueShareBps / 100).toFixed(2)}% от каждого платежа реферралов\n\n` +
       `Открой Mini App → Профиль → «Партнёрство» чтобы заполнить реквизиты и увидеть статистику.`,
   });
@@ -244,7 +248,14 @@ export function listPartners({ db, status = 'all', limit = 100, offset = 0 }) {
          (SELECT COALESCE(SUM(pa.partner_revenue_stars), 0) FROM payments pa
             WHERE pa.attributed_partner_id = p.telegram_user_id AND pa.status='paid') AS earned_stars,
          (SELECT COALESCE(SUM(po.amount_stars), 0) FROM partner_payouts po
-            WHERE po.partner_telegram_user_id = p.telegram_user_id AND po.status='paid') AS paid_out_stars
+            WHERE po.partner_telegram_user_id = p.telegram_user_id AND po.status='paid') AS paid_out_stars,
+         (SELECT COALESCE(SUM(pa.partner_revenue_rub), 0)
+            FROM payments pa WHERE pa.attributed_partner_id = p.telegram_user_id AND pa.status='paid')
+          + (SELECT COALESCE(SUM(yk.partner_revenue_rub), 0)
+            FROM yk_payments yk WHERE yk.attributed_partner_id = p.telegram_user_id AND yk.status='succeeded')
+          AS earned_rub,
+         (SELECT COALESCE(SUM(po.amount_rub), 0) FROM partner_payouts po
+            WHERE po.partner_telegram_user_id = p.telegram_user_id AND po.status='paid') AS paid_out_rub
        FROM partners p
        LEFT JOIN users u ON u.telegram_user_id = p.telegram_user_id
        ${statusFilter}
@@ -278,7 +289,14 @@ export function getPartner({ db, telegramUserId }) {
             WHERE po.partner_telegram_user_id = p.telegram_user_id
               AND po.status IN ('requested','awaiting_receipt','approved')) AS pending_payouts_stars,
          (SELECT COALESCE(SUM(po.amount_stars), 0) FROM partner_payouts po
-            WHERE po.partner_telegram_user_id = p.telegram_user_id AND po.status='paid') AS paid_out_stars
+            WHERE po.partner_telegram_user_id = p.telegram_user_id AND po.status='paid') AS paid_out_stars,
+         (SELECT COALESCE(SUM(pa.partner_revenue_rub), 0)
+            FROM payments pa WHERE pa.attributed_partner_id = p.telegram_user_id AND pa.status='paid')
+          + (SELECT COALESCE(SUM(yk.partner_revenue_rub), 0)
+            FROM yk_payments yk WHERE yk.attributed_partner_id = p.telegram_user_id AND yk.status='succeeded')
+          AS earned_rub,
+         (SELECT COALESCE(SUM(po.amount_rub), 0) FROM partner_payouts po
+            WHERE po.partner_telegram_user_id = p.telegram_user_id AND po.status='paid') AS paid_out_rub
        FROM partners p
        LEFT JOIN users u ON u.telegram_user_id = p.telegram_user_id
        WHERE p.telegram_user_id = ?`,
@@ -287,6 +305,7 @@ export function getPartner({ db, telegramUserId }) {
 
   if (!row) return null;
   row.balance_stars = (row.earned_stars || 0) - (row.paid_out_stars || 0) - (row.pending_payouts_stars || 0);
+  row.balance_rub = Math.max(0, (row.earned_rub || 0) - (row.paid_out_rub || 0));
   return row;
 }
 
@@ -438,7 +457,7 @@ export function listPayouts({ db, status, limit = 100, offset = 0 }) {
   const rows = db
     .prepare(
       `SELECT
-         po.id, po.partner_telegram_user_id, po.amount_stars, po.status,
+         po.id, po.partner_telegram_user_id, po.amount_rub, po.amount_stars, po.status,
          po.receipt_number, po.receipt_uploaded_at,
          po.external_payout_ref, po.external_payout_at, po.external_payout_amount_rub,
          po.requested_at, po.decided_at, po.decided_by_admin_id, po.rejection_reason,
@@ -501,7 +520,7 @@ export function approvePayout({ db, adminId, payoutId, ip, userAgent, requestId 
       chatId: po.partner_telegram_user_id,
       text:
         `📋 <b>Запрос на выплату принят</b>\n\n` +
-        `Сумма: ${po.amount_stars} ⭐\n\n` +
+        `Сумма: ${po.amount_rub != null ? po.amount_rub + ' ₽' : po.amount_stars + ' ⭐'}\n\n` +
         `Чтобы получить выплату, выставь нам чек через приложение «Мой налог»:\n` +
         `<b>${businessName}</b>` +
         (businessInn ? `\nИНН: <code>${businessInn}</code>` : '') +

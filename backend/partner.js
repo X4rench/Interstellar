@@ -12,7 +12,7 @@ import { sendMessage } from './bot-api.js';
  * (через roleLoader → req.partner). Никакого cross-partner-доступа.
  */
 
-const MIN_PAYOUT_STARS = 500;
+const MIN_PAYOUT_RUB = 500; // 500₽ минимальная сумма для вывода
 
 // ─── Summary ─────────────────────────────────────────────────────────────
 
@@ -47,23 +47,25 @@ export function getPartnerSummary({ db, partnerUserId, businessInn, businessName
 
   const conversions = db
     .prepare(
-      `SELECT COUNT(DISTINCT telegram_user_id) AS c
-       FROM payments
-       WHERE attributed_partner_id = ? AND status = 'paid'`,
+      `SELECT
+         (SELECT COUNT(DISTINCT telegram_user_id) FROM payments WHERE attributed_partner_id = ? AND status = 'paid')
+       + (SELECT COUNT(DISTINCT telegram_user_id) FROM yk_payments WHERE attributed_partner_id = ? AND status = 'succeeded')
+       AS c`,
     )
-    .get(partnerUserId);
+    .get(partnerUserId, partnerUserId);
 
-  const earned = db
-    .prepare(
-      `SELECT COALESCE(SUM(partner_revenue_stars), 0) AS s
-       FROM payments
-       WHERE attributed_partner_id = ? AND status = 'paid'`,
-    )
+  // Заработано: Stars-платежи + YooKassa-платежи, оба поля в рублях.
+  const earnedStars = db
+    .prepare(`SELECT COALESCE(SUM(partner_revenue_rub), 0) AS s FROM payments WHERE attributed_partner_id = ? AND status = 'paid'`)
     .get(partnerUserId);
+  const earnedYk = db
+    .prepare(`SELECT COALESCE(SUM(partner_revenue_rub), 0) AS s FROM yk_payments WHERE attributed_partner_id = ? AND status = 'succeeded'`)
+    .get(partnerUserId);
+  const totalEarned = Math.round(((earnedStars.s || 0) + (earnedYk.s || 0)) * 100) / 100;
 
   const paidOut = db
     .prepare(
-      `SELECT COALESCE(SUM(amount_stars), 0) AS s
+      `SELECT COALESCE(SUM(amount_rub), 0) AS s
        FROM partner_payouts
        WHERE partner_telegram_user_id = ? AND status = 'paid'`,
     )
@@ -71,13 +73,15 @@ export function getPartnerSummary({ db, partnerUserId, businessInn, businessName
 
   const pending = db
     .prepare(
-      `SELECT COALESCE(SUM(amount_stars), 0) AS s
+      `SELECT COALESCE(SUM(amount_rub), 0) AS s
        FROM partner_payouts
        WHERE partner_telegram_user_id = ? AND status IN ('requested','awaiting_receipt','approved')`,
     )
     .get(partnerUserId);
 
-  const balanceStars = Math.max(0, (earned.s || 0) - (paidOut.s || 0) - (pending.s || 0));
+  const balanceRub = Math.max(0,
+    Math.round((totalEarned - (paidOut.s || 0) - (pending.s || 0)) * 100) / 100,
+  );
 
   // Месячные bucket'ы (последние 4 месяца). NOT real-time чтобы партнёр не
   // мог сопоставить конкретного нового реферала по deltam (см. design-doc).
@@ -85,7 +89,7 @@ export function getPartnerSummary({ db, partnerUserId, businessInn, businessName
     .prepare(
       `SELECT
          strftime('%Y-%m', paid_at/1000, 'unixepoch') AS month,
-         COALESCE(SUM(partner_revenue_stars), 0) AS earned,
+         COALESCE(SUM(partner_revenue_rub), 0) AS earned_rub,
          COUNT(DISTINCT telegram_user_id) AS conversions
        FROM payments
        WHERE attributed_partner_id = ? AND status = 'paid'
@@ -102,12 +106,12 @@ export function getPartnerSummary({ db, partnerUserId, businessInn, businessName
     granted_at: partner.granted_at,
     referrals_count: refs.c,
     conversions_count: conversions.c,
-    earned_stars: earned.s || 0,
-    paid_out_stars: paidOut.s || 0,
-    pending_payouts_stars: pending.s || 0,
-    balance_stars: balanceStars,
-    can_request_payout: balanceStars >= MIN_PAYOUT_STARS,
-    min_payout_stars: MIN_PAYOUT_STARS,
+    earned_rub: totalEarned,
+    paid_out_rub: paidOut.s || 0,
+    pending_payouts_rub: pending.s || 0,
+    balance_rub: balanceRub,
+    can_request_payout: balanceRub >= MIN_PAYOUT_RUB,
+    min_payout_rub: MIN_PAYOUT_RUB,
     monthly: monthlyRows,
     // Реквизиты для выставления чека
     business_inn: businessInn || null,
@@ -336,7 +340,7 @@ export function listPartnerPayouts({ db, partnerUserId, limit = 50, offset = 0 }
 export function createPartnerPayout({
   db,
   partnerUserId,
-  amountStars,
+  amountRub,
   ip,
   userAgent,
   requestId,
@@ -377,39 +381,38 @@ export function createPartnerPayout({
       return;
     }
 
-    const earned = db
-      .prepare(
-        `SELECT COALESCE(SUM(partner_revenue_stars), 0) AS s FROM payments
-         WHERE attributed_partner_id = ? AND status = 'paid'`,
-      )
+    const earnedStarsRub = db
+      .prepare(`SELECT COALESCE(SUM(partner_revenue_rub), 0) AS s FROM payments WHERE attributed_partner_id = ? AND status = 'paid'`)
       .get(partnerUserId).s;
-    const paid = db
-      .prepare(
-        `SELECT COALESCE(SUM(amount_stars), 0) AS s FROM partner_payouts
-         WHERE partner_telegram_user_id = ? AND status = 'paid'`,
-      )
+    const earnedYkRub = db
+      .prepare(`SELECT COALESCE(SUM(partner_revenue_rub), 0) AS s FROM yk_payments WHERE attributed_partner_id = ? AND status = 'succeeded'`)
       .get(partnerUserId).s;
-    balance = Math.max(0, earned - paid);
+    const totalEarned = (earnedStarsRub || 0) + (earnedYkRub || 0);
 
-    if (balance < MIN_PAYOUT_STARS) {
-      outcome = { ok: false, error: 'BALANCE_BELOW_MIN', balance_stars: balance, min: MIN_PAYOUT_STARS };
+    const paid = db
+      .prepare(`SELECT COALESCE(SUM(amount_rub), 0) AS s FROM partner_payouts WHERE partner_telegram_user_id = ? AND status = 'paid'`)
+      .get(partnerUserId).s;
+    balance = Math.max(0, Math.round((totalEarned - (paid || 0)) * 100) / 100);
+
+    if (balance < MIN_PAYOUT_RUB) {
+      outcome = { ok: false, error: 'BALANCE_BELOW_MIN', balance_rub: balance, min: MIN_PAYOUT_RUB };
       return;
     }
 
-    requestedAmount = Number.isFinite(amountStars) && amountStars > 0
-      ? Math.min(amountStars, balance)
+    requestedAmount = Number.isFinite(amountRub) && amountRub > 0
+      ? Math.min(amountRub, balance)
       : balance;
 
-    if (requestedAmount < MIN_PAYOUT_STARS) {
-      outcome = { ok: false, error: 'AMOUNT_BELOW_MIN', min: MIN_PAYOUT_STARS };
+    if (requestedAmount < MIN_PAYOUT_RUB) {
+      outcome = { ok: false, error: 'AMOUNT_BELOW_MIN', min: MIN_PAYOUT_RUB };
       return;
     }
 
     const result = db
       .prepare(
         `INSERT INTO partner_payouts (
-           partner_telegram_user_id, amount_stars, status, requested_at
-         ) VALUES (?, ?, 'requested', ?)`,
+           partner_telegram_user_id, amount_stars, amount_rub, status, requested_at
+         ) VALUES (?, 0, ?, 'requested', ?)`,
       )
       .run(partnerUserId, requestedAmount, Date.now());
     payoutId = result.lastInsertRowid;
@@ -421,7 +424,7 @@ export function createPartnerPayout({
       targetUserId: partnerUserId,
       targetResource: 'partner_payouts',
       targetId: String(payoutId),
-      payload: { amount_stars: requestedAmount, balance_at_time: balance },
+      payload: { amount_rub: requestedAmount, balance_at_time: balance },
       ip,
       userAgent,
       requestId,
@@ -446,12 +449,12 @@ export function createPartnerPayout({
       text:
         `📥 <b>Новая заявка на выплату #${payoutId}</b>\n\n` +
         `Партнёр: <code>${partner.blogger_slug}</code> (#${partnerUserId})\n` +
-        `Сумма: <b>${requestedAmount} ⭐</b>\n\n` +
+        `Сумма: <b>${requestedAmount} ₽</b>\n\n` +
         `Открой админку → Выплаты для обработки.`,
     });
   }
 
-  return { ok: true, payout_id: payoutId, amount_stars: requestedAmount };
+  return { ok: true, payout_id: payoutId, amount_rub: requestedAmount };
 }
 
 /**

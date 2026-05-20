@@ -446,14 +446,16 @@ export interface AdminPartner {
   referrals_count: number
   conversions_count?: number
   earned_stars: number
-  pending_payouts_stars?: number
   paid_out_stars: number
-  balance_stars?: number
+  earned_rub?: number
+  paid_out_rub?: number
+  balance_rub?: number
 }
 
 export interface AdminPayout {
   id: number
   partner_telegram_user_id: number
+  amount_rub: number | null
   amount_stars: number
   status: 'requested' | 'awaiting_receipt' | 'approved' | 'paid' | 'rejected'
   receipt_number: string | null
@@ -567,13 +569,13 @@ export interface PartnerSummary {
   granted_at: number
   referrals_count: number
   conversions_count: number
-  earned_stars: number
-  paid_out_stars: number
-  pending_payouts_stars: number
-  balance_stars: number
+  earned_rub: number
+  paid_out_rub: number
+  pending_payouts_rub: number
+  balance_rub: number
   can_request_payout: boolean
-  min_payout_stars: number
-  monthly: { month: string; earned: number; conversions: number }[]
+  min_payout_rub: number
+  monthly: { month: string; earned_rub: number; conversions: number }[]
   business_inn: string | null
   business_name: string | null
 }
@@ -591,6 +593,7 @@ export interface PartnerProfile {
 
 export interface PartnerPayoutItem {
   id: number
+  amount_rub: number | null
   amount_stars: number
   status: 'requested' | 'awaiting_receipt' | 'approved' | 'paid' | 'rejected'
   receipt_number: string | null
@@ -626,10 +629,10 @@ export function partnerListPayouts(): Promise<{ ok: true; payouts: PartnerPayout
   return fetchAuthed('/partner/payouts')
 }
 
-export function partnerCreatePayout(amountStars?: number): Promise<{ ok: true; payout_id: number; amount_stars: number }> {
+export function partnerCreatePayout(amountRub?: number): Promise<{ ok: true; payout_id: number; amount_rub: number }> {
   return fetchAuthedConfirm('/partner/payouts', {
     method: 'POST',
-    jsonBody: amountStars ? { amount_stars: amountStars } : {},
+    jsonBody: amountRub ? { amount_rub: amountRub } : {},
   })
 }
 
@@ -654,4 +657,229 @@ export function adminListAudit(params: {
   if (params.limit) q.set('limit', String(params.limit))
   if (params.offset) q.set('offset', String(params.offset))
   return fetchAuthed(`/admin/audit?${q.toString()}`)
+}
+
+// ─── Admin: Analytics ───────────────────────────────────────────────────
+
+export interface AnalyticsSummary {
+  ok: true
+  users: {
+    total: number
+    new_today: number
+    new_week: number
+    new_month: number
+    dau: number
+  }
+  subscriptions: {
+    active: number
+    by_plan: { plan: string; cnt: number }[]
+    conversion: string  // e.g. "12.5" (%)
+  }
+  stars: { today: number; week: number; month: number; all: number }
+  yk_rub: { today: number; week: number; month: number; all: number }
+}
+
+export interface ChartPoint {
+  day: string   // YYYY-MM-DD
+  value: number
+}
+
+export interface UsersChartResponse {
+  ok: true
+  days: number
+  new_users: ChartPoint[]
+}
+
+export interface RevenueChartResponse {
+  ok: true
+  days: number
+  stars_by_day: ChartPoint[]
+  yk_rub_by_day: ChartPoint[]
+}
+
+export function adminGetAnalyticsSummary(): Promise<AnalyticsSummary> {
+  return fetchAuthed('/admin/analytics/summary')
+}
+
+export function adminGetUsersChart(days = 30): Promise<UsersChartResponse> {
+  return fetchAuthed(`/admin/analytics/users?days=${days}`)
+}
+
+export function adminGetRevenueChart(days = 30): Promise<RevenueChartResponse> {
+  return fetchAuthed(`/admin/analytics/revenue?days=${days}`)
+}
+
+// ─── Admin: Broadcast ────────────────────────────────────────────────────
+
+export interface BroadcastRecord {
+  id: number
+  admin_user_id: number
+  text: string
+  parse_mode: string
+  button_text: string | null
+  button_url: string | null
+  total_users: number
+  sent_count: number
+  failed_count: number
+  blocked_count: number
+  status: 'pending' | 'sending' | 'done' | 'cancelled'
+  created_at: number
+  started_at: number | null
+  finished_at: number | null
+}
+
+export function adminListBroadcasts(params?: {
+  limit?: number
+  offset?: number
+}): Promise<{ ok: true; broadcasts: BroadcastRecord[]; total: number }> {
+  const q = new URLSearchParams()
+  if (params?.limit)  q.set('limit',  String(params.limit))
+  if (params?.offset) q.set('offset', String(params.offset))
+  const qs = q.toString()
+  return fetchAuthed(`/admin/broadcast${qs ? '?' + qs : ''}`)
+}
+
+export function adminGetBroadcast(id: number): Promise<{ ok: true; broadcast: BroadcastRecord }> {
+  return fetchAuthed(`/admin/broadcast/${id}`)
+}
+
+export function adminCreateBroadcast(body: {
+  text: string
+  parse_mode?: 'HTML' | 'Markdown' | 'MarkdownV2'
+  button_text?: string
+  button_url?: string
+}): Promise<{ ok: true; broadcast_id: number; total_users: number }> {
+  return fetchAuthedConfirm('/admin/broadcast', { method: 'POST', jsonBody: body })
+}
+
+export function adminCancelBroadcast(id: number): Promise<{ ok: true }> {
+  return fetchAuthed(`/admin/broadcast/${id}/cancel`, { method: 'POST' })
+}
+
+// ─── Characters (public + admin) ─────────────────────────────────────────
+
+/**
+ * Root URL of the backend (without /api/v1).
+ * Used to build absolute photo URLs from relative /uploads/... paths.
+ */
+export function getBackendRoot(): string {
+  return API_BASE.replace(/\/api\/v1$/, '')
+}
+
+/** Character as returned from the backend (matches frontend Character interface). */
+export interface DbCharacter {
+  id: string
+  name: string
+  description: string
+  category: string
+  iconType: string
+  gradientKey: string
+  photo_url: string | null
+  firstMessage: string
+  persona: string
+  tags: string[]
+  messages: number
+  rating: number
+  isNew: boolean
+  isNSFW: boolean
+  gender?: string
+  era?: {
+    bornYear: number
+    diedYear: number | null
+    context?: string
+    knewWell?: string[]
+    didntKnow?: string[]
+  }
+  signature?: string
+  opinions?: string
+  // Admin-only extras
+  sort_order: number
+  is_active: boolean
+  created_at: number
+  updated_at: number
+  created_by_admin_id: number | null
+}
+
+/** Fetch active characters (public endpoint, no auth required). */
+export async function publicGetCharacters(): Promise<{ ok: true; characters: DbCharacter[]; total: number }> {
+  const res = await fetch(`${API_BASE}/characters`)
+  const data = await res.json() as { ok: true; characters: DbCharacter[]; total: number }
+  return data
+}
+
+export function adminListCharacters(): Promise<{ ok: true; characters: DbCharacter[]; total: number }> {
+  return fetchAuthed('/admin/characters')
+}
+
+export function adminGetCharacter(id: string): Promise<{ ok: true; character: DbCharacter }> {
+  return fetchAuthed(`/admin/characters/${encodeURIComponent(id)}`)
+}
+
+export function adminCreateCharacter(body: {
+  id: string
+  name: string
+  description?: string
+  category?: string
+  iconType?: string
+  gradientKey?: string
+  firstMessage?: string
+  persona?: string
+  era?: DbCharacter['era']
+  signature?: string
+  opinions?: string
+  tags?: string[]
+  gender?: string
+  isNSFW?: boolean
+  isNew?: boolean
+  sortOrder?: number
+}): Promise<{ ok: true; character: DbCharacter }> {
+  return fetchAuthed('/admin/characters', { method: 'POST', body: JSON.stringify(body) })
+}
+
+/** Fields accepted by the PATCH /admin/characters/:id endpoint (camelCase matching characters-db.js). */
+export interface CharacterUpdateBody {
+  name?: string
+  description?: string
+  category?: string
+  iconType?: string
+  gradientKey?: string
+  firstMessage?: string
+  persona?: string
+  era?: DbCharacter['era']
+  signature?: string
+  opinions?: string
+  tags?: string[]
+  gender?: string
+  isNSFW?: boolean
+  isNew?: boolean
+  sortOrder?: number
+  isActive?: boolean
+  rating?: number
+}
+
+export function adminUpdateCharacter(
+  id: string,
+  body: CharacterUpdateBody,
+): Promise<{ ok: true; character: DbCharacter }> {
+  return fetchAuthed(`/admin/characters/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
+}
+
+export function adminDeleteCharacter(id: string): Promise<{ ok: true }> {
+  return fetchAuthedConfirm(`/admin/characters/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    jsonBody: {},
+  })
+}
+
+export function adminUploadCharacterPhoto(
+  id: string,
+  photoData: string, // data:<mime>;base64,<data>
+): Promise<{ ok: true; photo_url: string }> {
+  return fetchAuthed(`/admin/characters/${encodeURIComponent(id)}/photo`, {
+    method: 'PATCH',
+    body: JSON.stringify({ photo_data: photoData }),
+  })
 }

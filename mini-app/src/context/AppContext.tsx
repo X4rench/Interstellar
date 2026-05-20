@@ -10,7 +10,7 @@ import {
 import { useSignal, initData } from '@telegram-apps/sdk-react'
 
 import { BUILT_IN_CHARACTERS, type Character } from '../data/characters'
-import { getMe, type MeSubscription, type Tier, ApiError } from '../utils/api'
+import { getMe, publicGetCharacters, getBackendRoot, type MeSubscription, type Tier, ApiError } from '../utils/api'
 import { logSecurityEvent } from '../utils/securityLog'
 import { deleteAvatar, wipeAllAvatars } from '../utils/avatarStorage'
 import type { LegalDocId } from '../utils/consent'
@@ -303,6 +303,50 @@ export function AppProvider({ children }: { children: ReactNode }) {
       clearTimeout(debounceTimer)
     }
   }, [refreshSubscription])
+
+  // ─── DB Characters (from backend) ───────────────────────────────────
+  // Loaded once on mount; merged with BUILT_IN_CHARACTERS (DB takes precedence
+  // on id collision, allowing overrides) and user-created custom chars.
+  useEffect(() => {
+    publicGetCharacters()
+      .then((res) => {
+        if (res.characters.length === 0) return
+        const backendRoot = getBackendRoot()
+        const dbChars: Character[] = res.characters.map((c) => ({
+          id:          c.id,
+          name:        c.name,
+          description: c.description,
+          category:    c.category,
+          iconType:    c.iconType,
+          gradientKey: c.gradientKey,
+          tags:        c.tags,
+          messages:    c.messages,
+          rating:      c.rating,
+          isNew:       c.isNew,
+          isNSFW:      c.isNSFW,
+          firstMessage: c.firstMessage,
+          persona:     c.persona,
+          gender:      c.gender as Character['gender'],
+          era:         c.era,
+          signature:   c.signature,
+          opinions:    c.opinions,
+          // Resolve relative /uploads/... path to absolute URL
+          avatarUri:   c.photo_url ? backendRoot + c.photo_url : undefined,
+          photo_url:   c.photo_url ? backendRoot + c.photo_url : undefined,
+        }))
+
+        setCharacters((prev) => {
+          const dbIds   = new Set(dbChars.map((c) => c.id))
+          const custom  = prev.filter((c) => c.userCreated) // keep user-created
+          // Remove any built-ins that DB overrides, keep user-created untouched
+          const others  = prev.filter((c) => !c.userCreated && !dbIds.has(c.id))
+          return [...dbChars, ...others, ...custom]
+        })
+      })
+      .catch(() => {
+        /* Fail silently — built-in characters still work without DB */
+      })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Characters ─────────────────────────────────────────────────────
   const addCharacter = useCallback((c: Character) => {

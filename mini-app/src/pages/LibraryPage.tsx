@@ -4,19 +4,17 @@ import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { CATEGORIES } from '../data/characters'
 import { getCharacterGradient } from '../utils/gradients'
-import { SearchIcon, MessageIcon, StarIcon } from '../icons'
+import { SearchIcon } from '../icons'
 import { CharacterIcon } from '../components/CharacterIcon'
 import { BottomNav } from '../components/BottomNav'
 
 import styles from './LibraryPage.module.css'
 
-type SortKey = 'rating' | 'messages' | 'alpha' | 'new'
+type SortKey = 'alpha' | 'new'
 
 // TABS вычисляются динамически из персонажей в компоненте (см. useMemo ниже).
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
-  { key: 'rating', label: 'По рейтингу' },
-  { key: 'messages', label: 'По популярности' },
   { key: 'alpha', label: 'По алфавиту' },
   { key: 'new', label: 'Сначала новые' },
 ]
@@ -37,11 +35,6 @@ function CheckIcon() {
   )
 }
 
-function fmtNum(n: number) {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M'
-  if (n >= 1000) return (n / 1000).toFixed(0) + 'K'
-  return String(n)
-}
 
 export function LibraryPage() {
   const nav = useNavigate()
@@ -49,7 +42,7 @@ export function LibraryPage() {
 
   const [activeTab, setActiveTab] = useState<string>('Все')
   const [search, setSearch] = useState('')
-  const [sortKey, setSortKey] = useState<SortKey>('rating')
+  const [sortKey, setSortKey] = useState<SortKey>('new')
   const [sortVisible, setSortVisible] = useState(false)
 
   const isMine = libraryFilter === 'mine'
@@ -101,8 +94,6 @@ export function LibraryPage() {
       )
     }
     return [...list].sort((a, b) => {
-      if (sortKey === 'rating') return b.rating - a.rating
-      if (sortKey === 'messages') return b.messages - a.messages
       if (sortKey === 'alpha') return a.name.localeCompare(b.name, 'ru')
       if (sortKey === 'new') return (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0)
       return 0
@@ -246,16 +237,6 @@ export function LibraryPage() {
                 <div className={styles.cardBody}>
                   <p className={styles.cardName}>{c.name}</p>
                   <p className={styles.cardSub}>{c.tags.join(' • ')}</p>
-                  <div className={styles.cardStats}>
-                    <span className={styles.cardStatRow}>
-                      <MessageIcon size={10} color="#888" />
-                      <span className={styles.cardStat}>{fmtNum(c.messages)}</span>
-                    </span>
-                    <span className={styles.cardStatRow}>
-                      <StarIcon size={10} color="#888" />
-                      <span className={styles.cardStat}>{c.rating}</span>
-                    </span>
-                  </div>
                 </div>
               </button>
             )

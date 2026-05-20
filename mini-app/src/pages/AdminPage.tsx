@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { useApp } from '../context/AppContext'
+import { CATEGORIES } from '../data/characters'
 import {
   adminListPartners,
   adminListPayouts,
@@ -12,9 +13,26 @@ import {
   adminApprovePayout,
   adminMarkPayoutPaid,
   adminRejectPayout,
+  adminGetAnalyticsSummary,
+  adminGetUsersChart,
+  adminGetRevenueChart,
+  adminListBroadcasts,
+  adminGetBroadcast,
+  adminCreateBroadcast,
+  adminCancelBroadcast,
+  adminListCharacters,
+  adminCreateCharacter,
+  adminUpdateCharacter,
+  adminDeleteCharacter,
+  adminUploadCharacterPhoto,
+  getBackendRoot,
   type AdminPartner,
   type AdminPayout,
   type AdminAuditEntry,
+  type AnalyticsSummary,
+  type ChartPoint,
+  type BroadcastRecord,
+  type DbCharacter,
   ApiError,
 } from '../utils/api'
 import { BackIcon } from '../icons'
@@ -22,7 +40,7 @@ import { appAlert, appConfirm, appPrompt } from '../components/AppDialogs'
 
 import styles from './AdminPage.module.css'
 
-type Tab = 'partners' | 'payouts' | 'audit'
+type Tab = 'partners' | 'payouts' | 'audit' | 'analytics' | 'broadcast' | 'characters'
 type PayoutStatus = AdminPayout['status'] | 'all'
 
 function fmtDate(ts: number | null) {
@@ -130,11 +148,138 @@ export function AdminPage() {
     }
   }, [])
 
+  // ── Analytics
+  const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null)
+  const [analyticsLoading, setAnalyticsLoading] = useState(false)
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null)
+  const [chartType, setChartType] = useState<'users' | 'revenue'>('users')
+  const [chartDays, setChartDays] = useState(30)
+  const [usersChart, setUsersChart] = useState<ChartPoint[]>([])
+  const [starsChart, setStarsChart] = useState<ChartPoint[]>([])
+  const [ykChart, setYkChart] = useState<ChartPoint[]>([])
+  const [chartLoading, setChartLoading] = useState(false)
+
+  const loadAnalytics = useCallback(async () => {
+    setAnalyticsLoading(true)
+    setAnalyticsError(null)
+    try {
+      const res = await adminGetAnalyticsSummary()
+      setAnalytics(res)
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403) setForbidden(true)
+      else setAnalyticsError(err instanceof Error ? err.message : 'Не удалось загрузить')
+    } finally {
+      setAnalyticsLoading(false)
+    }
+  }, [])
+
+  const loadChart = useCallback(async (type: 'users' | 'revenue', days: number) => {
+    setChartLoading(true)
+    try {
+      if (type === 'users') {
+        const res = await adminGetUsersChart(days)
+        setUsersChart(res.new_users)
+      } else {
+        const res = await adminGetRevenueChart(days)
+        setStarsChart(res.stars_by_day)
+        setYkChart(res.yk_rub_by_day)
+      }
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403) setForbidden(true)
+    } finally {
+      setChartLoading(false)
+    }
+  }, [])
+
+  // ── Broadcast
+  const [broadcasts, setBroadcasts] = useState<BroadcastRecord[]>([])
+  const [broadcastsLoading, setBroadcastsLoading] = useState(false)
+  const [activeBroadcastId, setActiveBroadcastId] = useState<number | null>(null)
+  const [activeBroadcast, setActiveBroadcast] = useState<BroadcastRecord | null>(null)
+  const broadcastPollRef = useRef<number | null>(null)
+
+  const loadBroadcasts = useCallback(async () => {
+    setBroadcastsLoading(true)
+    try {
+      const res = await adminListBroadcasts({ limit: 20 })
+      setBroadcasts(res.broadcasts)
+      // Если есть рассылка в процессе — начинаем её поллить
+      const running = res.broadcasts.find(b => b.status === 'sending' || b.status === 'pending')
+      if (running) setActiveBroadcastId(running.id)
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403) setForbidden(true)
+    } finally {
+      setBroadcastsLoading(false)
+    }
+  }, [])
+
+  // ── Characters
+  const [dbChars, setDbChars] = useState<DbCharacter[]>([])
+  const [charsLoading, setCharsLoading] = useState(false)
+  const [charsError, setCharsError] = useState<string | null>(null)
+  const [charModalOpen, setCharModalOpen] = useState(false)
+  const [charEdit, setCharEdit] = useState<DbCharacter | null>(null)
+
+  const loadChars = useCallback(async () => {
+    setCharsLoading(true)
+    setCharsError(null)
+    try {
+      const res = await adminListCharacters()
+      setDbChars(res.characters)
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403) setForbidden(true)
+      else setCharsError(err instanceof Error ? err.message : 'Ошибка загрузки')
+    } finally {
+      setCharsLoading(false)
+    }
+  }, [])
+
+  // Polling активной рассылки каждые 2 секунды
+  useEffect(() => {
+    if (!activeBroadcastId) {
+      if (broadcastPollRef.current !== null) { window.clearInterval(broadcastPollRef.current); broadcastPollRef.current = null }
+      return
+    }
+    const poll = async () => {
+      try {
+        const res = await adminGetBroadcast(activeBroadcastId)
+        setActiveBroadcast(res.broadcast)
+        // Обновляем список
+        setBroadcasts(prev => prev.map(b => b.id === res.broadcast.id ? res.broadcast : b))
+        if (res.broadcast.status === 'done' || res.broadcast.status === 'cancelled') {
+          setActiveBroadcastId(null)
+          setActiveBroadcast(null)
+        }
+      } catch {
+        // игнорируем polling-ошибки
+      }
+    }
+    void poll()
+    broadcastPollRef.current = window.setInterval(poll, 2000)
+    return () => {
+      if (broadcastPollRef.current !== null) { window.clearInterval(broadcastPollRef.current); broadcastPollRef.current = null }
+    }
+  }, [activeBroadcastId])
+
   useEffect(() => {
     if (tab === 'partners') void loadPartners()
     else if (tab === 'payouts') void loadPayouts(payoutStatusFilter)
     else if (tab === 'audit') void loadAudit()
-  }, [tab, payoutStatusFilter, loadPartners, loadPayouts, loadAudit])
+    else if (tab === 'analytics') { void loadAnalytics(); void loadChart(chartType, chartDays) }
+    else if (tab === 'broadcast') void loadBroadcasts()
+    else if (tab === 'characters') void loadChars()
+  }, [tab, payoutStatusFilter, loadPartners, loadPayouts, loadAudit, loadAnalytics, loadBroadcasts, loadChars]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Перезагружаем график при смене типа или периода.
+  // Начальное значение ref совпадает с дефолтными chartType/chartDays,
+  // поэтому при первом открытии вкладки этот эффект не дублирует запрос.
+  const prevChartKey = useRef('users-30')
+  useEffect(() => {
+    const key = `${chartType}-${chartDays}`
+    if (key === prevChartKey.current) return
+    prevChartKey.current = key
+    if (tab === 'analytics') void loadChart(chartType, chartDays)
+  }, [chartType, chartDays, tab, loadChart])
 
   // ── Modals
   const [grantOpen, setGrantOpen] = useState(false)
@@ -171,6 +316,24 @@ export function AdminPage() {
       </header>
 
       <nav className={styles.tabs}>
+        <button
+          className={`${styles.tab} ${tab === 'analytics' ? styles.tabOn : ''}`}
+          onClick={() => setTab('analytics')}
+        >
+          📊 Аналитика
+        </button>
+        <button
+          className={`${styles.tab} ${tab === 'broadcast' ? styles.tabOn : ''}`}
+          onClick={() => setTab('broadcast')}
+        >
+          📣 Рассылка
+        </button>
+        <button
+          className={`${styles.tab} ${tab === 'characters' ? styles.tabOn : ''}`}
+          onClick={() => setTab('characters')}
+        >
+          🎭 Персонажи
+        </button>
         <button
           className={`${styles.tab} ${tab === 'partners' ? styles.tabOn : ''}`}
           onClick={() => setTab('partners')}
@@ -235,11 +398,15 @@ export function AdminPage() {
                       <span className={styles.cardStatLbl}>Рефералов</span>
                     </div>
                     <div className={styles.cardStatItem}>
-                      <span className={styles.cardStatVal}>{p.earned_stars} ⭐</span>
+                      <span className={styles.cardStatVal}>
+                        {p.earned_rub != null ? `${p.earned_rub.toLocaleString('ru')} ₽` : `${p.earned_stars} ⭐`}
+                      </span>
                       <span className={styles.cardStatLbl}>Заработано</span>
                     </div>
                     <div className={styles.cardStatItem}>
-                      <span className={styles.cardStatVal}>{p.paid_out_stars} ⭐</span>
+                      <span className={styles.cardStatVal}>
+                        {p.paid_out_rub != null ? `${p.paid_out_rub.toLocaleString('ru')} ₽` : `${p.paid_out_stars} ⭐`}
+                      </span>
                       <span className={styles.cardStatLbl}>Выплачено</span>
                     </div>
                   </div>
@@ -312,7 +479,7 @@ export function AdminPage() {
                   <div className={styles.cardHeader}>
                     <div>
                       <p className={styles.cardTitle}>
-                        #{po.id} · {po.amount_stars} ⭐
+                        #{po.id} · {po.amount_rub != null ? `${po.amount_rub.toLocaleString('ru')} ₽` : `${po.amount_stars} ⭐`}
                       </p>
                       <p className={styles.cardSubtitle}>
                         {po.partner_first_name || `User #${po.partner_telegram_user_id}`}{' '}
@@ -344,7 +511,7 @@ export function AdminPage() {
                         onClick={async () => {
                           const ok = await appConfirm({
                             title: `Одобрить выплату #${po.id}?`,
-                            message: `Сумма: ${po.amount_stars} ⭐\n\nЕсли чек ещё не загружен — партнёру придёт инструкция по выставлению. Если чек уже есть — статус перейдёт сразу в "approved".`,
+                            message: `Сумма: ${po.amount_rub != null ? po.amount_rub.toLocaleString('ru') + ' ₽' : po.amount_stars + ' ⭐'}\n\nЕсли чек ещё не загружен — партнёру придёт инструкция по выставлению. Если чек уже есть — статус перейдёт сразу в "approved".`,
                             confirmLabel: 'Одобрить',
                           })
                           if (!ok) return
@@ -375,7 +542,7 @@ export function AdminPage() {
                         onClick={async () => {
                           const reason = await appPrompt({
                             title: `Отклонить выплату #${po.id}?`,
-                            message: `Сумма: ${po.amount_stars} ⭐\n\nПартнёр получит уведомление с указанной причиной.`,
+                            message: `Сумма: ${po.amount_rub != null ? po.amount_rub.toLocaleString('ru') + ' ₽' : po.amount_stars + ' ⭐'}\n\nПартнёр получит уведомление с указанной причиной.`,
                             placeholder: 'Причина отказа',
                             confirmLabel: 'Отклонить',
                           })
@@ -419,6 +586,341 @@ export function AdminPage() {
             ))}
           </>
         )}
+
+        {tab === 'analytics' && (
+          <>
+            <div className={styles.actionRow}>
+              <button className={styles.actionBtnGhost} onClick={() => { void loadAnalytics(); void loadChart(chartType, chartDays) }}>
+                Обновить
+              </button>
+            </div>
+
+            {analyticsError && <div className={styles.errorBox}>{analyticsError}</div>}
+            {analyticsLoading && <p className={styles.emptyText}>Загрузка…</p>}
+
+            {analytics && (
+              <>
+                {/* ─ Сводные карточки ─ */}
+                <div className={styles.statGrid}>
+                  <div className={styles.statCard}>
+                    <span className={styles.statVal}>{analytics.users.total.toLocaleString('ru')}</span>
+                    <span className={styles.statLbl}>Всего юзеров</span>
+                  </div>
+                  <div className={styles.statCard}>
+                    <span className={styles.statVal}>{analytics.users.dau.toLocaleString('ru')}</span>
+                    <span className={styles.statLbl}>DAU (24ч)</span>
+                  </div>
+                  <div className={styles.statCard}>
+                    <span className={styles.statVal}>{analytics.users.new_today.toLocaleString('ru')}</span>
+                    <span className={styles.statLbl}>Новых сегодня</span>
+                  </div>
+                  <div className={styles.statCard}>
+                    <span className={styles.statVal}>{analytics.users.new_week.toLocaleString('ru')}</span>
+                    <span className={styles.statLbl}>Новых за 7д</span>
+                  </div>
+                  <div className={styles.statCard}>
+                    <span className={styles.statVal}>{analytics.subscriptions.active.toLocaleString('ru')}</span>
+                    <span className={styles.statLbl}>Активных подписок</span>
+                  </div>
+                  <div className={styles.statCard}>
+                    <span className={styles.statVal}>{analytics.subscriptions.conversion}%</span>
+                    <span className={styles.statLbl}>Конверсия</span>
+                  </div>
+                </div>
+
+                {/* ─ Доход ─ */}
+                <div className={styles.revenueRow}>
+                  <div className={styles.revenueCard}>
+                    <p className={styles.revTitle}>⭐ Stars</p>
+                    <div className={styles.revGrid}>
+                      <div><span className={styles.revVal}>{analytics.stars.today.toLocaleString('ru')}</span><span className={styles.revLbl}>сегодня</span></div>
+                      <div><span className={styles.revVal}>{analytics.stars.week.toLocaleString('ru')}</span><span className={styles.revLbl}>7д</span></div>
+                      <div><span className={styles.revVal}>{analytics.stars.month.toLocaleString('ru')}</span><span className={styles.revLbl}>30д</span></div>
+                      <div><span className={styles.revVal}>{analytics.stars.all.toLocaleString('ru')}</span><span className={styles.revLbl}>всё время</span></div>
+                    </div>
+                  </div>
+                  <div className={styles.revenueCard}>
+                    <p className={styles.revTitle}>₽ ЮКасса</p>
+                    <div className={styles.revGrid}>
+                      <div><span className={styles.revVal}>{analytics.yk_rub.today.toFixed(0)}</span><span className={styles.revLbl}>сегодня</span></div>
+                      <div><span className={styles.revVal}>{analytics.yk_rub.week.toFixed(0)}</span><span className={styles.revLbl}>7д</span></div>
+                      <div><span className={styles.revVal}>{analytics.yk_rub.month.toFixed(0)}</span><span className={styles.revLbl}>30д</span></div>
+                      <div><span className={styles.revVal}>{analytics.yk_rub.all.toFixed(0)}</span><span className={styles.revLbl}>всё время</span></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ─ Подписки по планам ─ */}
+                {analytics.subscriptions.by_plan.length > 0 && (
+                  <div className={styles.card} style={{ marginBottom: 16 }}>
+                    <p className={styles.cardTitle} style={{ marginBottom: 8 }}>Подписки по тарифам</p>
+                    <div className={styles.cardStats} style={{ gridTemplateColumns: `repeat(${analytics.subscriptions.by_plan.length}, 1fr)` }}>
+                      {analytics.subscriptions.by_plan.map((p) => (
+                        <div key={p.plan} className={styles.cardStatItem}>
+                          <span className={styles.cardStatVal}>{p.cnt}</span>
+                          <span className={styles.cardStatLbl}>{p.plan}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ─ График ─ */}
+            <div className={styles.chartSection}>
+              <div className={styles.chartControls}>
+                <div className={styles.chartTypePills}>
+                  <button
+                    className={`${styles.filterPill} ${chartType === 'users' ? styles.filterPillOn : ''}`}
+                    onClick={() => setChartType('users')}
+                  >Пользователи</button>
+                  <button
+                    className={`${styles.filterPill} ${chartType === 'revenue' ? styles.filterPillOn : ''}`}
+                    onClick={() => setChartType('revenue')}
+                  >Доход</button>
+                </div>
+                <div className={styles.chartTypePills}>
+                  {([7, 14, 30] as const).map((d) => (
+                    <button
+                      key={d}
+                      className={`${styles.filterPill} ${chartDays === d ? styles.filterPillOn : ''}`}
+                      onClick={() => setChartDays(d)}
+                    >{d}д</button>
+                  ))}
+                </div>
+              </div>
+
+              {chartLoading && <p className={styles.emptyText} style={{ padding: '20px 0' }}>Загрузка графика…</p>}
+
+              {!chartLoading && chartType === 'users' && usersChart.length > 0 && (
+                <div className={styles.chartWrap}>
+                  <p className={styles.chartTitle}>Новые пользователи</p>
+                  <LineChart points={usersChart} color="#7c5cff" gradId="grad-users" />
+                  <div className={styles.chartAxisRow}>
+                    <span>{usersChart[0]?.day?.slice(5)}</span>
+                    <span>{usersChart[Math.floor(usersChart.length / 2)]?.day?.slice(5)}</span>
+                    <span>{usersChart[usersChart.length - 1]?.day?.slice(5)}</span>
+                  </div>
+                </div>
+              )}
+
+              {!chartLoading && chartType === 'revenue' && starsChart.length > 0 && (
+                <>
+                  <div className={styles.chartWrap}>
+                    <p className={styles.chartTitle}>⭐ Stars по дням</p>
+                    <LineChart points={starsChart} color="#ffd700" gradId="grad-stars" />
+                    <div className={styles.chartAxisRow}>
+                      <span>{starsChart[0]?.day?.slice(5)}</span>
+                      <span>{starsChart[Math.floor(starsChart.length / 2)]?.day?.slice(5)}</span>
+                      <span>{starsChart[starsChart.length - 1]?.day?.slice(5)}</span>
+                    </div>
+                  </div>
+                  <div className={styles.chartWrap} style={{ marginTop: 12 }}>
+                    <p className={styles.chartTitle}>₽ ЮКасса по дням</p>
+                    <LineChart points={ykChart} color="#3DBA6F" gradId="grad-yk" />
+                    <div className={styles.chartAxisRow}>
+                      <span>{ykChart[0]?.day?.slice(5)}</span>
+                      <span>{ykChart[Math.floor(ykChart.length / 2)]?.day?.slice(5)}</span>
+                      <span>{ykChart[ykChart.length - 1]?.day?.slice(5)}</span>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </>
+        )}
+
+        {tab === 'broadcast' && (
+          <>
+            {/* ─ Активная рассылка (progress) ─ */}
+            {activeBroadcast && (activeBroadcast.status === 'sending' || activeBroadcast.status === 'pending') && (
+              <div className={styles.broadcastProgress}>
+                <div className={styles.broadcastProgressHeader}>
+                  <span className={styles.broadcastProgressTitle}>Идёт рассылка #{activeBroadcast.id}</span>
+                  <button
+                    className={`${styles.smallBtn} ${styles.smallBtnDanger}`}
+                    onClick={async () => {
+                      const ok = await appConfirm({ title: 'Остановить рассылку?', message: 'Сообщения которые уже отправлены — не отзываются. Продолжение невозможно.', confirmLabel: 'Остановить' })
+                      if (!ok) return
+                      try { await adminCancelBroadcast(activeBroadcast.id) } catch { /* ignore */ }
+                    }}
+                  >Стоп</button>
+                </div>
+                <div className={styles.progressBarTrack}>
+                  <div
+                    className={styles.progressBarFill}
+                    style={{ width: `${activeBroadcast.total_users > 0 ? Math.round(((activeBroadcast.sent_count + activeBroadcast.failed_count + activeBroadcast.blocked_count) / activeBroadcast.total_users) * 100) : 0}%` }}
+                  />
+                </div>
+                <p className={styles.progressStats}>
+                  ✅ {activeBroadcast.sent_count} · ❌ {activeBroadcast.failed_count} · 🚫 {activeBroadcast.blocked_count} из {activeBroadcast.total_users}
+                </p>
+              </div>
+            )}
+
+            {/* ─ Форма создания рассылки ─ */}
+            <BroadcastCompose
+              onSent={async (id) => {
+                setActiveBroadcastId(id)
+                await loadBroadcasts()
+              }}
+            />
+
+            {/* ─ История рассылок ─ */}
+            <p className={styles.sectionTitle}>История рассылок</p>
+            {broadcastsLoading && <p className={styles.emptyText}>Загрузка…</p>}
+            {!broadcastsLoading && broadcasts.length === 0 && (
+              <p className={styles.emptyText}>Рассылок ещё не было</p>
+            )}
+            <div className={styles.list}>
+              {broadcasts.map((bc) => (
+                <div key={bc.id} className={styles.card}>
+                  <div className={styles.cardHeader}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p className={styles.cardTitle}>Рассылка #{bc.id}</p>
+                      <p className={styles.cardSubtitle}>{fmtDate(bc.created_at)}</p>
+                      <p className={styles.cardSubtitle} style={{ marginTop: 4, fontSize: 12, color: '#ccc', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                        {bc.text.length > 100 ? bc.text.slice(0, 100) + '…' : bc.text}
+                      </p>
+                    </div>
+                    <span className={`${styles.statusPill} ${broadcastStatusClass[bc.status]}`}>
+                      {broadcastStatusLabel[bc.status]}
+                    </span>
+                  </div>
+                  {(bc.status === 'done' || bc.status === 'sending') && (
+                    <div className={styles.cardStats} style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+                      <div className={styles.cardStatItem}>
+                        <span className={styles.cardStatVal}>{bc.total_users}</span>
+                        <span className={styles.cardStatLbl}>Всего</span>
+                      </div>
+                      <div className={styles.cardStatItem}>
+                        <span className={styles.cardStatVal} style={{ color: '#3DBA6F' }}>{bc.sent_count}</span>
+                        <span className={styles.cardStatLbl}>Доставлено</span>
+                      </div>
+                      <div className={styles.cardStatItem}>
+                        <span className={styles.cardStatVal} style={{ color: '#FF7777' }}>{bc.failed_count}</span>
+                        <span className={styles.cardStatLbl}>Ошибок</span>
+                      </div>
+                      <div className={styles.cardStatItem}>
+                        <span className={styles.cardStatVal} style={{ color: '#888' }}>{bc.blocked_count}</span>
+                        <span className={styles.cardStatLbl}>Заблокировали</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+        {tab === 'characters' && (
+          <>
+            <div className={styles.actionRow}>
+              <button
+                className={styles.actionBtn}
+                onClick={() => { setCharEdit(null); setCharModalOpen(true) }}
+              >
+                + Новый персонаж
+              </button>
+              <button className={styles.actionBtnGhost} onClick={loadChars}>
+                Обновить
+              </button>
+            </div>
+
+            {charsError && <div className={styles.errorBox}>{charsError}</div>}
+            {charsLoading && <p className={styles.emptyText}>Загрузка…</p>}
+            {!charsLoading && dbChars.length === 0 && (
+              <p className={styles.emptyText}>
+                Персонажей в БД нет. Нажми «+ Новый персонаж» чтобы добавить первого.
+              </p>
+            )}
+
+            <div className={styles.list}>
+              {dbChars.map((c) => (
+                <div
+                  key={c.id}
+                  className={styles.card}
+                  style={{ opacity: c.is_active ? 1 : 0.5 }}
+                >
+                  <div className={styles.cardHeader}>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center', flex: 1, minWidth: 0 }}>
+                      {/* Mini avatar */}
+                      <div style={{
+                        width: 44, height: 44, borderRadius: 10, flexShrink: 0,
+                        background: '#1a1a1a', border: '1px solid #303030',
+                        overflow: 'hidden', position: 'relative',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        {c.photo_url
+                          ? <img src={getBackendRoot() + c.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          : <span style={{ fontSize: 20 }}>🎭</span>
+                        }
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <p className={styles.cardTitle}>{c.name}</p>
+                        <p className={styles.cardSubtitle}>
+                          <code style={{ color: '#666', fontSize: 10 }}>{c.id}</code>
+                          {' · '}
+                          {c.category}
+                          {c.isNSFW && <span style={{ color: '#FF7777', marginLeft: 4 }}>18+</span>}
+                          {c.isNew && <span style={{ color: '#7c5cff', marginLeft: 4 }}>new</span>}
+                        </p>
+                        <p className={styles.cardSubtitle}>sort: {c.sort_order}</p>
+                      </div>
+                    </div>
+                    <span
+                      className={`${styles.statusPill} ${c.is_active ? styles.statusActive : styles.statusRevoked}`}
+                    >
+                      {c.is_active ? 'Активен' : 'Скрыт'}
+                    </span>
+                  </div>
+
+                  <div className={styles.cardActions}>
+                    <button
+                      className={`${styles.smallBtn} ${styles.smallBtnPrimary}`}
+                      onClick={() => { setCharEdit(c); setCharModalOpen(true) }}
+                    >
+                      Редактировать
+                    </button>
+                    <button
+                      className={styles.smallBtn}
+                      onClick={async () => {
+                        try {
+                          await adminUpdateCharacter(c.id, { isActive: !c.is_active })
+                          await loadChars()
+                        } catch (err) {
+                          await appAlert({ title: 'Ошибка', message: (err as Error).message })
+                        }
+                      }}
+                    >
+                      {c.is_active ? 'Скрыть' : 'Показать'}
+                    </button>
+                    <button
+                      className={`${styles.smallBtn} ${styles.smallBtnDanger}`}
+                      onClick={async () => {
+                        const ok = await appConfirm({
+                          title: `Удалить «${c.name}»?`,
+                          message: `Персонаж будет помечен неактивным и скрыт из приложения. Данные сохраняются в БД.\n\nID: ${c.id}`,
+                          confirmLabel: 'Удалить',
+                        })
+                        if (!ok) return
+                        try {
+                          await adminDeleteCharacter(c.id)
+                          await loadChars()
+                        } catch (err) {
+                          await appAlert({ title: 'Ошибка', message: (err as Error).message })
+                        }
+                      }}
+                    >
+                      Удалить
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
       </div>
 
       {/* Grant partner modal */}
@@ -455,6 +957,173 @@ export function AdminPage() {
           }}
         />
       )}
+
+      {/* Character create/edit modal */}
+      {charModalOpen && (
+        <CharacterEditModal
+          char={charEdit}
+          onClose={() => setCharModalOpen(false)}
+          onDone={async () => {
+            setCharModalOpen(false)
+            await loadChars()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ─── Broadcast status maps ───────────────────────────────────────────────
+
+const broadcastStatusLabel: Record<string, string> = {
+  pending:   'Ждёт',
+  sending:   'Отправка',
+  done:      'Готово',
+  cancelled: 'Отменена',
+}
+
+const broadcastStatusClass: Record<string, string> = {
+  pending:   styles.statusRequested,
+  sending:   styles.statusAwaiting,
+  done:      styles.statusPaid,
+  cancelled: styles.statusRevoked,
+}
+
+// ─── LineChart ───────────────────────────────────────────────────────────
+
+function LineChart({ points, color, gradId }: { points: ChartPoint[]; color: string; gradId: string }) {
+  if (!points.length) return <div style={{ height: 80 }} />
+  const W = 320, H = 80, PAD = 4
+  const vals = points.map(p => p.value)
+  const max  = Math.max(...vals, 1)
+  const n    = points.length
+  const xs   = points.map((_, i) => PAD + (i / Math.max(n - 1, 1)) * (W - PAD * 2))
+  const ys   = points.map(p => H - PAD - (p.value / max) * (H - PAD * 2 - 4))
+
+  const pathD = xs.map((x, i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ')
+  const areaD = `${pathD} L${(W - PAD).toFixed(1)},${H} L${PAD},${H} Z`
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: 80, display: 'block' }}>
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor={color} stopOpacity="0.3" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.02" />
+        </linearGradient>
+      </defs>
+      <path d={areaD} fill={`url(#${gradId})`} />
+      <path d={pathD} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+// ─── BroadcastCompose ────────────────────────────────────────────────────
+
+function BroadcastCompose({ onSent }: { onSent: (id: number) => void | Promise<void> }) {
+  const [text, setText] = useState('')
+  const [parseMode, setParseMode] = useState<'HTML' | 'MarkdownV2'>('HTML')
+  const [showButton, setShowButton] = useState(false)
+  const [btnText, setBtnText] = useState('')
+  const [btnUrl,  setBtnUrl]  = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const canSend = !busy && text.trim().length > 0 && text.length <= 4096 &&
+    (!showButton || (btnText.trim().length > 0 && /^https?:\/\//.test(btnUrl.trim())))
+
+  const send = async () => {
+    const ok = await appConfirm({
+      title: 'Отправить рассылку?',
+      message: `Сообщение уйдёт всем пользователям бота. Это действие нельзя отменить для уже отправленных сообщений.\n\nПервые несколько символов:\n${text.trim().slice(0, 80)}…`,
+      confirmLabel: 'Отправить',
+    })
+    if (!ok) return
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await adminCreateBroadcast({
+        text: text.trim(),
+        parse_mode: parseMode,
+        button_text: showButton ? btnText.trim() : undefined,
+        button_url:  showButton ? btnUrl.trim()  : undefined,
+      })
+      setText('')
+      setBtnText('')
+      setBtnUrl('')
+      setShowButton(false)
+      await onSent(res.broadcast_id)
+    } catch (err) {
+      if (err instanceof ApiError) setError(`${err.code}: ${err.message}`)
+      else setError((err as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className={styles.card} style={{ marginBottom: 16 }}>
+      <p className={styles.cardTitle} style={{ marginBottom: 12 }}>Новая рассылка</p>
+
+      <div className={styles.field}>
+        <label className={styles.label}>Текст сообщения</label>
+        <textarea
+          className={styles.textarea}
+          rows={5}
+          value={text}
+          onChange={e => setText(e.target.value)}
+          placeholder={'Привет! 👋\nСегодня у нас <b>новинка</b>...'}
+        />
+        <p className={styles.hint}>{text.length}/4096 · форматирование HTML (теги &lt;b&gt;, &lt;i&gt;, &lt;a href&gt;)</p>
+      </div>
+
+      <div className={styles.field}>
+        <label className={styles.label}>Разметка</label>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {(['HTML', 'MarkdownV2'] as const).map(m => (
+            <button
+              key={m}
+              className={`${styles.filterPill} ${parseMode === m ? styles.filterPillOn : ''}`}
+              onClick={() => setParseMode(m)}
+            >{m}</button>
+          ))}
+        </div>
+      </div>
+
+      <div className={styles.field}>
+        <label className={styles.label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <input
+            type="checkbox"
+            checked={showButton}
+            onChange={e => setShowButton(e.target.checked)}
+            style={{ accentColor: '#7c5cff' }}
+          />
+          Добавить кнопку
+        </label>
+      </div>
+
+      {showButton && (
+        <>
+          <div className={styles.field}>
+            <label className={styles.label}>Текст кнопки</label>
+            <input className={styles.input} value={btnText} onChange={e => setBtnText(e.target.value)} placeholder="Открыть приложение" />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>URL кнопки</label>
+            <input className={styles.input} value={btnUrl} onChange={e => setBtnUrl(e.target.value)} placeholder="https://t.me/YourBot/app" />
+          </div>
+        </>
+      )}
+
+      {error && <div className={styles.errorBox}>{error}</div>}
+
+      <button
+        className={styles.actionBtn}
+        style={{ width: '100%', opacity: canSend ? 1 : 0.4, cursor: canSend ? 'pointer' : 'not-allowed' }}
+        onClick={send}
+        disabled={!canSend}
+      >
+        {busy ? 'Запускаем…' : '📣 Отправить рассылку'}
+      </button>
     </div>
   )
 }
@@ -658,6 +1327,373 @@ function EditPartnerModal({
   )
 }
 
+// ─── Character create/edit modal ────────────────────────────────────────
+// Resize + compress image to ≤600×600 JPEG@75% so payload stays under 512kb
+async function compressImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const objUrl = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(objUrl)
+      const MAX = 600
+      let w = img.width, h = img.height
+      if (w > MAX || h > MAX) {
+        if (w >= h) { h = Math.round(h * MAX / w); w = MAX }
+        else        { w = Math.round(w * MAX / h); h = MAX }
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = w; canvas.height = h
+      canvas.getContext('2d')!.drawImage(img, 0, 0, w, h)
+      resolve(canvas.toDataURL('image/jpeg', 0.75))
+    }
+    img.onerror = () => { URL.revokeObjectURL(objUrl); reject(new Error('Не удалось прочитать изображение')) }
+    img.src = objUrl
+  })
+}
+
+const CHAR_CATEGORIES = CATEGORIES.filter(c => c !== 'Все')
+
+interface CharForm {
+  id: string
+  name: string
+  description: string
+  category: string
+  gender: string
+  tags: string          // comma-separated
+  gradientKey: string
+  iconType: string
+  sortOrder: string
+  isNSFW: boolean
+  isNew: boolean
+  firstMessage: string
+  persona: string
+  signature: string
+  opinions: string
+  eraEnabled: boolean
+  bornYear: string
+  diedYear: string
+  eraContext: string
+  knewWell: string      // one per line
+  didntKnow: string     // one per line
+}
+
+function emptyForm(): CharForm {
+  return {
+    id: '', name: '', description: '', category: 'Другие', gender: '',
+    tags: '', gradientKey: 'default', iconType: 'brain', sortOrder: '0',
+    isNSFW: false, isNew: false, firstMessage: '', persona: '',
+    signature: '', opinions: '', eraEnabled: false,
+    bornYear: '', diedYear: '', eraContext: '', knewWell: '', didntKnow: '',
+  }
+}
+
+function charToForm(c: DbCharacter): CharForm {
+  return {
+    id:           c.id,
+    name:         c.name,
+    description:  c.description,
+    category:     c.category,
+    gender:       c.gender ?? '',
+    tags:         (c.tags ?? []).join(', '),
+    gradientKey:  c.gradientKey,
+    iconType:     c.iconType,
+    sortOrder:    String(c.sort_order),
+    isNSFW:       c.isNSFW,
+    isNew:        c.isNew,
+    firstMessage: c.firstMessage,
+    persona:      c.persona,
+    signature:    c.signature ?? '',
+    opinions:     c.opinions ?? '',
+    eraEnabled:   !!c.era,
+    bornYear:     c.era ? String(c.era.bornYear) : '',
+    diedYear:     c.era?.diedYear != null ? String(c.era.diedYear) : '',
+    eraContext:   c.era?.context ?? '',
+    knewWell:     (c.era?.knewWell ?? []).join('\n'),
+    didntKnow:    (c.era?.didntKnow ?? []).join('\n'),
+  }
+}
+
+function formToPayload(f: CharForm) {
+  const era = f.eraEnabled && f.bornYear ? {
+    bornYear:  Number(f.bornYear),
+    diedYear:  f.diedYear ? Number(f.diedYear) : null,
+    context:   f.eraContext.trim() || undefined,
+    knewWell:  f.knewWell.split('\n').map(s => s.trim()).filter(Boolean),
+    didntKnow: f.didntKnow.split('\n').map(s => s.trim()).filter(Boolean),
+  } : undefined
+
+  return {
+    name:         f.name.trim(),
+    description:  f.description.trim(),
+    category:     f.category,
+    gender:       f.gender || undefined,
+    tags:         f.tags.split(',').map(s => s.trim()).filter(Boolean),
+    gradientKey:  f.gradientKey.trim() || 'default',
+    iconType:     f.iconType.trim() || 'brain',
+    sortOrder:    Number(f.sortOrder) || 0,
+    isNSFW:       f.isNSFW,
+    isNew:        f.isNew,
+    firstMessage: f.firstMessage.trim(),
+    persona:      f.persona.trim(),
+    signature:    f.signature.trim() || undefined,
+    opinions:     f.opinions.trim() || undefined,
+    era,
+  }
+}
+
+function CharacterEditModal({
+  char,
+  onClose,
+  onDone,
+}: {
+  char: DbCharacter | null
+  onClose: () => void
+  onDone: () => void | Promise<void>
+}) {
+  const isEdit = char !== null
+  const [form, setForm] = useState<CharForm>(() => char ? charToForm(char) : emptyForm())
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(
+    char?.photo_url ? getBackendRoot() + char.photo_url : null
+  )
+  const [photoBusy, setPhotoBusy] = useState(false)
+  const photoInputRef = useRef<HTMLInputElement>(null)
+
+  const set = (field: keyof CharForm) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+    setForm(f => ({ ...f, [field]: e.target.value }))
+  const setCheck = (field: keyof CharForm) => (e: ChangeEvent<HTMLInputElement>) =>
+    setForm(f => ({ ...f, [field]: e.target.checked }))
+
+  const canSubmit = !busy && form.name.trim().length > 0 && (isEdit || form.id.trim().length > 0)
+
+  const submit = async () => {
+    setBusy(true); setError(null)
+    try {
+      if (isEdit) {
+        await adminUpdateCharacter(char.id, formToPayload(form))
+      } else {
+        await adminCreateCharacter({ id: form.id.trim(), ...formToPayload(form) })
+      }
+      await onDone()
+    } catch (err) {
+      if (err instanceof ApiError) setError(`${err.code}: ${err.message}`)
+      else setError((err as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handlePhotoFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setPhotoBusy(true); setError(null)
+    try {
+      const dataUrl = await compressImage(file)
+      setPhotoPreview(dataUrl)
+      if (isEdit) {
+        const res = await adminUploadCharacterPhoto(char.id, dataUrl)
+        setPhotoPreview(getBackendRoot() + res.photo_url)
+      }
+      // If creating: store compressed data URL in form state for later upload after create
+      // For simplicity here, photo upload is only available after character creation
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setPhotoBusy(false)
+      if (photoInputRef.current) photoInputRef.current.value = ''
+    }
+  }
+
+  return (
+    <div className={styles.modalOverlay} onClick={onClose}>
+      <div className={styles.modalCard} onClick={e => e.stopPropagation()}>
+        <div className={styles.modalHandle} />
+        <h2 className={styles.modalTitle}>
+          {isEdit ? `Редактировать: ${char.name}` : 'Новый персонаж'}
+        </h2>
+
+        {/* Photo upload (edit mode only) */}
+        {isEdit && (
+          <div className={styles.field} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+            <div style={{
+              width: 60, height: 60, borderRadius: 12, background: '#1a1a1a',
+              border: '1px solid #303030', overflow: 'hidden', position: 'relative',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}>
+              {photoPreview
+                ? <img src={photoPreview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : <span style={{ fontSize: 28 }}>🎭</span>
+              }
+            </div>
+            <div>
+              <button
+                className={styles.smallBtn}
+                onClick={() => photoInputRef.current?.click()}
+                disabled={photoBusy}
+              >
+                {photoBusy ? 'Загрузка…' : photoPreview ? 'Сменить фото' : 'Загрузить фото'}
+              </button>
+              <p className={styles.hint}>JPEG/PNG до 600×600 · автосжатие</p>
+            </div>
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              style={{ display: 'none' }}
+              onChange={handlePhotoFile}
+            />
+          </div>
+        )}
+
+        {/* ID — only when creating */}
+        {!isEdit && (
+          <div className={styles.field}>
+            <label className={styles.label}>ID персонажа *</label>
+            <input
+              className={styles.input}
+              value={form.id}
+              onChange={set('id')}
+              placeholder="freud, my-new-hero"
+            />
+            <p className={styles.hint}>Только a-z, 0-9, дефис. Нельзя изменить после создания.</p>
+          </div>
+        )}
+
+        <div className={styles.field}>
+          <label className={styles.label}>Имя *</label>
+          <input className={styles.input} value={form.name} onChange={set('name')} />
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label}>Краткое описание</label>
+          <textarea className={styles.textarea} rows={2} value={form.description} onChange={set('description')} placeholder="Отец психоанализа" />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div className={styles.field}>
+            <label className={styles.label}>Категория</label>
+            <select className={styles.input} value={form.category} onChange={set('category')}>
+              {CHAR_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              <option value="Другие">Другие</option>
+            </select>
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>Пол</label>
+            <select className={styles.input} value={form.gender} onChange={set('gender')}>
+              <option value="">Не указан</option>
+              <option value="male">Мужской</option>
+              <option value="female">Женский</option>
+            </select>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div className={styles.field}>
+            <label className={styles.label}>Иконка (iconType)</label>
+            <input className={styles.input} value={form.iconType} onChange={set('iconType')} placeholder="brain" />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>Градиент</label>
+            <input className={styles.input} value={form.gradientKey} onChange={set('gradientKey')} placeholder="default" />
+          </div>
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label}>Теги (через запятую)</label>
+          <input className={styles.input} value={form.tags} onChange={set('tags')} placeholder="психолог, история, наука" />
+        </div>
+
+        <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#ccc', cursor: 'pointer' }}>
+            <input type="checkbox" checked={form.isNSFW} onChange={setCheck('isNSFW')} style={{ accentColor: '#ff5cdb' }} />
+            18+ (NSFW)
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#ccc', cursor: 'pointer' }}>
+            <input type="checkbox" checked={form.isNew} onChange={setCheck('isNew')} style={{ accentColor: '#7c5cff' }} />
+            Новинка
+          </label>
+          <div className={styles.field} style={{ margin: 0, flex: 1 }}>
+            <label className={styles.label} style={{ textTransform: 'none', fontSize: 11 }}>Порядок</label>
+            <input className={styles.input} type="number" value={form.sortOrder} onChange={set('sortOrder')} style={{ padding: '6px 8px' }} />
+          </div>
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label}>Первое сообщение персонажа</label>
+          <textarea className={styles.textarea} rows={3} value={form.firstMessage} onChange={set('firstMessage')} placeholder="Добрый день! Чем могу помочь?" />
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label}>Системный промпт (persona)</label>
+          <textarea className={styles.textarea} rows={6} value={form.persona} onChange={set('persona')} placeholder="Ты — Зигмунд Фрейд, отец психоанализа..." />
+          <p className={styles.hint}>{form.persona.length} симв. · видно только LLM, не пользователю</p>
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label}>Фирменный ход (signature) — опционально</label>
+          <textarea className={styles.textarea} rows={2} value={form.signature} onChange={set('signature')} placeholder="переводишь разговор на детство и сны" />
+          <p className={styles.hint}>Как персонаж типично реагирует на эмоциональные темы</p>
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label}>Убеждения (opinions) — опционально</label>
+          <textarea className={styles.textarea} rows={2} value={form.opinions} onChange={set('opinions')} placeholder="считаешь, что поведение определяется бессознательным" />
+        </div>
+
+        {/* Era */}
+        <div className={styles.field}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#ccc', cursor: 'pointer', marginBottom: 8 }}>
+            <input type="checkbox" checked={form.eraEnabled} onChange={setCheck('eraEnabled')} style={{ accentColor: '#7c5cff' }} />
+            <span className={styles.label} style={{ margin: 0 }}>Эпоха персонажа</span>
+          </label>
+          {form.eraEnabled && (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label className={styles.label}>Год рождения *</label>
+                  <input className={styles.input} type="number" value={form.bornYear} onChange={set('bornYear')} placeholder="1856" />
+                </div>
+                <div>
+                  <label className={styles.label}>Год смерти</label>
+                  <input className={styles.input} type="number" value={form.diedYear} onChange={set('diedYear')} placeholder="1939 или пусто" />
+                </div>
+              </div>
+              <div className={styles.field} style={{ marginTop: 8 }}>
+                <label className={styles.label}>Описание эпохи</label>
+                <input className={styles.input} value={form.eraContext} onChange={set('eraContext')} placeholder="Вена конца 19 — начала 20 в." />
+              </div>
+              <div className={styles.field}>
+                <label className={styles.label}>Что хорошо знал (по одному на строку)</label>
+                <textarea className={styles.textarea} rows={3} value={form.knewWell} onChange={set('knewWell')} placeholder={"психоанализ\nинтерпретация снов\nвенское общество"} />
+              </div>
+              <div className={styles.field}>
+                <label className={styles.label}>Чего не знал (по одному на строку)</label>
+                <textarea className={styles.textarea} rows={3} value={form.didntKnow} onChange={set('didntKnow')} placeholder={"интернет\nсмартфоны\nсоциальные сети"} />
+              </div>
+            </>
+          )}
+        </div>
+
+        {error && <div className={styles.errorBox}>{error}</div>}
+
+        <div className={styles.modalActions}>
+          <button className={`${styles.modalBtn} ${styles.modalBtnGhost}`} onClick={onClose} disabled={busy}>
+            Отмена
+          </button>
+          <button
+            className={`${styles.modalBtn} ${styles.modalBtnPrimary}`}
+            onClick={submit}
+            disabled={!canSubmit}
+          >
+            {busy ? 'Сохраняем…' : isEdit ? 'Сохранить' : 'Создать'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Mark payout paid modal ──────────────────────────────────────────────
 function MarkPayoutPaidModal({
   payout,
@@ -697,7 +1733,7 @@ function MarkPayoutPaidModal({
         <div className={styles.modalHandle} />
         <h2 className={styles.modalTitle}>Отметить выплаченным</h2>
         <p className={styles.cardSubtitle} style={{ marginBottom: 16 }}>
-          Выплата #{payout.id} · {payout.amount_stars} ⭐
+          Выплата #{payout.id} · {payout.amount_rub != null ? `${payout.amount_rub.toLocaleString('ru')} ₽` : `${payout.amount_stars} ⭐`}
           {payout.receipt_number && <> · чек {payout.receipt_number}</>}
         </p>
 

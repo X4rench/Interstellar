@@ -20,6 +20,11 @@ import { appAlert, appConfirm } from '../components/AppDialogs'
 
 import styles from './PartnerPage.module.css'
 
+function fmtRub(val: number | null | undefined): string {
+  if (val == null) return '—'
+  return val.toLocaleString('ru', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' ₽'
+}
+
 function fmtDate(ts: number | null) {
   if (!ts) return '—'
   const d = new Date(ts)
@@ -141,7 +146,7 @@ export function PartnerPage() {
     }
     const ok = await appConfirm({
       title: 'Запросить выплату?',
-      message: `Сумма: ${summary.balance_stars} ⭐\n\nПосле одобрения админом получишь инструкцию по выставлению чека через «Мой налог».`,
+      message: `Сумма: ${fmtRub(summary.balance_rub)}\n\nПосле одобрения админом получишь инструкцию по выставлению чека через «Мой налог».`,
       confirmLabel: 'Запросить',
     })
     if (!ok) return
@@ -149,7 +154,7 @@ export function PartnerPage() {
       const res = await partnerCreatePayout()
       await appAlert({
         title: `✅ Заявка #${res.payout_id} создана`,
-        message: `Сумма: ${res.amount_stars} ⭐\n\nЖди инструкцию от админа по выставлению чека.`,
+        message: `Сумма: ${fmtRub(res.amount_rub)}\n\nЖди инструкцию от админа по выставлению чека.`,
       })
       await refresh()
     } catch (err) {
@@ -196,11 +201,11 @@ export function PartnerPage() {
                 <span className={styles.statLbl}>Оплатили Pro</span>
               </div>
               <div className={styles.statBox}>
-                <span className={styles.statVal}>{summary.earned_stars} ⭐</span>
+                <span className={styles.statVal}>{fmtRub(summary.earned_rub)}</span>
                 <span className={styles.statLbl}>Заработано всего</span>
               </div>
               <div className={styles.statBox}>
-                <span className={styles.statVal}>{summary.paid_out_stars} ⭐</span>
+                <span className={styles.statVal}>{fmtRub(summary.paid_out_rub)}</span>
                 <span className={styles.statLbl}>Выплачено</span>
               </div>
             </div>
@@ -210,22 +215,22 @@ export function PartnerPage() {
               <h3 className={styles.sectionTitle}>Баланс</h3>
               <div className={styles.balanceCard}>
                 <p className={styles.balanceLbl}>Доступно к выплате</p>
-                <p className={styles.balanceVal}>{summary.balance_stars} ⭐</p>
+                <p className={styles.balanceVal}>{fmtRub(summary.balance_rub)}</p>
                 <p className={styles.balanceHint}>
-                  Минимум для запроса: {summary.min_payout_stars} ⭐
-                  {summary.pending_payouts_stars > 0 && (
-                    <> · В обработке: {summary.pending_payouts_stars} ⭐</>
+                  Минимум для запроса: {fmtRub(summary.min_payout_rub)}
+                  {summary.pending_payouts_rub > 0 && (
+                    <> · В обработке: {fmtRub(summary.pending_payouts_rub)}</>
                   )}
                 </p>
                 <button
                   className={styles.payoutBtn}
-                  disabled={!summary.can_request_payout || summary.pending_payouts_stars > 0}
+                  disabled={!summary.can_request_payout || summary.pending_payouts_rub > 0}
                   onClick={handleRequestPayout}
                 >
-                  {summary.pending_payouts_stars > 0
+                  {summary.pending_payouts_rub > 0
                     ? 'Заявка уже в обработке'
                     : !summary.can_request_payout
-                      ? `Накопи ещё ${summary.min_payout_stars - summary.balance_stars} ⭐`
+                      ? `Накопи ещё ${fmtRub(summary.min_payout_rub - summary.balance_rub)}`
                       : 'Запросить выплату'}
                 </button>
               </div>
@@ -256,7 +261,7 @@ export function PartnerPage() {
                 <div key={po.id} className={styles.payoutItem}>
                   <div className={styles.payoutRow}>
                     <div style={{ flex: 1 }}>
-                      <p className={styles.payoutAmount}>#{po.id} · {po.amount_stars} ⭐</p>
+                      <p className={styles.payoutAmount}>#{po.id} · {fmtRub(po.amount_rub)}</p>
                       <p className={styles.payoutDate}>Запрошена {fmtDate(po.requested_at)}</p>
                     </div>
                     <span className={`${styles.statusPill} ${statusClass[po.status]}`}>
@@ -275,7 +280,7 @@ export function PartnerPage() {
                             <br />ИНН: <code>{summary.business_inn}</code>
                           </>
                         )}
-                        <br />Сумма чека: пересчитай Stars в рубли по своему курсу.
+                        <br />Сумма чека: {po.amount_rub ? fmtRub(po.amount_rub) : 'по сумме выплаты'}.
                         <br /><br />
                         После выставления — введи номер чека ниже:
                       </div>

@@ -84,14 +84,28 @@ export async function createYkPayment({ db, userId, plan, autoRenew, returnUrl }
     },
   });
 
+  // Атрибуция к партнёру (если юзер пришёл по партнёрской ссылке).
+  const attrRow = db
+    .prepare('SELECT matched_partner_id FROM attributions WHERE telegram_user_id = ?')
+    .get(userId);
+  const attrPartnerId = attrRow?.matched_partner_id ?? null;
+  let attrShareBps = null;
+  if (attrPartnerId) {
+    const partnerRow = db
+      .prepare("SELECT revenue_share_bps FROM partners WHERE telegram_user_id = ? AND status = 'active'")
+      .get(attrPartnerId);
+    attrShareBps = partnerRow?.revenue_share_bps ?? null;
+  }
+
   // Идемпотентность: INSERT OR IGNORE — если webhook успел прийти ДО того
   // как мы дошли сюда (маловероятно, но возможно при retry), не перезапишем.
   const now = Date.now();
   db.prepare(`
     INSERT OR IGNORE INTO yk_payments
       (yk_payment_id, telegram_user_id, plan, amount_kopecks, status,
-       metadata_json, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       metadata_json, attributed_partner_id, revenue_share_bps_snapshot,
+       created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     payment.id,
     userId,
@@ -99,6 +113,8 @@ export async function createYkPayment({ db, userId, plan, autoRenew, returnUrl }
     amountKopecks,
     payment.status,
     JSON.stringify({ auto_renew: autoRenew }),
+    attrPartnerId,
+    attrShareBps,
     now,
     now,
   );
@@ -164,7 +180,8 @@ export function handleYkPaymentSucceeded({ db, ykPayment }) {
   // (или таблица грохнута). Логируем и игнорируем — не активируем
   // подписку «из ниоткуда».
   const row = db.prepare(`
-    SELECT telegram_user_id, plan, status, amount_kopecks, metadata_json
+    SELECT telegram_user_id, plan, status, amount_kopecks, metadata_json,
+           attributed_partner_id, revenue_share_bps_snapshot
     FROM yk_payments WHERE yk_payment_id = ?
   `).get(paymentId);
 
@@ -270,6 +287,16 @@ export function handleYkPaymentSucceeded({ db, ykPayment }) {
     }
   });
   tx();
+
+  // Партнёрская доля в рублях (рассчитываем снаружи транзакции — не критично,
+  // webhook может повторить если упадёт, partner_revenue_rub DEFAULT 0 безопасен).
+  if (row.attributed_partner_id && row.revenue_share_bps_snapshot) {
+    const partnerRevenueRub = Math.round(
+      (row.amount_kopecks / 100) * (row.revenue_share_bps_snapshot / 10000) * 100,
+    ) / 100;
+    db.prepare('UPDATE yk_payments SET partner_revenue_rub = ? WHERE yk_payment_id = ?')
+      .run(partnerRevenueRub, paymentId);
+  }
 
   // Реферальная награда (идемпотентна: UNIQUE(referred_user_id) не даст
   // начислить дважды, даже если вебхук прилетит повторно или при авторенью).

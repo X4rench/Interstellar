@@ -129,12 +129,12 @@ export function upsertUser(db, tgUser) {
   });
 
   if (tgUser.start_param) {
-    upsertAttributionStmt(db).run(tgUser.telegram_user_id, tgUser.start_param, now);
+    const attrResult = upsertAttributionStmt(db).run(tgUser.telegram_user_id, tgUser.start_param, now);
 
-    // User-referral attribution: start_param = 'ref_XXXXXXXX'
-    // Записываем referred_by_user_id только один раз (если ещё не установлен).
-    // Самореферал блокируется проверкой telegram_user_id ≠ referrer.telegram_user_id.
     if (tgUser.start_param.startsWith('ref_')) {
+      // User-referral attribution: start_param = 'ref_XXXXXXXX'
+      // Записываем referred_by_user_id только один раз (если ещё не установлен).
+      // Самореферал блокируется проверкой telegram_user_id ≠ referrer.telegram_user_id.
       const code = tgUser.start_param.slice(4)
       if (code) {
         const referrer = db
@@ -146,8 +146,33 @@ export function upsertUser(db, tgUser) {
           ).run(referrer.telegram_user_id, tgUser.telegram_user_id)
         }
       }
+    } else if (attrResult.changes === 1) {
+      // Новая атрибуция через slug партнёра. Сразу матчим matched_partner_id
+      // (не ждём grantPartner backfill — партнёр уже существует).
+      // Также возвращаем данные партнёра чтобы server.js мог отправить уведомление.
+      const partner = db
+        .prepare(
+          `SELECT u.telegram_user_id, u.first_name, u.username
+           FROM partners p JOIN users u ON u.telegram_user_id = p.telegram_user_id
+           WHERE LOWER(p.blogger_slug) = LOWER(?) AND p.status = 'active'`,
+        )
+        .get(tgUser.start_param)
+      if (partner) {
+        db.prepare(
+          'UPDATE attributions SET matched_partner_id = ? WHERE telegram_user_id = ? AND matched_partner_id IS NULL',
+        ).run(partner.telegram_user_id, tgUser.telegram_user_id)
+        return {
+          newPartnerReferral: {
+            partnerUserId: partner.telegram_user_id,
+            firstName: partner.first_name,
+            username: partner.username,
+          },
+        }
+      }
     }
   }
+
+  return {}
 }
 
 /**

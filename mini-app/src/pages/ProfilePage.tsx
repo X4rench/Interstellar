@@ -6,7 +6,7 @@ import { useApp } from '../context/AppContext'
 import { ChevronRightIcon } from '../icons'
 import { BottomNav } from '../components/BottomNav'
 import { appConfirm, appAlert } from '../components/AppDialogs'
-import { ykToggleAutoRenew, getReferralStats, type ReferralStatsResponse } from '../utils/api'
+import { ykToggleAutoRenew, getReferralStats, partnerGetSummary, type ReferralStatsResponse, type PartnerSummary } from '../utils/api'
 import invertLogo from '../icons/invertLogo.png'
 
 import styles from './ProfilePage.module.css'
@@ -160,6 +160,138 @@ function formatRuDate(iso: string | null): string {
   ]
   const d = new Date(iso)
   return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`
+}
+
+// ─── Партнёрский блок (видим только партнёрам) ───────────────────────────────
+
+function PartnerBannerBlock({ bloggerSlug, sharePercent }: { bloggerSlug: string; sharePercent: number }) {
+  const nav = useNavigate()
+  const [summary, setSummary] = useState<PartnerSummary | null>(null)
+
+  useEffect(() => {
+    partnerGetSummary()
+      .then((r) => setSummary(r.summary))
+      .catch(() => {})
+  }, [])
+
+  const fmtRub = (v: number) =>
+    v.toLocaleString('ru', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' ₽'
+
+  return (
+    <div
+      style={{
+        margin: '12px 20px 0',
+        background: 'linear-gradient(145deg, #1a1030 0%, #12082a 100%)',
+        border: '1.5px solid rgba(124, 92, 255, 0.4)',
+        boxShadow: '0 0 24px rgba(124, 92, 255, 0.12)',
+        borderRadius: 16,
+        overflow: 'hidden',
+      }}
+    >
+      {/* Заголовок */}
+      <div
+        style={{
+          padding: '14px 16px 12px',
+          borderBottom: '1px solid rgba(124, 92, 255, 0.15)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+        }}
+      >
+        <span
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 10,
+            background: 'linear-gradient(135deg, #7c5cff, #ff5cdb)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            fontSize: 16,
+          }}
+        >
+          🌟
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#fff' }}>
+              Партнёрская программа
+            </p>
+            <span
+              style={{
+                background: 'linear-gradient(135deg, #7c5cff, #ff5cdb)',
+                borderRadius: 5,
+                padding: '1px 7px',
+                fontSize: 9,
+                fontWeight: 800,
+                color: '#fff',
+                letterSpacing: 0.5,
+              }}
+            >
+              ПАРТНЁР
+            </span>
+          </div>
+          <p style={{ margin: '2px 0 0', fontSize: 11, color: '#a89cd8', lineHeight: 1.3 }}>
+            {bloggerSlug} · {sharePercent}% с каждого платежа
+          </p>
+        </div>
+      </div>
+
+      {/* Быстрая статистика */}
+      <div style={{ padding: '12px 16px' }}>
+        {summary ? (
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            {[
+              { val: String(summary.referrals_count), lbl: 'Рефералов' },
+              { val: String(summary.conversions_count), lbl: 'Оплатили' },
+              { val: fmtRub(summary.balance_rub), lbl: 'Баланс' },
+            ].map(({ val, lbl }) => (
+              <div
+                key={lbl}
+                style={{
+                  flex: 1,
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(124,92,255,0.2)',
+                  borderRadius: 10,
+                  padding: '8px 4px',
+                  textAlign: 'center',
+                }}
+              >
+                <p style={{ margin: 0, fontSize: lbl === 'Баланс' ? 13 : 18, fontWeight: 700, color: '#fff' }}>{val}</p>
+                <p style={{ margin: '2px 0 0', fontSize: 10, color: '#8870c8' }}>{lbl}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ height: 56, marginBottom: 12 }} />
+        )}
+
+        <button
+          onClick={() => nav('/partner')}
+          style={{
+            width: '100%',
+            padding: '11px',
+            background: 'linear-gradient(135deg, #7c5cff 0%, #b455e8 50%, #ff5cdb 100%)',
+            border: 0,
+            borderRadius: 10,
+            fontSize: 13,
+            fontWeight: 700,
+            color: '#fff',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+          }}
+        >
+          Партнёрский кабинет
+          <ChevronRightIcon color="#fff" />
+        </button>
+      </div>
+    </div>
+  )
 }
 
 // ─── Реферальный блок ────────────────────────────────────────────────────────
@@ -677,6 +809,14 @@ export function ProfilePage() {
           />
         )}
 
+        {/* Партнёрский кабинет — видим только partner'у, стоит ПЕРЕД реф.блоком */}
+        {isPartner && partnerInfo && (
+          <PartnerBannerBlock
+            bloggerSlug={partnerInfo.blogger_slug}
+            sharePercent={Math.round(partnerInfo.revenue_share_bps / 100)}
+          />
+        )}
+
         {/* Реферальный блок — виден всем юзерам */}
         <ReferralBlock />
 
@@ -684,25 +824,6 @@ export function ProfilePage() {
               чтобы между последней карточкой (подписка / autorenew)
               и первым заголовком секции был зазор. ── */}
         <div style={{ marginTop: 24 }}>
-
-        {/* Партнёрство (видно только partner'у) */}
-        {isPartner && partnerInfo && (
-          <div className={styles.section}>
-            <h3 className={styles.sectionTitle}>Партнёрство</h3>
-            <div className={styles.list}>
-              <button className={styles.listItem} onClick={() => nav('/partner')}>
-                <span className={styles.listLabel}>
-                  Партнёрский кабинет
-                  <br />
-                  <span style={{ fontSize: 11, color: '#7c5cff' }}>
-                    slug: {partnerInfo.blogger_slug} · {(partnerInfo.revenue_share_bps / 100).toFixed(0)}%
-                  </span>
-                </span>
-                <ChevronRightIcon color="#888" />
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Администрирование (видно только admin'у) */}
         {isAdmin && (
