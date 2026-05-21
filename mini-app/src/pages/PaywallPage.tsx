@@ -1,11 +1,9 @@
 import { useMemo, useRef, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { openInvoice, openLink } from '@telegram-apps/sdk-react'
+import { openLink } from '@telegram-apps/sdk-react'
 
 import { useApp, type PaywallReason } from '../context/AppContext'
 import {
-  createInvoice as apiCreateInvoice,
-  getInvoiceStatus as apiGetInvoiceStatus,
   ykCreatePayment,
   ykGetPaymentStatus,
   PLANS,
@@ -112,6 +110,13 @@ function TierCard({ plan, popular, features, currentTier, flowState, busyPlan, o
   const busy = busyPlan === plan
   const isWorking = busy && (flowState === 'creating' || flowState === 'opening' || flowState === 'paying')
 
+  // Disabled только когда мы реально дёргаем YK API (короткое окно ~1-2s).
+  // Во время 'opening' / 'paying' (юзер на YK странице или вернулся не оплатив)
+  // — позволяем переключиться на другой тариф или повторить попытку.
+  // Это фиксит баг "приложение залипает после возврата с ЮК без оплаты".
+  const isCreating = flowState === 'creating'
+  const isThisCardLocked = isCreating && busy
+
   return (
     <div className={`${styles.tierCard} ${popular ? styles.tierCardPopular : ''}`}>
       {popular && <span className={styles.tierBadge}>ХИТ</span>}
@@ -144,7 +149,7 @@ function TierCard({ plan, popular, features, currentTier, flowState, busyPlan, o
         <button
           className={`${styles.tierBtn} ${popular ? styles.tierBtnPrimary : styles.tierBtnSecondary}`}
           onClick={() => onBuy(plan)}
-          disabled={isWorking || busyPlan !== null}
+          disabled={isCreating || isThisCardLocked}
         >
           {isWorking ? (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -181,7 +186,6 @@ export function PaywallPage() {
   const [state, setState] = useState<FlowState>('idle')
   const [busyPlan, setBusyPlan] = useState<PlanCode | null>(null)
   const [errorDetail, setErrorDetail] = useState<string>('')
-  const [pollCount, setPollCount] = useState(0)
 
   const currentPayloadRef = useRef<string | null>(null)
   const pollTimerRef = useRef<number | null>(null)
@@ -217,43 +221,16 @@ export function PaywallPage() {
     return () => document.removeEventListener('visibilitychange', onVisibility)
   }, [])
 
-  const startStatusPolling = (payload: string) => {
-    setState('paying')
-    setPollCount(0)
-    let attempts = 0
-    const maxAttempts = 40
-    const tick = async () => {
-      attempts++
-      setPollCount(attempts)
-      try {
-        const res = await apiGetInvoiceStatus(payload)
-        if (res.status === 'paid') {
-          setState('success')
-          refreshSubscription()
-          window.setTimeout(closePaywall, 2000)
-          return
-        }
-        if (res.status === 'expired' || res.status === 'failed') {
-          setState('failed')
-          setErrorDetail('Инвойс истёк или ошибка оплаты.')
-          return
-        }
-        if (attempts >= maxAttempts) {
-          setState('polling_timeout')
-          setErrorDetail('Платёж обрабатывается. Подписка появится в Profile через минуту.')
-          return
-        }
-        pollTimerRef.current = window.setTimeout(tick, 1500)
-      } catch {
-        if (attempts < maxAttempts) {
-          pollTimerRef.current = window.setTimeout(tick, 2500)
-        } else {
-          setState('error')
-          setErrorDetail('Сеть нестабильна. Проверь Pro в Profile через минуту.')
-        }
-      }
+  // Принудительно отменяет текущий поллинг и возвращает paywall в idle.
+  // Используется когда юзер кликает на другой тариф пока висит поллинг
+  // от предыдущей попытки, или жмёт «Отменить ожидание».
+  const cancelCurrentPolling = () => {
+    if (pollTimerRef.current !== null) {
+      window.clearTimeout(pollTimerRef.current)
+      pollTimerRef.current = null
     }
-    pollTimerRef.current = window.setTimeout(tick, 1500)
+    setBusyPlan(null)
+    currentPayloadRef.current = null
   }
 
   // YK status polling: после возврата с YK-сайта поллим до succeeded.
@@ -261,12 +238,10 @@ export function PaywallPage() {
   // status ('succeeded' вместо 'paid', plus 'pending'/'canceled').
   const startYkPolling = (paymentId: string) => {
     setState('paying')
-    setPollCount(0)
     let attempts = 0
     const maxAttempts = 60 // 60 × 2s = 2 минуты
     const tick = async () => {
       attempts++
-      setPollCount(attempts)
       try {
         const res = await ykGetPaymentStatus(paymentId)
         if (res.status === 'succeeded') {
@@ -298,14 +273,19 @@ export function PaywallPage() {
   }
 
   const handleBuy = async (plan: PlanCode) => {
-    if (state !== 'idle' && state !== 'failed' && state !== 'cancelled' && state !== 'error' && state !== 'rate_limited' && state !== 'polling_timeout') {
-      return
-    }
+    // Блокируем только во время активного запроса к YK API ('creating').
+    // В 'opening'/'paying' (юзер на YK-странице или вернулся не оплатив) —
+    // разрешаем смену тарифа: отменяем текущий поллинг и запускаем новый.
+    if (state === 'creating') return
+
+    // Отменим предыдущий поллинг (если был) — юзер передумал и выбрал другой тариф.
+    cancelCurrentPolling()
+
     setState('creating')
     setBusyPlan(plan)
     setErrorDetail('')
 
-    // ── Попытка №1: ЮКасса (если настроена на бэке) ──
+    // ── ТОЛЬКО ЮКасса. Stars-fallback убран (требование: все платежи в рублях).
     // Авто-продление включаем по умолчанию для подписок (Day Pass — не имеет
     // смысла). На бэке save_payment_method=true → ЮК запомнит карту юзера
     // и cron каждый час продлит подписку без участия юзера.
@@ -336,40 +316,24 @@ export function PaywallPage() {
         startYkPolling(res.yk_payment_id)
         return
       }
-      // confirmation_url нет — статус succeeded сразу (recurring сценарий)?
+      // confirmation_url нет — статус succeeded сразу (recurring сценарий: уже
+      // есть сохранённая карта от прошлой подписки → YK списал сразу без редиректа).
       if (res.status === 'succeeded') {
         setState('success')
         refreshSubscription()
         window.setTimeout(closePaywall, 2000)
         return
       }
+      // Неожиданный ответ от YK — нет confirmation_url, нет succeeded.
+      setState('error')
+      setErrorDetail('Не удалось открыть страницу оплаты. Попробуй ещё раз.')
+      setBusyPlan(null)
     } catch (err) {
-      // 503 YK_NOT_CONFIGURED → fallback на Stars.
-      // Остальные ошибки (429, 500) — показываем юзеру.
+      // Показываем ошибку юзеру вместо fallback'а на Stars.
       if (err instanceof ApiError && err.code === 'YK_NOT_CONFIGURED') {
-        console.warn('[paywall] YK not configured, falling back to Stars')
-        // Provod ниже на Stars flow
+        setState('error')
+        setErrorDetail('Платежи временно недоступны. Попробуй позже.')
       } else if (err instanceof ApiError && err.status === 429) {
-        setState('rate_limited')
-        setErrorDetail('Слишком часто. Подожди минуту.')
-        setBusyPlan(null)
-        return
-      } else {
-        // Любая другая ошибка — пробуем Stars как fallback
-        console.warn('[paywall] YK failed, falling back to Stars:', err)
-      }
-    }
-
-    // ── Попытка №2: Telegram Stars (legacy fallback) ──
-    let invoiceLink: string
-    let payload: string
-    try {
-      const res = await apiCreateInvoice(plan)
-      invoiceLink = res.invoice_link
-      payload = res.payload
-      currentPayloadRef.current = payload
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 429) {
         setState('rate_limited')
         setErrorDetail('Слишком часто. Подожди минуту.')
       } else {
@@ -377,36 +341,7 @@ export function PaywallPage() {
         setErrorDetail(err instanceof Error ? err.message : 'Не удалось создать платёж')
       }
       setBusyPlan(null)
-      return
     }
-
-    setState('opening')
-    let status: string
-    try {
-      status = await openInvoice(invoiceLink, 'url')
-    } catch (err) {
-      setState('error')
-      setErrorDetail(err instanceof Error ? err.message : 'Не удалось открыть инвойс')
-      setBusyPlan(null)
-      return
-    }
-
-    if (status === 'paid' || status === 'pending') {
-      startStatusPolling(payload)
-      return
-    }
-    if (status === 'cancelled') {
-      setState('cancelled')
-      setBusyPlan(null)
-      return
-    }
-    if (status === 'failed') {
-      setState('failed')
-      setErrorDetail('Платёж не прошёл. Попробуйте ещё раз или свяжитесь с поддержкой.')
-      setBusyPlan(null)
-      return
-    }
-    startStatusPolling(payload)
   }
 
   const goLegal = (docId: string) => {
@@ -415,8 +350,24 @@ export function PaywallPage() {
     nav(`/legal/${docId}`)
   }
 
-  const isWorking = state === 'creating' || state === 'opening' || state === 'paying'
-  const isSuccess = state === 'success'
+  // isPolling — состояния когда юзер открыл YK или вернулся не оплатив.
+  // В этих состояниях ВСЁ остаётся интерактивным (отмена, выбор другого тарифа,
+  // закрытие пейволла). Это фиксит залипание после возврата с ЮК без оплаты.
+  const isPolling = state === 'opening' || state === 'paying'
+
+  // Закрытие пейволла — отменяет любой активный поллинг и закрывает модалку.
+  const handleClose = () => {
+    cancelCurrentPolling()
+    closePaywall()
+  }
+
+  // Отмена ожидания: остановить поллинг и вернуться в idle.
+  // Юзер не платил — попробует другой тариф или закроет пейволл.
+  const handleCancelWait = () => {
+    cancelCurrentPolling()
+    setState('cancelled')
+    setErrorDetail('')
+  }
 
   // Features per tier
   const basicFeatures = [
@@ -441,13 +392,18 @@ export function PaywallPage() {
   ]
 
   return (
-    <div className={styles.overlay} onClick={isWorking ? undefined : closePaywall}>
+    // Оверлей-клик закрывает пейволл во всех состояниях КРОМЕ 'creating'
+    // (мы ждём ответа YK API ~1-2s — иначе создадим висящий платёж в БД).
+    // В 'opening'/'paying' закрывать можно — это лишь отменит поллинг.
+    <div className={styles.overlay} onClick={state === 'creating' ? undefined : handleClose}>
       <style>{`@keyframes paywallSpin { from { transform: rotate(0); } to { transform: rotate(360deg); } }`}</style>
       <div className={styles.sheet} onClick={(e) => e.stopPropagation()}>
         <button
           className={styles.closeBtn}
-          onClick={closePaywall}
-          disabled={isWorking && !isSuccess}
+          onClick={handleClose}
+          // Только во время активного YK API-запроса блокируем крестик.
+          // В polling-состояниях крестик работает и отменяет ожидание.
+          disabled={state === 'creating'}
           aria-label="Закрыть"
         >
           <CloseIcon />
@@ -521,8 +477,53 @@ export function PaywallPage() {
           )}
         </div>
 
+        {/* Polling-баннер с кнопкой отмены: видим юзеру когда он открыл ЮК
+            (или вернулся не оплатив, но visibility-handler не успел сработать).
+            Даём явный exit — без этого юзер залипал в "Проверяем…" и не мог
+            выбрать другой тариф или закрыть пейволл. */}
+        {isPolling && (
+          <div
+            style={{
+              margin: '0 16px 12px',
+              padding: '10px 14px',
+              background: 'rgba(124, 92, 255, 0.1)',
+              border: '1px solid rgba(124, 92, 255, 0.3)',
+              borderRadius: 12,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ margin: 0, fontSize: 12, color: '#c9b8ff', fontWeight: 600 }}>
+                {state === 'opening' ? 'Открываем ЮКассу…' : 'Ждём подтверждения оплаты…'}
+              </p>
+              <p style={{ margin: '2px 0 0', fontSize: 11, color: '#8870c8', lineHeight: 1.3 }}>
+                Если передумал — нажми «Отмена» и выбери другой тариф.
+              </p>
+            </div>
+            <button
+              onClick={handleCancelWait}
+              style={{
+                background: 'rgba(124, 92, 255, 0.15)',
+                border: '1px solid rgba(124, 92, 255, 0.35)',
+                borderRadius: 8,
+                padding: '6px 12px',
+                fontSize: 11,
+                fontWeight: 600,
+                color: '#c9b8ff',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                flexShrink: 0,
+              }}
+            >
+              Отмена
+            </button>
+          </div>
+        )}
+
         {/* Error / hints */}
-        {errorDetail && (
+        {errorDetail && !isPolling && (
           <p
             style={{
               margin: '0 16px 12px',
@@ -535,7 +536,6 @@ export function PaywallPage() {
               lineHeight: 1.5,
             }}
           >
-            {state === 'paying' && pollCount > 0 && `Проверяем платёж… (${pollCount}/40) · `}
             {errorDetail}
           </p>
         )}

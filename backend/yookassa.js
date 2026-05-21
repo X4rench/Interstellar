@@ -146,6 +146,9 @@ export async function createPayment({
     },
     description: description.slice(0, 128),
     save_payment_method: savePaymentMethod,
+    // Разрешённые способы оплаты — без SberPay ('sberbank').
+    // Порядок: СБП первым (самый выгодный для нас), потом карта.
+    payment_method_types: ['sbp', 'bank_card', 'tinkoff_bank', 'sberbank'],
     ...(metadata && { metadata }),
     ...(receipt && { receipt }),
   };
