@@ -246,6 +246,18 @@ export const TIER_DAILY_LIMITS = {
 };
 
 /**
+ * Day Pass даёт фиксированную дневную квоту 100 сообщений (вместо unlimited).
+ * Без лимита был риск злоупотребления: за 75₽ юзер мог сжечь нам сотни ₽
+ * на LLM-токенах. 100 msg/день — между Basic (50) и Premium (200), безопасная
+ * маржа: 100 сообщений × ~0.05₽/токены ≈ 5₽ при цене DP 75₽ → ~93% маржа.
+ *
+ * Если у юзера активный Premium и куплен DP — используется max(200, 100)=200
+ * (DP бесполезен для Premium, в UI таким юзерам DP не предлагаем).
+ * Для Free (10/день) и Basic (50/день) — DP поднимает до 100.
+ */
+export const DAY_PASS_DAILY_LIMIT = 100;
+
+/**
  * Размер sliding-window истории (сколько последних сообщений шлём в LLM).
  * Меньше для бесплатных = меньше токенов = меньше costs. Premium даёт
  * глубже память. UNIVERSAL_RULES + persona кэшируются вне зависимости.
@@ -333,10 +345,14 @@ export function checkAndIncrementChatUsage(db, telegramUserId) {
   // Унифицированная логика для всех тиров (free/basic/premium): дневная
   // квота из chat_usage с UTC-day-bucket. Раньше free шёл по отдельной
   // ветке через users.free_messages_used (lifetime) — поменяли на daily
-  // для retention. Day Pass снимает лимит для платных, для free не
-  // применяется (free не может купить Day Pass — он сначала покупает
-  // подписку, и тогда DP relevant).
-  const limit = TIER_DAILY_LIMITS[tier];
+  // для retention.
+  //
+  // Day Pass теперь НЕ снимает лимит — даёт фиксированную квоту 100/день
+  // (раньше был unlimited, что давало возможность сжечь нам сотни ₽ за 75₽).
+  // Эффективный лимит = max(базовый, DAY_PASS_LIMIT) — для Free/Basic это
+  // апгрейд до 100, для Premium бесполезно (200 > 100).
+  const baseLimit = TIER_DAILY_LIMITS[tier];
+  const limit = hasPass ? Math.max(baseLimit, DAY_PASS_DAILY_LIMIT) : baseLimit;
   const bucket = getDayBucket();
 
   let result;
@@ -348,8 +364,8 @@ export function checkAndIncrementChatUsage(db, telegramUserId) {
       .get(telegramUserId, bucket);
     const current = row?.count ?? 0;
 
-    if (!hasPass && current >= limit) {
-      result = { ok: false, tier, count: current, limit, has_day_pass: false };
+    if (current >= limit) {
+      result = { ok: false, tier, count: current, limit, has_day_pass: hasPass };
       return;
     }
 

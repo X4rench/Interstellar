@@ -67,8 +67,16 @@ export async function createYkPayment({ db, userId, plan, autoRenew, returnUrl }
   if (!amountKopecks) {
     throw new Error('UNSUPPORTED_PLAN');
   }
-  // Day Pass — разовая покупка, save_payment_method не имеет смысла.
-  const savePaymentMethod = autoRenew && plan !== 'day_pass';
+  // Автопродление отключено по бизнес-решению.
+  // ВАЖНО: save_payment_method=true вызывает 400 от ЮКассы если в
+  // payment_method_types есть НЕ-карточные методы (SBP, T-Pay, SberPay).
+  // Это и был баг с Basic/Premium — они зависали при создании платежа.
+  // Для Day Pass save был false → работал. Теперь везде false → все
+  // планы создаются успешно, ни один не продлевается автоматически.
+  const savePaymentMethod = false;
+  // autoRenew параметр оставлен в сигнатуре для совместимости со старыми
+  // вызовами с фронта, но больше не влияет на флоу — игнорируется.
+  void autoRenew;
 
   // Вызываем YK ПЕРВЫМ — без её ответа у нас нет yk_payment_id.
   // Если YK упала — ничего не пишем в БД (нечего активировать).
@@ -80,7 +88,7 @@ export async function createYkPayment({ db, userId, plan, autoRenew, returnUrl }
     metadata: {
       telegram_user_id: String(userId),
       plan,
-      auto_renew: String(autoRenew),
+      auto_renew: 'false',
     },
   });
 

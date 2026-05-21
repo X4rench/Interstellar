@@ -241,13 +241,13 @@ export const PLANS: Record<PlanCode | 'free', PlanMeta> = {
   day_pass: {
     code: 'day_pass',
     title: 'Day Pass',
-    shortDescription: '24h без лимита',
+    shortDescription: '100 сообщений на 24 часа',
     stars: 50,
     approxRub: 75,
-    daily_msg_limit: 0, // снимает лимит
-    history_window: 0, // используется лимит текущего тира
+    daily_msg_limit: 100, // фиксированная квота (не снимает лимит, а заменяет)
+    history_window: 15, // как у Basic — DP это апгрейд для Free/Basic до 100
     custom_characters: 'unlimited',
-    nsfw_access: false, // не апгрейд тира, только убирает day-cap
+    nsfw_access: false, // не апгрейд тира, только увеличивает дневную квоту
     duration_days: 'one-time-24h',
   },
 }
