@@ -76,6 +76,11 @@ export function CreatePage() {
   const [ageGateVisible, setAgeGateVisible] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
+  // touched — показываем "обязательное поле" только после того как юзер
+  // хоть раз кликнул в поле и ушёл из него (onBlur).
+  const [touchedName, setTouchedName] = useState(false)
+  const [touchedDescription, setTouchedDescription] = useState(false)
+
   // При размонтировании — отзываем object-URL чтобы не утекал.
   useEffect(() => {
     return () => {
@@ -122,13 +127,13 @@ export function CreatePage() {
   }
 
   // Валидация — определяем активна ли кнопка submit.
+  // firstMessage — опциональное поле (buildPersonaTemplate обрабатывает пустое значение).
   const canSubmit =
     name.trim().length >= 2 &&
     name.length <= FIELD_LIMITS.name &&
     description.trim().length >= 5 &&
     description.length <= FIELD_LIMITS.description &&
     persona.length <= FIELD_LIMITS.personaRaw &&
-    firstMessage.trim().length >= 5 &&
     firstMessage.length <= FIELD_LIMITS.firstMessage &&
     !submitting
 
@@ -284,26 +289,42 @@ export function CreatePage() {
 
         {/* Name */}
         <div className={styles.field}>
-          <label className={styles.label}>Имя персонажа</label>
+          <label className={styles.label}>
+            Имя персонажа <span style={{ color: '#ff5555' }}>*</span>
+          </label>
           <input
             className={styles.input}
             value={name}
             onChange={(e) => setName(e.target.value)}
+            onBlur={() => setTouchedName(true)}
             placeholder="Например: Анна Каренина"
             maxLength={FIELD_LIMITS.name}
           />
+          {touchedName && name.trim().length < 2 && (
+            <p style={{ margin: '4px 0 0', fontSize: 11, color: '#ff5555' }}>
+              Обязательное поле (минимум 2 символа)
+            </p>
+          )}
         </div>
 
         {/* Description */}
         <div className={styles.field}>
-          <label className={styles.label}>Краткое описание</label>
+          <label className={styles.label}>
+            Краткое описание <span style={{ color: '#ff5555' }}>*</span>
+          </label>
           <input
             className={styles.input}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
+            onBlur={() => setTouchedDescription(true)}
             placeholder="Например: Героиня романа Толстого"
             maxLength={FIELD_LIMITS.description}
           />
+          {touchedDescription && description.trim().length < 5 && (
+            <p style={{ margin: '4px 0 0', fontSize: 11, color: '#ff5555' }}>
+              Обязательное поле (минимум 5 символов)
+            </p>
+          )}
         </div>
 
         {/* Persona */}
@@ -321,14 +342,17 @@ export function CreatePage() {
           </p>
         </div>
 
-        {/* First message */}
+        {/* First message — необязательное поле */}
         <div className={styles.field}>
-          <label className={styles.label}>Первое сообщение собеседнику</label>
+          <label className={styles.label}>
+            Первое сообщение собеседнику{' '}
+            <span style={{ color: '#666', fontWeight: 400, fontSize: 11 }}>(необязательно)</span>
+          </label>
           <textarea
             className={styles.textarea}
             value={firstMessage}
             onChange={(e) => setFirstMessage(e.target.value)}
-            placeholder="С чего начнёт разговор..."
+            placeholder="С чего начнёт разговор... (если не заполнить — юзер пишет первым)"
             maxLength={FIELD_LIMITS.firstMessage}
           />
         </div>

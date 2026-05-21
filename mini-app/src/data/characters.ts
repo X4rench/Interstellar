@@ -28,6 +28,7 @@ export interface Character {
   rating: number
   isNew?: boolean
   isNSFW?: boolean
+  created_at?: number   // Unix ms — для DB-персонажей из админки, используется в сортировке
   firstMessage: string
   persona: string
   userCreated?: boolean

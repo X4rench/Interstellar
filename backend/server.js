@@ -1257,11 +1257,16 @@ app.post(
     }
 
     const data = await upstream.json();
-    const content = data?.choices?.[0]?.message?.content;
-    if (typeof content !== 'string' || !content.trim()) {
+    const raw = data?.choices?.[0]?.message?.content;
+    if (typeof raw !== 'string' || !raw.trim()) {
       console.error('[polza] empty content in response', JSON.stringify(data).slice(0, 500));
       return res.status(502).json({ ok: false, error: 'EMPTY_RESPONSE' });
     }
+
+    // Нормализуем типографику: длинные (—) и средние (–) тире заменяем на
+    // обычный дефис. Нейросеть генерирует их в русском тексте по правилам
+    // типографики, но в мессенджерах они выглядят чужеродно.
+    const content = raw.replace(/[—–]/g, '-');
 
     return res.json({ ok: true, response: content });
   } catch (err) {

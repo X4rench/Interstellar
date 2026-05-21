@@ -600,7 +600,7 @@ export function ProfilePage() {
         {subscriptionError && !subscriptionLoading && (
           <div
             style={{
-              margin: '10px 20px 0',
+              margin: '10px 20px 12px',
               padding: '10px 14px',
               background: 'rgba(255, 80, 80, 0.08)',
               border: '1px solid rgba(255, 80, 80, 0.25)',

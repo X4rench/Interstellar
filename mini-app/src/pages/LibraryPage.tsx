@@ -95,7 +95,14 @@ export function LibraryPage() {
     }
     return [...list].sort((a, b) => {
       if (sortKey === 'alpha') return a.name.localeCompare(b.name, 'ru')
-      if (sortKey === 'new') return (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0)
+      if (sortKey === 'new') {
+        // Первичная сортировка: isNew=true (встроенные «новинки») — наверх.
+        const newDiff = (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0)
+        if (newDiff !== 0) return newDiff
+        // Вторичная: DB-персонажи с created_at — по дате создания (новее = выше).
+        // Встроенные без created_at идут после них.
+        return (b.created_at ?? 0) - (a.created_at ?? 0)
+      }
       return 0
     })
   }, [sourceCharacters, activeTab, search, sortKey])
