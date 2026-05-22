@@ -681,6 +681,95 @@ export function ProfilePage() {
           </div>
         )}
 
+        {/* Day Pass CTA — единственная точка входа в Day Pass для Premium-юзеров
+            (у них нет кнопки апгрейда). Basic/Free могут купить DP через Paywall
+            из апгрейд-кнопок, но и здесь видеть удобно. Скрываем только когда
+            DP уже активен — две покупки подряд бесполезны (срок не накапливается). */}
+        {isPremium && !dayPassActive && (
+          <button
+            onClick={() => openPaywall('manual')}
+            style={{
+              margin: '12px 20px 0',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: '14px 16px',
+              background: '#131313',
+              border: '1px solid #232323',
+              borderRadius: 14,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              width: 'calc(100% - 40px)',
+              textAlign: 'left',
+            }}
+          >
+            <span
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                background: 'linear-gradient(135deg, #7c5cff, #ff5cdb)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                fontSize: 16,
+              }}
+            >
+              🎟
+            </span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: '#fff' }}>
+                Day Pass · 75 ₽
+              </p>
+              <p style={{ margin: '2px 0 0', fontSize: 12, color: '#888', lineHeight: 1.4 }}>
+                +100 сообщений на 24 часа (разово, сверх тарифа)
+              </p>
+            </div>
+            <ChevronRightIcon color="#888" />
+          </button>
+        )}
+
+        {/* Day Pass активен — показываем что осталось времени */}
+        {dayPassActive && (
+          <div
+            style={{
+              margin: '12px 20px 0',
+              padding: '14px 16px',
+              background: '#131313',
+              border: '1px solid rgba(124, 92, 255, 0.3)',
+              borderRadius: 14,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+            }}
+          >
+            <span
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                background: 'linear-gradient(135deg, #7c5cff, #ff5cdb)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                fontSize: 16,
+              }}
+            >
+              🎟
+            </span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#fff' }}>
+                Day Pass активен
+              </p>
+              <p style={{ margin: '2px 0 0', fontSize: 11, color: '#888', lineHeight: 1.4 }}>
+                +100 сообщений добавлено к лимиту на 24 часа
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Партнёрский кабинет — видим только partner'у, стоит ПЕРЕД реф.блоком */}
         {isPartner && partnerInfo && (
           <PartnerBannerBlock
