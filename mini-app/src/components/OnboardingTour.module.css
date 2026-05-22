@@ -1,0 +1,244 @@
+/* ─── OnboardingTour: космический онбординг для первого захода ─────────────
+ * Стиль: чёрный фон с эффектом звёздного неба + фиолетово-розовая
+ * подсветка. Полноэкранный overlay с плавной сменой шагов.
+ */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200; /* выше PaywallOverlay (100) на случай рассинхрона */
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: inherit;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Космический градиентный фон на весь экран — мягкое фиолетовое свечение
+   снизу + переход в чёрный. Перекрашивается на каждом слайде. */
+.bg {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse at center bottom,
+    rgba(124, 92, 255, 0.25) 0%,
+    rgba(255, 92, 219, 0.12) 30%,
+    rgba(0, 0, 0, 0) 70%
+  );
+  pointer-events: none;
+  transition: background 0.5s ease;
+}
+
+/* Звёздное поле — анимированные точки. Чисто декоративно. */
+.stars {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.star {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  background: #fff;
+  border-radius: 50%;
+  opacity: 0.6;
+  animation: twinkle 3s ease-in-out infinite;
+}
+
+.star.big {
+  width: 3px;
+  height: 3px;
+  opacity: 0.8;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.6);
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.2; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+/* ─── Top bar: skip + step indicator ─────────────────────────── */
+.topBar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(var(--safe-top, 0) + 16px) 20px 0;
+  z-index: 2;
+}
+
+.dots {
+  display: flex;
+  gap: 6px;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+}
+
+.dotActive {
+  width: 18px;
+  background: linear-gradient(90deg, #7c5cff, #ff5cdb);
+  box-shadow: 0 0 8px rgba(124, 92, 255, 0.5);
+}
+
+.skipBtn {
+  background: transparent;
+  border: 0;
+  color: #888;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 6px 10px;
+  border-radius: 8px;
+  transition: color 0.2s ease;
+}
+
+.skipBtn:hover {
+  color: #fff;
+}
+
+/* ─── Content area ─────────────────────────────────────────── */
+.content {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 32px;
+  text-align: center;
+  z-index: 2;
+}
+
+.iconWrap {
+  width: 140px;
+  height: 140px;
+  border-radius: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 32px;
+  background: linear-gradient(135deg, rgba(124, 92, 255, 0.15), rgba(255, 92, 219, 0.15));
+  border: 1.5px solid rgba(124, 92, 255, 0.35);
+  box-shadow:
+    0 0 40px rgba(124, 92, 255, 0.25),
+    0 0 80px rgba(255, 92, 219, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  position: relative;
+  animation: floaty 4s ease-in-out infinite;
+}
+
+@keyframes floaty {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+/* Полупрозрачный пульсирующий halo вокруг иконки */
+.iconWrap::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 44px;
+  border: 1px solid rgba(124, 92, 255, 0.18);
+  animation: pulse 3s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  line-height: 1.15;
+  margin: 0 0 14px;
+  background: linear-gradient(135deg, #fff 0%, #c9b8ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.subtitle {
+  font-size: 15px;
+  color: #b0a8c8;
+  line-height: 1.5;
+  margin: 0;
+  max-width: 320px;
+}
+
+/* Эффект перехода между слайдами */
+.slide {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: slideIn 0.4s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ─── Bottom action ─────────────────────────────────────────── */
+.bottom {
+  position: relative;
+  padding: 24px 20px calc(24px + var(--safe-bottom, 0));
+  z-index: 2;
+}
+
+.nextBtn {
+  width: 100%;
+  padding: 16px;
+  border: 0;
+  border-radius: 16px;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  cursor: pointer;
+  font-family: inherit;
+  background: linear-gradient(135deg, #7c5cff 0%, #b455e8 50%, #ff5cdb 100%);
+  color: #fff;
+  box-shadow: 0 6px 24px rgba(124, 92, 255, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: transform 0.1s ease, box-shadow 0.2s ease;
+}
+
+.nextBtn:active {
+  transform: scale(0.98);
+  box-shadow: 0 3px 12px rgba(124, 92, 255, 0.3);
+}
+
+.arrowIcon {
+  display: inline-flex;
+  align-items: center;
+  transition: transform 0.2s ease;
+}
+
+.nextBtn:hover .arrowIcon {
+  transform: translateX(2px);
+}

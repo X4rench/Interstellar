@@ -1,10 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useSignal, initData } from '@telegram-apps/sdk-react'
 
 import { SentryErrorBoundary } from './sentry'
 import { AppProvider, useApp } from './context/AppContext'
 import { AppDialogs } from './components/AppDialogs'
+import { OnboardingTour } from './components/OnboardingTour'
 
 import { HomePage } from './pages/HomePage'
 import { LibraryPage } from './pages/LibraryPage'
@@ -16,7 +17,36 @@ import { LegalPage } from './pages/LegalPage'
 import { AdminPage } from './pages/AdminPage'
 import { PartnerPage } from './pages/PartnerPage'
 
+/**
+ * Ключ в localStorage для отметки прохождения онбординга.
+ * Если когда-то понадобится переонбординг (например после большого
+ * редизайна) — поменяй версию: 'interstellar_onboarded_v2' и т.д.
+ */
+const ONBOARDING_KEY = 'interstellar_onboarded_v1'
+
 export function App() {
+  // Показываем онбординг при первом заходе. SSR-safe: на сервере
+  // typeof localStorage === undefined, поэтому делаем lazy init и
+  // защищаем try/catch (Telegram in-app browser может в редких случаях
+  // запретить localStorage — лучше тогда не показывать онбординг, чем
+  // упасть с белым экраном).
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(ONBOARDING_KEY) !== '1'
+    } catch {
+      return false
+    }
+  })
+
+  const completeOnboarding = () => {
+    try {
+      localStorage.setItem(ONBOARDING_KEY, '1')
+    } catch {
+      /* localStorage недоступен — просто закрываем для этой сессии */
+    }
+    setShowOnboarding(false)
+  }
+
   return (
     <SentryErrorBoundary fallback={<FallbackError />}>
       <AppProvider>
@@ -35,6 +65,7 @@ export function App() {
           </Routes>
           <PaywallOverlay />
           <AppDialogs />
+          {showOnboarding && <OnboardingTour onComplete={completeOnboarding} />}
         </BrowserRouter>
       </AppProvider>
     </SentryErrorBoundary>
