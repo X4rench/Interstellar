@@ -25,10 +25,16 @@ import {
 // Цены в КОПЕЙКАХ. Источник истины — синхронизировать с frontend PLANS
 // в mini-app/src/utils/api.ts (там approxRub) и legalContent.ts (цены в
 // договоре-оферте).
+//
+// ⚠️ ВРЕМЕННО: 1₽ ВЕЗДЕ для тестирования боевого магазина ЮКассы.
+// Когда тесты пройдут — вернуть на боевые цены:
+//   basic_month:   30000,  // 300 ₽
+//   premium_month: 75000,  // 750 ₽
+//   day_pass:       7500,  // 75 ₽
 export const YK_PLAN_PRICES_KOPECKS = {
-  basic_month:   30000,  // 300 ₽
-  premium_month: 75000,  // 750 ₽
-  day_pass:       7500,  // 75 ₽
+  basic_month:   100,  // 1 ₽ (тест)
+  premium_month: 100,  // 1 ₽ (тест)
+  day_pass:      100,  // 1 ₽ (тест)
 };
 
 // Длительность активации в МИЛЛИСЕКУНДАХ (важно — все timestamp'ы в проекте
