@@ -246,14 +246,22 @@ export const TIER_DAILY_LIMITS = {
 };
 
 /**
- * Day Pass даёт фиксированную дневную квоту 100 сообщений (вместо unlimited).
- * Без лимита был риск злоупотребления: за 75₽ юзер мог сжечь нам сотни ₽
- * на LLM-токенах. 100 msg/день — между Basic (50) и Premium (200), безопасная
- * маржа: 100 сообщений × ~0.05₽/токены ≈ 5₽ при цене DP 75₽ → ~93% маржа.
+ * Day Pass — ADDITIVE бонус: +100 сообщений сверх дневного лимита тарифа.
  *
- * Если у юзера активный Premium и куплен DP — используется max(200, 100)=200
- * (DP бесполезен для Premium, в UI таким юзерам DP не предлагаем).
- * Для Free (10/день) и Basic (50/день) — DP поднимает до 100.
+ * Эффективные лимиты при активном DP:
+ *   Free    (10)  → 10 + 100 = 110/день
+ *   Basic   (50)  → 50 + 100 = 150/день
+ *   Premium (200) → 200 + 100 = 300/день
+ *
+ * Раньше было max(limit, 100) — что делало DP бесполезным для Premium
+ * (max(200,100)=200 — никакого буста). Теперь Premium-юзер тоже может купить
+ * DP за 75₽ и получить +100 на день. Маржа сохраняется: 100 доп. сообщений
+ * × ~0.05₽/токены ≈ 5₽ → ~93% маржа при цене 75₽.
+ *
+ * Edge case: если DP куплен в 23:00 UTC, при пересечении полуночи UTC
+ * bucket сбросится → +100 во второй календарный день. Worst case ~200
+ * доп.сообщений за 24h sliding window. Маржа всё равно положительная
+ * (10₽ затрат vs 75₽ цена), и это редкий кейс.
  */
 export const DAY_PASS_DAILY_LIMIT = 100;
 
@@ -347,12 +355,12 @@ export function checkAndIncrementChatUsage(db, telegramUserId) {
   // ветке через users.free_messages_used (lifetime) — поменяли на daily
   // для retention.
   //
-  // Day Pass теперь НЕ снимает лимит — даёт фиксированную квоту 100/день
-  // (раньше был unlimited, что давало возможность сжечь нам сотни ₽ за 75₽).
-  // Эффективный лимит = max(базовый, DAY_PASS_LIMIT) — для Free/Basic это
-  // апгрейд до 100, для Premium бесполезно (200 > 100).
+  // Day Pass даёт ADDITIVE бонус +100 сообщений (DAY_PASS_DAILY_LIMIT)
+  // сверх дневного лимита тарифа. Это позволяет Premium-юзерам тоже
+  // получать выгоду от DP (раньше max() делал DP бесполезным для них).
+  // Free: 10+100=110, Basic: 50+100=150, Premium: 200+100=300.
   const baseLimit = TIER_DAILY_LIMITS[tier];
-  const limit = hasPass ? Math.max(baseLimit, DAY_PASS_DAILY_LIMIT) : baseLimit;
+  const limit = hasPass ? baseLimit + DAY_PASS_DAILY_LIMIT : baseLimit;
   const bucket = getDayBucket();
 
   let result;

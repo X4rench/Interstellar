@@ -158,6 +158,8 @@ function TierCard({ plan, popular, features, currentTier, flowState, busyPlan, o
                 {flowState === 'creating' ? 'Создаём…' : flowState === 'paying' ? 'Проверяем…' : 'Открываем…'}
               </span>
             </span>
+          ) : plan === 'day_pass' ? (
+            `Купить за ${meta.approxRub} ₽`
           ) : currentTier === 'basic' && plan === 'premium_month' ? (
             'Апгрейд'
           ) : (
@@ -387,11 +389,31 @@ export function PaywallPage() {
     '∞ кастомных персонажей',
     'Всё из Basic',
   ]
-  const dayPassFeatures = [
-    '100 сообщений на 24 часа',
-    'Активирует в текущем тарифе',
-    'Без подписки и обязательств',
-  ]
+  // Day Pass — ADDITIVE +100 сообщений сверх лимита тарифа на 24 часа.
+  // Features подбираются по текущему тиру юзера в JSX ниже:
+  //   Free    (10/день)  → +100 → всего 110
+  //   Basic   (50/день)  → +100 → всего 150
+  //   Premium (200/день) → +100 → всего 300
+  const dayPassFeaturesByTier: Record<'free' | 'basic' | 'premium', string[]> = {
+    free: [
+      '+100 сообщений за 24 часа',
+      'Всего 110 сообщений в день',
+      'Все 56+ персонажей',
+      'Без подписки и обязательств',
+    ],
+    basic: [
+      '+100 сообщений за 24 часа',
+      'Всего 150 сообщений в день',
+      'Сверх вашего Basic-лимита',
+      'Без обязательств',
+    ],
+    premium: [
+      '+100 сообщений за 24 часа',
+      'Всего 300 сообщений в день',
+      'Сверх вашего Premium-лимита',
+      'Без обязательств',
+    ],
+  }
 
   return (
     // Оверлей-клик закрывает пейволл во всех состояниях КРОМЕ 'creating'
@@ -453,24 +475,14 @@ export function PaywallPage() {
             onBuy={handleBuy}
           />
 
-          {/* Day Pass — показываем всем кроме Premium-юзеров (им и так
-              200/день — DP бесполезен, max(200,100)=200). Free-юзерам DP
-              поднимает лимит с 10 до 100/24h, Basic-юзерам — с 50 до 100/24h.
-              Позиционируется как «попробуй на сутки без подписки» — низкий
-              barrier для Free. */}
-          {tier !== 'premium' && !dayPassActive && (
+          {/* Day Pass — доступен ВСЕМ тирам (включая Premium), кроме случая
+              когда DP уже активен. Логика стала additive: +100 сообщений
+              сверх дневного лимита тарифа. Для Premium это полезный буст
+              (200→300 на 24h), раньше DP для Premium был бесполезным max(200,100). */}
+          {!dayPassActive && (
             <TierCard
               plan="day_pass"
-              features={
-                tier === 'free'
-                  ? [
-                      '100 сообщений на 24 часа',
-                      'В 10 раз больше чем Free',
-                      'Все 56+ персонажей',
-                      'Без подписки и обязательств',
-                    ]
-                  : dayPassFeatures
-              }
+              features={dayPassFeaturesByTier[tier]}
               currentTier={tier}
               flowState={state}
               busyPlan={busyPlan}
