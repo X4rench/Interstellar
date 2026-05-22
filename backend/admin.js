@@ -688,3 +688,216 @@ export function listAudit({ db, action, targetUserId, actorUserId, limit = 100, 
   const total = db.prepare(`SELECT COUNT(*) AS c FROM audit_log ${where}`).get(...params).c;
   return { entries: rows, total, limit, offset };
 }
+
+// ─── Subscription management (admin grant/revoke) ────────────────────────
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const PLAN_DEFAULT_DAYS = {
+  basic_month: 30,
+  premium_month: 30,
+  day_pass: 1,
+};
+
+/**
+ * Выдача подписки админом (бесплатно — для тестов, инфлюенсеров, рефаунд-кейсов).
+ * Сразу активирует — никаких pre-checkout flow. Для day_pass пишет в day_passes,
+ * для basic/premium — в subscriptions (предварительно отменяя текущую если есть).
+ *
+ * @param plan 'basic_month' | 'premium_month' | 'day_pass'
+ * @param durationDays число дней (опционально, по умолчанию: 30 для подписок, 1 для DP)
+ */
+export function grantSubscription({
+  db,
+  adminId,
+  targetUserId,
+  plan,
+  durationDays,
+  ip,
+  userAgent,
+  requestId,
+}) {
+  if (!PLAN_DEFAULT_DAYS[plan]) {
+    return { ok: false, error: 'INVALID_PLAN' };
+  }
+  const days = Number.isInteger(durationDays) && durationDays > 0 && durationDays <= 3650
+    ? durationDays
+    : PLAN_DEFAULT_DAYS[plan];
+
+  const targetUser = db
+    .prepare('SELECT telegram_user_id, first_name, username FROM users WHERE telegram_user_id = ?')
+    .get(targetUserId);
+  if (!targetUser) return { ok: false, error: 'TARGET_USER_NOT_FOUND' };
+
+  const now = Date.now();
+  const expiresAt = now + days * DAY_MS;
+
+  const tx = db.transaction(() => {
+    if (plan === 'day_pass') {
+      // day_passes требует UNIQUE telegram_payment_charge_id — фейковый id для grant.
+      // Префикс admin_grant_ чтобы не конфликтовало с реальными Stars/YK platежами.
+      db.prepare(`
+        INSERT INTO day_passes (telegram_user_id, purchased_at, expires_at,
+          telegram_payment_charge_id, source)
+        VALUES (?, ?, ?, ?, 'admin_grant')
+      `).run(targetUserId, now, expiresAt, `admin_grant_${now}_${targetUserId}`);
+    } else {
+      // Отменяем активные подписки чтобы не накапливались параллельные строки.
+      // Юзер получает новую подписку с нужным сроком, старая закрывается.
+      db.prepare(`
+        UPDATE subscriptions
+        SET cancelled_at = ?
+        WHERE telegram_user_id = ? AND expires_at > ? AND cancelled_at IS NULL
+      `).run(now, targetUserId, now);
+
+      db.prepare(`
+        INSERT INTO subscriptions
+          (telegram_user_id, plan, started_at, expires_at, is_trial,
+           auto_renew, source)
+        VALUES (?, ?, ?, ?, 0, 0, 'admin_grant')
+      `).run(targetUserId, plan, now, expiresAt);
+    }
+
+    logAction(db, {
+      actorUserId: adminId,
+      actorRole: 'admin',
+      action: 'admin_grant_subscription',
+      targetUserId,
+      targetResource: plan === 'day_pass' ? 'day_passes' : 'subscriptions',
+      targetId: String(targetUserId),
+      payload: { plan, duration_days: days, expires_at: expiresAt },
+      ip,
+      userAgent,
+      requestId,
+    });
+  });
+  tx();
+
+  // Уведомление юзеру (fire-and-forget).
+  const planLabel = plan === 'premium_month'
+    ? 'Premium'
+    : plan === 'basic_month'
+      ? 'Basic'
+      : 'Day Pass';
+  const expiresStr = new Date(expiresAt).toLocaleDateString('ru', { day: 'numeric', month: 'long', year: 'numeric' });
+  sendMessage({
+    chatId: targetUserId,
+    text:
+      `🎁 <b>Тебе подарили подписку Interstellar!</b>\n\n` +
+      `Тариф: <b>${planLabel}</b>\n` +
+      `Действует до: <b>${escapeHtml(expiresStr)}</b>\n\n` +
+      `Открывай Mini App и пользуйся 🚀`,
+  });
+
+  return { ok: true, plan, expires_at: expiresAt, duration_days: days };
+}
+
+/**
+ * Отбирание подписки админом. Закрывает активные subscriptions (cancelled_at=now)
+ * и истечает активные day_passes (expires_at=now). После этого юзер сразу
+ * становится free-tier до новой покупки/grant.
+ */
+export function revokeSubscription({
+  db,
+  adminId,
+  targetUserId,
+  reason,
+  ip,
+  userAgent,
+  requestId,
+}) {
+  const targetUser = db
+    .prepare('SELECT telegram_user_id FROM users WHERE telegram_user_id = ?')
+    .get(targetUserId);
+  if (!targetUser) return { ok: false, error: 'TARGET_USER_NOT_FOUND' };
+
+  const now = Date.now();
+  let subsCancelled = 0;
+  let dpExpired = 0;
+
+  const tx = db.transaction(() => {
+    const subRes = db.prepare(`
+      UPDATE subscriptions
+      SET cancelled_at = ?
+      WHERE telegram_user_id = ? AND expires_at > ? AND cancelled_at IS NULL
+    `).run(now, targetUserId, now);
+    subsCancelled = subRes.changes;
+
+    const dpRes = db.prepare(`
+      UPDATE day_passes
+      SET expires_at = ?
+      WHERE telegram_user_id = ? AND expires_at > ?
+    `).run(now, targetUserId, now);
+    dpExpired = dpRes.changes;
+
+    logAction(db, {
+      actorUserId: adminId,
+      actorRole: 'admin',
+      action: 'admin_revoke_subscription',
+      targetUserId,
+      targetResource: 'subscriptions',
+      targetId: String(targetUserId),
+      payload: {
+        subscriptions_cancelled: subsCancelled,
+        day_passes_expired: dpExpired,
+        reason: reason || null,
+      },
+      ip,
+      userAgent,
+      requestId,
+    });
+  });
+  tx();
+
+  if (subsCancelled > 0 || dpExpired > 0) {
+    // Уведомление юзеру (fire-and-forget). Только если реально что-то отобрали.
+    sendMessage({
+      chatId: targetUserId,
+      text:
+        `⚠️ <b>Подписка отозвана администратором.</b>\n\n` +
+        (reason ? `Причина: ${escapeHtml(reason)}\n\n` : '') +
+        `Если считаешь это ошибкой — свяжись с поддержкой.`,
+    });
+  }
+
+  return {
+    ok: true,
+    subscriptions_cancelled: subsCancelled,
+    day_passes_expired: dpExpired,
+  };
+}
+
+/**
+ * Получить текущий статус подписки юзера (для админ-UI).
+ * Возвращает информацию о всех активных подписках + day pass.
+ */
+export function getUserSubscriptionStatus({ db, targetUserId }) {
+  const targetUser = db
+    .prepare('SELECT telegram_user_id, first_name, last_name, username FROM users WHERE telegram_user_id = ?')
+    .get(targetUserId);
+  if (!targetUser) return { ok: false, error: 'TARGET_USER_NOT_FOUND' };
+
+  const now = Date.now();
+  const sub = db
+    .prepare(`
+      SELECT plan, started_at, expires_at, source, auto_renew
+      FROM subscriptions
+      WHERE telegram_user_id = ? AND expires_at > ? AND cancelled_at IS NULL
+      ORDER BY expires_at DESC LIMIT 1
+    `)
+    .get(targetUserId, now);
+  const dp = db
+    .prepare(`
+      SELECT purchased_at, expires_at, source
+      FROM day_passes
+      WHERE telegram_user_id = ? AND expires_at > ?
+      ORDER BY expires_at DESC LIMIT 1
+    `)
+    .get(targetUserId, now);
+
+  return {
+    ok: true,
+    user: targetUser,
+    subscription: sub || null,
+    day_pass: dp || null,
+  };
+}

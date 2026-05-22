@@ -61,6 +61,9 @@ import {
   markPayoutPaid,
   rejectPayout,
   listAudit,
+  grantSubscription as adminGrantSubscription,
+  revokeSubscription as adminRevokeSubscription,
+  getUserSubscriptionStatus as adminGetUserSubStatus,
 } from './admin.js';
 import { getAnalyticsSummary, getUsersChart, getRevenueChart } from './analytics.js';
 import {
@@ -977,6 +980,64 @@ app.post('/api/v1/admin/payouts/:id/reject', ...requireAdminConfirm, (req, res) 
     res.json(result);
   } catch (err) {
     console.error('[admin] rejectPayout failed:', err);
+    res.status(500).json({ ok: false, error: 'INTERNAL_ERROR' });
+  }
+});
+
+// ─── admin: subscription management (grant/revoke) ──────────────────────
+// Админ может бесплатно выдать подписку (для тестов, инфлюенсеров, рефаунда)
+// или отобрать (нарушение TOS, рефаунд). Все операции — audit-logged.
+
+// GET текущее состояние подписки юзера. Read-only — обычный requireAdmin.
+app.get('/api/v1/admin/users/:id/subscription', ...requireAdmin, (req, res) => {
+  const targetId = Number(req.params.id);
+  if (!Number.isFinite(targetId)) return res.status(400).json({ ok: false, error: 'BAD_ID' });
+  try {
+    const result = adminGetUserSubStatus({ db, targetUserId: targetId });
+    if (!result.ok) return res.status(404).json(result);
+    res.json(result);
+  } catch (err) {
+    console.error('[admin] getUserSubStatus failed:', err);
+    res.status(500).json({ ok: false, error: 'INTERNAL_ERROR' });
+  }
+});
+
+// POST выдать подписку. Destructive → requireAdminConfirm (fresh auth + X-Confirm-Action).
+app.post('/api/v1/admin/users/:id/grant-subscription', ...requireAdminConfirm, (req, res) => {
+  const targetId = Number(req.params.id);
+  if (!Number.isFinite(targetId)) return res.status(400).json({ ok: false, error: 'BAD_ID' });
+  try {
+    const { plan, duration_days } = req.body || {};
+    const result = adminGrantSubscription({
+      db,
+      ...adminContext(req),
+      targetUserId: targetId,
+      plan,
+      durationDays: duration_days !== undefined ? Number(duration_days) : undefined,
+    });
+    if (!result.ok) return res.status(400).json(result);
+    res.json(result);
+  } catch (err) {
+    console.error('[admin] grantSubscription failed:', err);
+    res.status(500).json({ ok: false, error: 'INTERNAL_ERROR' });
+  }
+});
+
+// POST отобрать активную подписку и/или Day Pass.
+app.post('/api/v1/admin/users/:id/revoke-subscription', ...requireAdminConfirm, (req, res) => {
+  const targetId = Number(req.params.id);
+  if (!Number.isFinite(targetId)) return res.status(400).json({ ok: false, error: 'BAD_ID' });
+  try {
+    const result = adminRevokeSubscription({
+      db,
+      ...adminContext(req),
+      targetUserId: targetId,
+      reason: req.body?.reason,
+    });
+    if (!result.ok) return res.status(400).json(result);
+    res.json(result);
+  } catch (err) {
+    console.error('[admin] revokeSubscription failed:', err);
     res.status(500).json({ ok: false, error: 'INTERNAL_ERROR' });
   }
 });

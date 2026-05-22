@@ -560,6 +560,63 @@ export function adminRejectPayout(id: number, reason: string): Promise<{ ok: tru
   return fetchAuthedConfirm(`/admin/payouts/${id}/reject`, { method: 'POST', jsonBody: { reason } })
 }
 
+// ─── Admin: subscription grant/revoke ───────────────────────────────────
+
+export interface AdminUserSubscriptionStatus {
+  telegram_user_id: number
+  first_name: string
+  last_name: string | null
+  username: string | null
+}
+
+export interface AdminSubscriptionInfo {
+  plan: string
+  started_at: number
+  expires_at: number
+  source: string
+  auto_renew: 0 | 1
+}
+
+export interface AdminDayPassInfo {
+  purchased_at: number
+  expires_at: number
+  source: string
+}
+
+/** Возвращает текущий статус подписки/DP юзера (для admin UI). */
+export function adminGetUserSubscription(
+  telegramUserId: number,
+): Promise<{
+  ok: true
+  user: AdminUserSubscriptionStatus
+  subscription: AdminSubscriptionInfo | null
+  day_pass: AdminDayPassInfo | null
+}> {
+  return fetchAuthed(`/admin/users/${telegramUserId}/subscription`)
+}
+
+/** Выдать подписку бесплатно (basic/premium/day_pass). duration_days опционально. */
+export function adminGrantSubscription(
+  telegramUserId: number,
+  body: { plan: 'basic_month' | 'premium_month' | 'day_pass'; duration_days?: number },
+): Promise<{ ok: true; plan: string; expires_at: number; duration_days: number }> {
+  return fetchAuthedConfirm(`/admin/users/${telegramUserId}/grant-subscription`, {
+    method: 'POST',
+    jsonBody: body,
+  })
+}
+
+/** Отозвать активную подписку и/или DP. */
+export function adminRevokeSubscription(
+  telegramUserId: number,
+  reason?: string,
+): Promise<{ ok: true; subscriptions_cancelled: number; day_passes_expired: number }> {
+  return fetchAuthedConfirm(`/admin/users/${telegramUserId}/revoke-subscription`, {
+    method: 'POST',
+    jsonBody: reason ? { reason } : {},
+  })
+}
+
 // ─── Partner API ────────────────────────────────────────────────────────
 
 export interface PartnerSummary {

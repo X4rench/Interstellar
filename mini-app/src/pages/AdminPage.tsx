@@ -25,6 +25,9 @@ import {
   adminUpdateCharacter,
   adminDeleteCharacter,
   adminUploadCharacterPhoto,
+  adminGetUserSubscription,
+  adminGrantSubscription,
+  adminRevokeSubscription,
   getBackendRoot,
   type AdminPartner,
   type AdminPayout,
@@ -33,6 +36,9 @@ import {
   type ChartPoint,
   type BroadcastRecord,
   type DbCharacter,
+  type AdminUserSubscriptionStatus,
+  type AdminSubscriptionInfo,
+  type AdminDayPassInfo,
   ApiError,
 } from '../utils/api'
 import { BackIcon } from '../icons'
@@ -40,7 +46,7 @@ import { appAlert, appConfirm, appPrompt } from '../components/AppDialogs'
 
 import styles from './AdminPage.module.css'
 
-type Tab = 'partners' | 'payouts' | 'audit' | 'analytics' | 'broadcast' | 'characters'
+type Tab = 'partners' | 'payouts' | 'audit' | 'analytics' | 'broadcast' | 'characters' | 'subscriptions'
 type PayoutStatus = AdminPayout['status'] | 'all'
 
 function fmtDate(ts: number | null) {
@@ -109,6 +115,37 @@ export function AdminPage() {
       }
     } finally {
       setPartnersLoading(false)
+    }
+  }, [])
+
+  // ── Subscriptions (admin grant/revoke)
+  // userIdInput — что юзер набирает (string чтобы хранить промежуточный пустой ввод).
+  // subResult — последний загруженный статус юзера или null.
+  const [userIdInput, setUserIdInput] = useState('')
+  const [subQueryLoading, setSubQueryLoading] = useState(false)
+  const [subResult, setSubResult] = useState<{
+    user: AdminUserSubscriptionStatus
+    subscription: AdminSubscriptionInfo | null
+    day_pass: AdminDayPassInfo | null
+  } | null>(null)
+  const [subError, setSubError] = useState<string | null>(null)
+  const [subBusy, setSubBusy] = useState(false)
+  // Кастомный duration для grant — если 0, используется дефолт (30 дней для подписки, 1 для DP).
+  const [grantDurationDays, setGrantDurationDays] = useState<number>(0)
+
+  const loadSubStatus = useCallback(async (uid: number) => {
+    setSubQueryLoading(true)
+    setSubError(null)
+    setSubResult(null)
+    try {
+      const res = await adminGetUserSubscription(uid)
+      setSubResult({ user: res.user, subscription: res.subscription, day_pass: res.day_pass })
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403) setForbidden(true)
+      else if (err instanceof ApiError && err.status === 404) setSubError('Юзер не найден. Проверь Telegram ID — юзер должен хоть раз зайти в приложение.')
+      else setSubError(err instanceof Error ? err.message : 'Не удалось загрузить')
+    } finally {
+      setSubQueryLoading(false)
     }
   }, [])
 
@@ -333,6 +370,12 @@ export function AdminPage() {
           onClick={() => setTab('characters')}
         >
           🎭 Персонажи
+        </button>
+        <button
+          className={`${styles.tab} ${tab === 'subscriptions' ? styles.tabOn : ''}`}
+          onClick={() => setTab('subscriptions')}
+        >
+          🎟 Подписки
         </button>
         <button
           className={`${styles.tab} ${tab === 'partners' ? styles.tabOn : ''}`}
@@ -562,6 +605,198 @@ export function AdminPage() {
                 </div>
               ))}
             </div>
+          </>
+        )}
+
+        {tab === 'subscriptions' && (
+          <>
+            <p className={styles.emptyText} style={{ marginBottom: 12, color: '#888' }}>
+              Выдай или отбери подписку у юзера по Telegram ID. Юзер должен хоть раз зайти в Mini App.
+            </p>
+
+            {/* Поиск юзера */}
+            <div className={styles.actionRow}>
+              <input
+                value={userIdInput}
+                onChange={(e) => setUserIdInput(e.target.value.replace(/[^\d]/g, ''))}
+                placeholder="Telegram ID (например 123456789)"
+                inputMode="numeric"
+                style={{
+                  flex: 1,
+                  background: '#0c0c0c',
+                  border: '1px solid #232323',
+                  borderRadius: 10,
+                  padding: '10px 14px',
+                  color: '#fff',
+                  fontSize: 14,
+                  fontFamily: 'inherit',
+                }}
+              />
+              <button
+                className={styles.actionBtn}
+                disabled={subQueryLoading || !userIdInput}
+                onClick={() => {
+                  const uid = Number(userIdInput)
+                  if (Number.isFinite(uid) && uid > 0) void loadSubStatus(uid)
+                }}
+              >
+                {subQueryLoading ? 'Ищем…' : 'Найти'}
+              </button>
+            </div>
+
+            {subError && <div className={styles.errorBox}>{subError}</div>}
+
+            {subResult && (
+              <div className={styles.card} style={{ marginTop: 12 }}>
+                <div className={styles.cardHeader}>
+                  <div>
+                    <p className={styles.cardTitle}>
+                      {subResult.user.first_name}
+                      {subResult.user.last_name ? ` ${subResult.user.last_name}` : ''}
+                      {subResult.user.username && (
+                        <span style={{ fontWeight: 400, color: '#888', marginLeft: 6 }}>
+                          @{subResult.user.username}
+                        </span>
+                      )}
+                    </p>
+                    <p className={styles.cardSubtitle}>
+                      Telegram ID: <code>{subResult.user.telegram_user_id}</code>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Текущее состояние */}
+                <div style={{ padding: '12px 16px', borderTop: '1px solid #1a1a1a' }}>
+                  <p style={{ margin: '0 0 6px', fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Текущая подписка
+                  </p>
+                  {subResult.subscription ? (
+                    <p style={{ margin: 0, fontSize: 13, color: '#fff' }}>
+                      <b>{subResult.subscription.plan === 'premium_month' ? 'Premium' : 'Basic'}</b>
+                      {' '}· до {fmtDate(subResult.subscription.expires_at)}
+                      {' '}· source: <code style={{ color: '#7c5cff' }}>{subResult.subscription.source}</code>
+                    </p>
+                  ) : (
+                    <p style={{ margin: 0, fontSize: 13, color: '#666' }}>Нет активной подписки (Free)</p>
+                  )}
+
+                  <p style={{ margin: '10px 0 6px', fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Day Pass
+                  </p>
+                  {subResult.day_pass ? (
+                    <p style={{ margin: 0, fontSize: 13, color: '#fff' }}>
+                      Активен · до {fmtDate(subResult.day_pass.expires_at)}
+                      {' '}· source: <code style={{ color: '#7c5cff' }}>{subResult.day_pass.source}</code>
+                    </p>
+                  ) : (
+                    <p style={{ margin: 0, fontSize: 13, color: '#666' }}>Нет активного Day Pass</p>
+                  )}
+                </div>
+
+                {/* Управление длительностью для grant */}
+                <div style={{ padding: '12px 16px', borderTop: '1px solid #1a1a1a' }}>
+                  <p style={{ margin: '0 0 8px', fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Длительность (дней)
+                  </p>
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+                    {[0, 1, 7, 30, 90, 365].map((d) => (
+                      <button
+                        key={d}
+                        onClick={() => setGrantDurationDays(d)}
+                        style={{
+                          flex: 1,
+                          padding: '6px 4px',
+                          background: grantDurationDays === d ? 'linear-gradient(135deg, #7c5cff, #ff5cdb)' : '#1a1a1a',
+                          color: grantDurationDays === d ? '#fff' : '#aaa',
+                          border: 0,
+                          borderRadius: 6,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          fontFamily: 'inherit',
+                        }}
+                      >
+                        {d === 0 ? 'Дефолт' : `${d}д`}
+                      </button>
+                    ))}
+                  </div>
+                  <p style={{ margin: '4px 0 0', fontSize: 10, color: '#666' }}>
+                    "Дефолт" = 30 дней для подписки, 1 для Day Pass.
+                  </p>
+                </div>
+
+                {/* Кнопки grant/revoke */}
+                <div className={styles.cardActions} style={{ flexWrap: 'wrap' }}>
+                  {(['basic_month', 'premium_month', 'day_pass'] as const).map((plan) => {
+                    const label = plan === 'basic_month' ? 'Выдать Basic' : plan === 'premium_month' ? 'Выдать Premium' : 'Выдать Day Pass'
+                    return (
+                      <button
+                        key={plan}
+                        className={`${styles.smallBtn} ${styles.smallBtnPrimary}`}
+                        disabled={subBusy}
+                        onClick={async () => {
+                          const ok = await appConfirm({
+                            title: `${label}?`,
+                            message: `Юзеру #${subResult.user.telegram_user_id} (${subResult.user.first_name}) будет выдан тариф ${plan}${grantDurationDays > 0 ? ` на ${grantDurationDays} дней` : ' на дефолтный срок'}. Активная подписка (если есть) будет отменена.`,
+                            confirmLabel: 'Выдать',
+                          })
+                          if (!ok) return
+                          setSubBusy(true)
+                          try {
+                            await adminGrantSubscription(subResult.user.telegram_user_id, {
+                              plan,
+                              duration_days: grantDurationDays > 0 ? grantDurationDays : undefined,
+                            })
+                            await appAlert({ title: 'Готово', message: `${label} ✓` })
+                            await loadSubStatus(subResult.user.telegram_user_id)
+                          } catch (err) {
+                            await appAlert({ title: 'Ошибка', message: (err as Error).message })
+                          } finally {
+                            setSubBusy(false)
+                          }
+                        }}
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
+
+                  {(subResult.subscription || subResult.day_pass) && (
+                    <button
+                      className={`${styles.smallBtn} ${styles.smallBtnDanger}`}
+                      disabled={subBusy}
+                      onClick={async () => {
+                        const reason = await appPrompt({
+                          title: 'Отозвать подписку?',
+                          message: `Активная подписка и Day Pass юзера #${subResult.user.telegram_user_id} будут немедленно прекращены. Юзеру придёт уведомление.`,
+                          placeholder: 'Причина (опционально)',
+                          confirmLabel: 'Отозвать',
+                        })
+                        if (reason === null) return // отмена
+                        setSubBusy(true)
+                        try {
+                          const res = await adminRevokeSubscription(
+                            subResult.user.telegram_user_id,
+                            reason || undefined,
+                          )
+                          await appAlert({
+                            title: 'Готово',
+                            message: `Отозвано: подписок ${res.subscriptions_cancelled}, day pass ${res.day_passes_expired}`,
+                          })
+                          await loadSubStatus(subResult.user.telegram_user_id)
+                        } catch (err) {
+                          await appAlert({ title: 'Ошибка', message: (err as Error).message })
+                        } finally {
+                          setSubBusy(false)
+                        }
+                      }}
+                    >
+                      Отозвать всё
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </>
         )}
 
