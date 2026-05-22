@@ -198,6 +198,17 @@ export function PaywallPage() {
     }
   }, [])
 
+  // Блокируем scroll body когда пейволл смонтирован — без этого был
+  // double-scroll (две полосы прокрутки) и юзер мог докрутить страницу
+  // под модалкой, видя затемнённый Profile сверху.
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prevOverflow
+    }
+  }, [])
+
   // Когда юзер вернулся из внешнего браузера (YK) не заплатив — останавливаем
   // поллинг и сбрасываем в idle. Без этого setPollCount каждые 2с держит
   // paywall в состоянии 'paying', вызывает частые setState и мигание.

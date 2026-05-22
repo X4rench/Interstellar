@@ -4,20 +4,26 @@
   background: rgba(0, 0, 0, 0.85);
   z-index: 100;
   display: flex;
-  align-items: flex-end;
+  align-items: stretch;
   justify-content: center;
+  /* overflow:hidden — чтобы оверлей не давал scroll'у проваливаться
+     на body, когда юзер дотягивает sheet до края. */
+  overflow: hidden;
 }
 
 .sheet {
   width: 100%;
   max-width: 480px;
   background: #000;
-  border-radius: 24px 24px 0 0;
-  max-height: 95dvh;
+  /* Раньше был bottom-sheet с border-radius 24px и max-height 95dvh —
+     из-за этого сверху проглядывал затемнённый Profile. Теперь модалка
+     fullscreen и нет double-scroll. */
+  height: 100dvh;
   overflow-y: auto;
   position: relative;
   -webkit-overflow-scrolling: touch;
   padding-bottom: calc(24px + var(--safe-bottom));
+  padding-top: var(--safe-top, 0);
 }
 
 .closeBtn {
