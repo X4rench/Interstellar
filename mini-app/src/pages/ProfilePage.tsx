@@ -472,8 +472,29 @@ export function ProfilePage() {
           <div style={{ flex: 1, minWidth: 0 }}>
             <p className={styles.userName}>{displayName}</p>
             <p className={styles.userHandle}>{handle}</p>
-            {tierLabel && <span className={styles.proPill}>{tierLabel}</span>}
-            {dayPassActive && <span className={styles.proPill} style={{ marginLeft: 6 }}>+ DAY PASS</span>}
+            {/* Премиум-стиль pill'а: тёмная подложка + glow + градиентный текст.
+                Звезда для Premium, ромб для Basic, билет для Day Pass. */}
+            {tier === 'premium' && (
+              <span className={`${styles.tierPill} ${styles.tierPillPremium}`}>
+                <span className={styles.tierPillIcon}>★</span>
+                <span className={styles.tierPillText}>Premium</span>
+              </span>
+            )}
+            {tier === 'basic' && (
+              <span className={`${styles.tierPill} ${styles.tierPillBasic}`}>
+                <span className={styles.tierPillIcon}>◆</span>
+                <span className={styles.tierPillText}>Basic</span>
+              </span>
+            )}
+            {dayPassActive && (
+              <span
+                className={`${styles.tierPill} ${styles.tierPillDayPass}`}
+                style={{ marginLeft: tierLabel ? 6 : 0 }}
+              >
+                <span className={styles.tierPillIcon}>🎟</span>
+                <span className={styles.tierPillText}>Day Pass</span>
+              </span>
+            )}
           </div>
         </div>
 

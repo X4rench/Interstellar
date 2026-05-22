@@ -60,6 +60,88 @@
   margin: 0;
 }
 
+/* ─── Tier-индикатор у имени юзера ─────────────────────────────────────
+ * Был: яркий solid-gradient pill (как stock-badge). Стало: космический
+ * стиль под тему приложения — тёмная подложка, градиентный текст,
+ * подсветка-glow, ⋆-знак. У каждого тира свой акцент:
+ *   Premium  → ярче, золотисто-лиловый, с glow и звездой
+ *   Basic    → тише, лавандовый, без glow, с ромбом
+ *   Day Pass → розоватый, с билетом
+ */
+.tierPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 999px;
+  padding: 3px 10px 3px 8px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.7px;
+  margin-top: 6px;
+  font-family: inherit;
+  text-transform: uppercase;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.tierPillIcon {
+  font-size: 11px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ── PREMIUM — premium-look: glow, рамка ярче, gradient text */
+.tierPillPremium {
+  background: linear-gradient(135deg, rgba(124, 92, 255, 0.18) 0%, rgba(255, 92, 219, 0.12) 100%);
+  border: 1px solid rgba(124, 92, 255, 0.5);
+  box-shadow:
+    0 0 14px rgba(124, 92, 255, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.tierPillPremium .tierPillText {
+  background: linear-gradient(135deg, #e0d3ff 0%, #ffc8f0 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 12px rgba(255, 200, 240, 0.3);
+}
+
+.tierPillPremium .tierPillIcon {
+  color: #ffb8ee;
+  filter: drop-shadow(0 0 4px rgba(255, 92, 219, 0.7));
+}
+
+/* ── BASIC — приглушённый лавандовый, без glow */
+.tierPillBasic {
+  background: rgba(124, 92, 255, 0.1);
+  border: 1px solid rgba(124, 92, 255, 0.3);
+}
+
+.tierPillBasic .tierPillText {
+  color: #c9b8ff;
+}
+
+.tierPillBasic .tierPillIcon {
+  color: #a89cd8;
+}
+
+/* ── DAY PASS — розоватый акцент, отличается от sub-badge */
+.tierPillDayPass {
+  background: rgba(255, 92, 219, 0.1);
+  border: 1px solid rgba(255, 92, 219, 0.3);
+}
+
+.tierPillDayPass .tierPillText {
+  color: #ff9ee6;
+}
+
+.tierPillDayPass .tierPillIcon {
+  font-size: 10px;
+}
+
+/* Legacy alias — старый класс на случай если где-то используется. */
 .proPill {
   display: inline-block;
   background: linear-gradient(135deg, #7c5cff, #ff5cdb);
