@@ -522,7 +522,11 @@ export function ProfilePage() {
               <p style={{ margin: '2px 0 0', fontSize: 11, color: '#aa6666', lineHeight: 1.3 }}>
                 {subscriptionError === 'INVALID_INIT_DATA' || subscriptionError === 'BAD_INIT_DATA'
                   ? 'Сессия устарела — закрой и переоткрой бота'
-                  : 'Проверь подключение к сети'}
+                  : subscriptionError === 'TIMEOUT'
+                    ? 'Сервер не отвечает. Попробуй через минуту.'
+                    : subscriptionError === 'NETWORK'
+                      ? 'Нет связи с сервером. Проверь интернет и попробуй ещё раз.'
+                      : 'Не удалось получить данные. Попробуй ещё раз.'}
               </p>
             </div>
             <button

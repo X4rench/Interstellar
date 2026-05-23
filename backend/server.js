@@ -307,56 +307,92 @@ app.post('/api/v1/auth/validate-init-data', requireAuth, (req, res) => {
 
 // ─── users: profile + subscription + role + tier ─────────────────────────
 app.get('/api/v1/users/me', requireAuth, roleLoader, (req, res) => {
-  const u = req.tgUser;
+  // Без try/catch было: любой throw из upsertUser/getActiveSubscription/etc
+  // → 500 без логирования → фронт показывает "нет интернета".
+  // Теперь — ловим, логируем, отдаём пустой профиль чтобы юзер хоть как-то
+  // мог пользоваться приложением (free-tier как fallback).
+  try {
+    const u = req.tgUser;
 
-  // Upsert юзера + регистрация атрибуции (если start_param впервые).
-  const { newPartnerReferral } = upsertUser(db, u);
-  if (newPartnerReferral) {
-    const { partnerUserId, firstName, username } = newPartnerReferral;
-    const displayName = username ? `@${escapeHtml(username)}` : escapeHtml(firstName || 'пользователь');
-    sendMessage({ chatId: partnerUserId, text: `👤 У вас новый реферал: ${displayName}` });
+    // Upsert юзера + регистрация атрибуции (если start_param впервые).
+    const { newPartnerReferral } = upsertUser(db, u);
+    if (newPartnerReferral) {
+      const { partnerUserId, firstName, username } = newPartnerReferral;
+      const displayName = username ? `@${escapeHtml(username)}` : escapeHtml(firstName || 'пользователь');
+      sendMessage({ chatId: partnerUserId, text: `👤 У вас новый реферал: ${displayName}` });
+    }
+
+    const subscription = getActiveSubscription(db, u.telegram_user_id);
+    const tier = getUserTier(db, u.telegram_user_id);
+    const dayPassActive = hasActiveDayPass(db, u.telegram_user_id);
+    // Для free-юзеров — сколько осталось lifetime-сообщений (для UI индикатора).
+    // Для платных не имеет смысла, но всё равно отдаём (frontend сам решит).
+    const freeMessagesRemaining = getFreeMessagesRemaining(db, u.telegram_user_id);
+
+    const partnerPublic = req.partner
+      ? {
+          blogger_slug: req.partner.blogger_slug,
+          revenue_share_bps: req.partner.revenue_share_bps,
+          pii_provided: req.partner.pii_provided === 1,
+        }
+      : null;
+
+    res.json({
+      ok: true,
+      user: {
+        telegram_user_id: u.telegram_user_id,
+        username: u.username,
+        first_name: u.first_name,
+        last_name: u.last_name,
+        language_code: u.language_code,
+        photo_url: u.photo_url,
+      },
+      subscription, // null если нет активной
+      // Tier-info: фронт использует для feature-gates (NSFW = premium, etc).
+      tier,                             // 'free' | 'basic' | 'premium'
+      day_pass_active: dayPassActive,
+      // One-shot Free: сколько у юзера осталось бесплатных сообщений.
+      // Имеет смысл только для tier='free'. Frontend показывает индикатор.
+      free_messages_remaining: freeMessagesRemaining,
+      free_messages_lifetime: FREE_LIFETIME_MESSAGES,
+      role: req.role,                   // 'admin' | 'partner' | 'regular'
+      partner: partnerPublic,           // null если не partner
+      bot: {
+        username: process.env.BOT_USERNAME || null,
+        app_name: process.env.BOT_APP_NAME || 'app',
+      },
+    });
+  } catch (err) {
+    // Логируем полную ошибку для диагностики на сервере.
+    console.error('[users/me] handler failed:', err?.stack || err);
+    // Возвращаем 200 с дефолтным free-профилем чтобы фронт мог продолжить
+    // работу (приложение не белым экраном). В payload — error-flag для
+    // отладки + Sentry на фронте может это поймать.
+    res.json({
+      ok: true,
+      user: {
+        telegram_user_id: req.tgUser.telegram_user_id,
+        username: req.tgUser.username,
+        first_name: req.tgUser.first_name,
+        last_name: req.tgUser.last_name,
+        language_code: req.tgUser.language_code,
+        photo_url: req.tgUser.photo_url,
+      },
+      subscription: null,
+      tier: 'free',
+      day_pass_active: false,
+      free_messages_remaining: FREE_LIFETIME_MESSAGES,
+      free_messages_lifetime: FREE_LIFETIME_MESSAGES,
+      role: 'regular',
+      partner: null,
+      bot: {
+        username: process.env.BOT_USERNAME || null,
+        app_name: process.env.BOT_APP_NAME || 'app',
+      },
+      // Soft-error: фронт видит что что-то пошло не так, но не сломался.
+      _server_error: 'PROFILE_PARTIAL',
+    });
   }
-
-  const subscription = getActiveSubscription(db, u.telegram_user_id);
-  const tier = getUserTier(db, u.telegram_user_id);
-  const dayPassActive = hasActiveDayPass(db, u.telegram_user_id);
-  // Для free-юзеров — сколько осталось lifetime-сообщений (для UI индикатора).
-  // Для платных не имеет смысла, но всё равно отдаём (frontend сам решит).
-  const freeMessagesRemaining = getFreeMessagesRemaining(db, u.telegram_user_id);
-
-  const partnerPublic = req.partner
-    ? {
-        blogger_slug: req.partner.blogger_slug,
-        revenue_share_bps: req.partner.revenue_share_bps,
-        pii_provided: req.partner.pii_provided === 1,
-      }
-    : null;
-
-  res.json({
-    ok: true,
-    user: {
-      telegram_user_id: u.telegram_user_id,
-      username: u.username,
-      first_name: u.first_name,
-      last_name: u.last_name,
-      language_code: u.language_code,
-      photo_url: u.photo_url,
-    },
-    subscription, // null если нет активной
-    // Tier-info: фронт использует для feature-gates (NSFW = premium, etc).
-    tier,                             // 'free' | 'basic' | 'premium'
-    day_pass_active: dayPassActive,
-    // One-shot Free: сколько у юзера осталось бесплатных сообщений.
-    // Имеет смысл только для tier='free'. Frontend показывает индикатор.
-    free_messages_remaining: freeMessagesRemaining,
-    free_messages_lifetime: FREE_LIFETIME_MESSAGES,
-    role: req.role,                   // 'admin' | 'partner' | 'regular'
-    partner: partnerPublic,           // null если не partner
-    bot: {
-      username: process.env.BOT_USERNAME || null,
-      app_name: process.env.BOT_APP_NAME || 'app',
-    },
-  });
 });
 
 // ─── referral: код и статистика ──────────────────────────────────────────

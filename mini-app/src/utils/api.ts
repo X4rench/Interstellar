@@ -23,8 +23,42 @@ export class ApiError extends Error {
  * Если initData ещё не восстановлен (SDK не успел инициализироваться) —
  * бросает ApiError(0, 'NO_INIT_DATA'). Это редкий race; в нормальном flow
  * initApp() блокирует render до завершения init.
+ *
+ * Авто-ретрай для GET: при сетевой ошибке / 5xx делаем до 2 повторов с
+ * экспоненциальным backoff (400ms, 1200ms). Это сглаживает кратковременные
+ * проблемы у пользователей с нестабильной сетью (РФ + мобильные сети).
  */
 export async function fetchAuthed<T>(path: string, init?: RequestInit): Promise<T> {
+  const method = (init?.method || 'GET').toUpperCase()
+  // Ретраим только идемпотентные запросы (GET). POST/PATCH/DELETE — слишком
+  // рискованно (можем удвоить операцию). Максимум 2 ретрая = 3 попытки всего.
+  const maxAttempts = method === 'GET' ? 3 : 1
+  let lastErr: unknown
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      return await fetchAuthedOnce<T>(path, init)
+    } catch (err) {
+      lastErr = err
+      // Ретраим только сетевые ошибки и 5xx. Auth/403/4xx — финальные.
+      const shouldRetry =
+        err instanceof ApiError
+          ? err.status === 0 || (err.status >= 500 && err.status < 600)
+          : true // не ApiError = сетевая ошибка / abort
+      if (!shouldRetry || attempt === maxAttempts - 1) break
+      // 400ms, 1200ms — экспоненциальный backoff с лёгким jitter.
+      const delay = 400 * Math.pow(3, attempt) + Math.random() * 200
+      await new Promise((r) => setTimeout(r, delay))
+    }
+  }
+
+  throw lastErr
+}
+
+/**
+ * Одна попытка запроса. Используется внутри fetchAuthed для ретраев.
+ */
+async function fetchAuthedOnce<T>(path: string, init?: RequestInit): Promise<T> {
   const raw = initData.raw()
   if (!raw) throw new ApiError(0, 'NO_INIT_DATA')
 
@@ -57,6 +91,17 @@ export async function fetchAuthed<T>(path: string, init?: RequestInit): Promise<
     }
 
     return data as T
+  } catch (err) {
+    // AbortError (timeout) → удобный код для UI.
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new ApiError(0, 'TIMEOUT')
+    }
+    // TypeError = fetch failed (DNS, CORS, offline). Конвертируем чтобы
+    // ретрай-логика выше могла её распознать.
+    if (err instanceof TypeError) {
+      throw new ApiError(0, 'NETWORK')
+    }
+    throw err
   } finally {
     clearTimeout(timer)
   }
