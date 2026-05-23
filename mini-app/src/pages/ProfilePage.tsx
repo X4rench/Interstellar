@@ -384,6 +384,153 @@ function ReferralBlock() {
   )
 }
 
+// ─── Self-info секция (имя/пол/возраст) ──────────────────────────────────
+
+import type { UserProfile } from '../context/AppContext'
+
+/**
+ * Блок «О тебе» — юзер вводит имя/пол/возраст, эти данные шлются с каждым
+ * chat-запросом и LLM учитывает их при общении.
+ *
+ * Поля опциональны. Сохранение по onBlur (текстовые) или сразу (пол).
+ */
+function UserSelfInfoSection({
+  profile,
+  onChange,
+}: {
+  profile: UserProfile
+  onChange: (p: UserProfile) => void
+}) {
+  // Локальные state'ы — чтобы не дёргать onChange (а значит localStorage)
+  // на каждое нажатие клавиши. Сохраняем по blur и при смене пола.
+  const [name, setName] = useState(profile.name ?? '')
+  const [age, setAge] = useState<string>(profile.age ? String(profile.age) : '')
+
+  const persistName = () => {
+    const trimmed = name.trim().slice(0, 40)
+    if (trimmed !== (profile.name ?? '')) onChange({ name: trimmed || undefined })
+  }
+  const persistAge = () => {
+    const n = parseInt(age, 10)
+    const valid = Number.isFinite(n) && n >= 1 && n <= 120 ? n : undefined
+    if (valid !== profile.age) onChange({ age: valid })
+  }
+
+  return (
+    <div className={styles.section}>
+      <h3 className={styles.sectionTitle}>О тебе</h3>
+      <p style={{ margin: '0 20px 12px', fontSize: 12, color: '#888', lineHeight: 1.4 }}>
+        Эти данные помогут персонажам общаться естественнее — они будут учитывать твой пол, возраст и иногда обращаться по имени. Всё опционально.
+      </p>
+
+      <div
+        style={{
+          margin: '0 20px',
+          padding: '14px 16px',
+          background: '#131313',
+          border: '1px solid #232323',
+          borderRadius: 14,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 14,
+        }}
+      >
+        {/* Имя */}
+        <div>
+          <label style={{ display: 'block', fontSize: 11, color: '#888', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+            Имя
+          </label>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={persistName}
+            placeholder="Как к тебе обращаться"
+            maxLength={40}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              background: '#0c0c0c',
+              border: '1px solid #2a2a2a',
+              borderRadius: 10,
+              color: '#fff',
+              fontSize: 14,
+              fontFamily: 'inherit',
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
+        </div>
+
+        {/* Пол */}
+        <div>
+          <label style={{ display: 'block', fontSize: 11, color: '#888', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+            Пол
+          </label>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {([
+              { val: 'male' as const, lbl: 'Мужской' },
+              { val: 'female' as const, lbl: 'Женский' },
+              { val: 'other' as const, lbl: 'Другой' },
+            ]).map((opt) => {
+              const active = profile.gender === opt.val
+              return (
+                <button
+                  key={opt.val}
+                  onClick={() =>
+                    onChange({ gender: active ? undefined : opt.val })
+                  }
+                  style={{
+                    flex: 1,
+                    padding: '8px 4px',
+                    background: active
+                      ? 'linear-gradient(135deg, #7c5cff, #ff5cdb)'
+                      : '#1a1a1a',
+                    color: active ? '#fff' : '#aaa',
+                    border: 0,
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {opt.lbl}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Возраст */}
+        <div>
+          <label style={{ display: 'block', fontSize: 11, color: '#888', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+            Возраст
+          </label>
+          <input
+            value={age}
+            onChange={(e) => setAge(e.target.value.replace(/[^\d]/g, '').slice(0, 3))}
+            onBlur={persistAge}
+            placeholder="Например 24"
+            inputMode="numeric"
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              background: '#0c0c0c',
+              border: '1px solid #2a2a2a',
+              borderRadius: 10,
+              color: '#fff',
+              fontSize: 14,
+              fontFamily: 'inherit',
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function ProfilePage() {
@@ -399,6 +546,7 @@ export function ProfilePage() {
     refreshSubscription, subscriptionLoading, subscriptionError,
     isAdmin, isPartner, partnerInfo,
     favorites, setLibraryFilter,
+    userProfile, setUserProfile,
   } = useApp()
 
   // Лейбл и цвет для tier-badge в шапке.
@@ -977,6 +1125,15 @@ export function ProfilePage() {
             )}
           </div>
         </div>
+
+        {/* О тебе — self-info для immersion в чате.
+            Юзер заполняет имя/пол/возраст → инфа шлётся в каждый chat-запрос →
+            LLM знает с кем говорит и иногда обращается по имени. Все поля
+            опциональны: незаполненные просто не передаются. */}
+        <UserSelfInfoSection
+          profile={userProfile}
+          onChange={setUserProfile}
+        />
 
         {/* Data management */}
         <div className={styles.section}>

@@ -1244,7 +1244,7 @@ app.post(
     // tier и has_day_pass передаём в history-trim ниже.
     const tier = usage.tier;
 
-  const { persona, messages } = req.body || {};
+  const { persona, messages, user_info: userInfo } = req.body || {};
 
   if (typeof persona !== 'string' || !persona.trim()) {
     return res.status(400).json({ ok: false, error: 'BAD_PERSONA' });
@@ -1259,6 +1259,33 @@ app.post(
     return res.status(400).json({ ok: false, error: 'HISTORY_TOO_LONG' });
   }
 
+  // ── Self-info юзера (необязательно) ──
+  // Юзер заполнил «о себе» в Профиле: имя/пол/возраст. Аккуратно валидируем
+  // и форматируем небольшой блок для system-prompt чтобы LLM знала с кем
+  // общается. Без user_info — старое поведение (LLM ничего не знает).
+  let userInfoBlock = '';
+  if (userInfo && typeof userInfo === 'object') {
+    const name = typeof userInfo.name === 'string' ? userInfo.name.trim().slice(0, 40) : '';
+    const gender = ['male', 'female', 'other'].includes(userInfo.gender) ? userInfo.gender : null;
+    const age = Number.isInteger(userInfo.age) && userInfo.age >= 1 && userInfo.age <= 120
+      ? userInfo.age
+      : null;
+    const parts = [];
+    if (name) parts.push(`имя ${name}`);
+    if (gender) parts.push(gender === 'male' ? 'мужской пол' : gender === 'female' ? 'женский пол' : 'пол не указан');
+    if (age) parts.push(`${age} ${age === 1 ? 'год' : age >= 2 && age <= 4 ? 'года' : 'лет'}`);
+    if (parts.length > 0) {
+      // Инструкция модели — естественно использовать инфу, НЕ перечислять её,
+      // НЕ делать темой разговора, НЕ упоминать каждый раз.
+      userInfoBlock =
+        `\n\n[Информация о собеседнике для контекста]\n` +
+        `Ты общаешься с человеком: ${parts.join(', ')}. ` +
+        `Учитывай это при общении (тональность, обращения, грамматический род). ` +
+        `Имя используй ИЗРЕДКА и только когда уместно — не в каждом сообщении. ` +
+        `Не зачитывай эту информацию вслух, не делай её темой разговора.`;
+    }
+  }
+
   // ── Sliding window: keep последние N сообщений (per-tier) ──
   // Persona всегда отправляем (кэшируется через x-grok-conv-id ниже).
   // Free: 5, Basic: 15, Premium: 30. Чем выше тир — тем глубже память.
@@ -1268,7 +1295,7 @@ app.post(
     : messages;
 
   const aiMessages = [
-    { role: 'system', content: persona },
+    { role: 'system', content: persona + userInfoBlock },
     ...trimmedMessages.map((m) => {
       const role = m?.role === 'user' ? 'user' : 'assistant';
       const content = String(m?.content ?? '').slice(0, MAX_MSG_LEN);

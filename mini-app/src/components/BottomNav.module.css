@@ -34,13 +34,16 @@
 }
 
 .addBtn {
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   background: #ffffff;
-  border-radius: 14px;
+  border-radius: 13px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: -6px;
+  /* margin-top: -6px был у "приподнятого" плюса без label. С label плюс
+     остаётся на уровне с другими иконками, чтобы текст под ним совпадал
+     по вертикали с остальными подписями. */
+  margin-top: -2px;
   box-shadow: 0 4px 8px rgba(255, 255, 255, 0.12);
 }

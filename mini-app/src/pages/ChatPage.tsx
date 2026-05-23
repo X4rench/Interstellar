@@ -81,6 +81,7 @@ export function ChatPage() {
     freeMessagesLifetime,
     openPaywall,
     refreshSubscription,
+    userProfile,
   } = useApp()
 
   const character = characters.find((c) => c.id === characterId)
@@ -167,7 +168,10 @@ export function ChatPage() {
     ]
 
     try {
-      const responseText = await apiSendMessage(persona, history)
+      // Передаём self-info юзера (имя/пол/возраст) — бэк добавит её в
+      // system-prompt чтобы LLM знала с кем говорит. Если все поля пустые
+      // — отправит undefined, бэк не будет ничего инжектить.
+      const responseText = await apiSendMessage(persona, history, userProfile)
       addMessage(character.id, {
         id: `msg_${Date.now()}_c`,
         role: 'character',

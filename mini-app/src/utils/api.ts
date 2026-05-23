@@ -117,17 +117,40 @@ export interface ChatMessage {
 }
 
 /**
+ * Self-info юзера для контекста LLM (имя/пол/возраст).
+ * Хранится локально в browser, шлётся с каждым chat-запросом.
+ * Все поля опциональные — юзер сам решает что заполнить.
+ */
+export interface ChatUserInfo {
+  name?: string
+  gender?: 'male' | 'female' | 'other'
+  age?: number
+}
+
+/**
  * Отправляет сообщение в чат. C2-fix: /chat теперь требует initData-auth
  * + rate-limit. На клиенте история живёт локально, каждый запрос шлёт
  * всю переписку целиком (stateless backend).
  *
+ * user_info — опциональная self-info юзера для immersion (бэк подмешает её
+ * в system-prompt). LLM будет иногда называть юзера по имени, понимать пол
+ * и возраст. Без user_info — старое поведение (LLM не знает кто юзер).
+ *
  * При 429 (rate limit) — ApiError кидается, UI показывает «слишком часто».
  */
-export async function sendMessage(persona: string, messages: ChatMessage[]): Promise<string> {
+export async function sendMessage(
+  persona: string,
+  messages: ChatMessage[],
+  userInfo?: ChatUserInfo,
+): Promise<string> {
   type ChatResponse = { ok: true; response: string }
+  const body: Record<string, unknown> = { persona, messages }
+  if (userInfo && (userInfo.name || userInfo.gender || userInfo.age)) {
+    body.user_info = userInfo
+  }
   const data = await fetchAuthed<ChatResponse>('/chat', {
     method: 'POST',
-    body: JSON.stringify({ persona, messages }),
+    body: JSON.stringify(body),
   })
   if (typeof data?.response !== 'string' || !data.response.trim()) {
     throw new ApiError(502, 'EMPTY_RESPONSE')

@@ -62,10 +62,29 @@ const LS_CUSTOM_CHARS = 'customCharacters_v1'
 const LS_FAVORITES = 'favorites_v1'
 const LS_MOODS = 'character_moods_v1'
 const LS_LIBRARY_FILTER = 'library_filter_v1'
+// Self-info юзера (имя/пол/возраст) — храним локально, шлём в chat-запросах
+// чтобы LLM знала с кем говорит. На бэке не дублируем (TG-уровень PII уже
+// есть, а это юзер-задаваемая дополнительная инфа для immersion).
+const LS_USER_PROFILE = 'user_profile_v1'
 
 // ─── Context shape ───────────────────────────────────────────────────────
 
 export type UserRole = 'admin' | 'partner' | 'regular'
+
+/**
+ * Self-info юзера. Все поля опциональны — юзер сам решает что заполнить.
+ * Используется только для контекста LLM при чате (передаётся в /chat).
+ *
+ * Не путать с TG-профилем (first_name/username из initData) — это
+ * информация которую юзер вручную ввёл «о себе» (например другое имя
+ * по которому хочет чтобы его называли, пол для правильных склонений,
+ * возраст для адекватной тональности).
+ */
+export interface UserProfile {
+  name?: string
+  gender?: 'male' | 'female' | 'other'
+  age?: number
+}
 
 export interface PartnerPublicInfo {
   blogger_slug: string
@@ -129,6 +148,11 @@ interface AppContextValue {
   subscriptionLoading: boolean
   /** Сообщение об ошибке /users/me, если бэк недоступен или 401. */
   subscriptionError: string | null
+
+  // Self-info юзера для immersion в чате (имя/пол/возраст).
+  // Хранится в localStorage, шлётся с каждым chat-запросом.
+  userProfile: UserProfile
+  setUserProfile: (p: UserProfile) => void
 
   // Paywall.
   paywallReason: PaywallReason | null
@@ -214,6 +238,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const raw = loadJSON<'all' | 'mine' | 'favorites'>(LS_LIBRARY_FILTER, 'all')
     return raw === 'mine' || raw === 'favorites' ? raw : 'all'
   })
+  // Self-info юзера. По умолчанию пустой объект — юзер сам заполнит в Профиле.
+  const [userProfile, setUserProfileState] = useState<UserProfile>(() =>
+    loadJSON<UserProfile>(LS_USER_PROFILE, {}),
+  )
   const [legalDocId, setLegalDocId] = useState<LegalDocId | null>(null)
 
   // Premium state — приходит с бэка.
@@ -425,6 +453,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     saveJSON(LS_LIBRARY_FILTER, f)
   }, [])
 
+  // Сохраняем self-info юзера в LS. Принимает частичный объект — мерджим
+  // с предыдущим состоянием, чтобы можно было обновлять поля по одному.
+  const setUserProfile = useCallback((p: UserProfile) => {
+    setUserProfileState((prev) => {
+      const next: UserProfile = { ...prev, ...p }
+      // Очищаем undefined-поля чтобы сериализация была чистой.
+      if (next.name === '') delete next.name
+      if (next.age === undefined || (typeof next.age === 'number' && next.age < 1)) delete next.age
+      saveJSON(LS_USER_PROFILE, next)
+      return next
+    })
+  }, [])
+
   // ─── Paywall ────────────────────────────────────────────────────────
   const openPaywall = useCallback((reason: PaywallReason) => setPaywallReason(reason), [])
   const closePaywall = useCallback(() => setPaywallReason(null), [])
@@ -558,6 +599,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     libraryFilter,
     setLibraryFilter,
+
+    userProfile,
+    setUserProfile,
 
     subscription,
     isPremium,

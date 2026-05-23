@@ -42,6 +42,9 @@ export function BottomNav({ activeTab }: Props) {
             <path d="M9 3v12M3 9h12" stroke="black" strokeWidth={2} strokeLinecap="round" />
           </svg>
         </span>
+        {/* Без подписи плюсик читался как "что-то добавить", непонятно что
+            именно. С "Создать" сразу ясно — кнопка создания персонажа. */}
+        <span className={styles.label} style={{ color: theme.text3 }}>Создать</span>
       </button>
 
       <button className={styles.item} onClick={() => goLibrary('mine')}>
