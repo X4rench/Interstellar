@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { useApp, type Message } from '../context/AppContext'
@@ -21,6 +21,15 @@ import { AgeGateModal } from '../components/AgeGateModal'
 import { appConfirm } from '../components/AppDialogs'
 
 import styles from './ChatPage.module.css'
+
+// ── Авто-рост поля ввода ───────────────────────────────────────────────
+// Поле растёт под количество строк до INPUT_MAX_LINES, дальше — внутренний
+// скролл (как в обычных мессенджерах). Значения синхронизированы с CSS
+// .textInput: line-height 20px + вертикальные паддинги 7+7=14px.
+const INPUT_LINE_HEIGHT = 20
+const INPUT_VPAD = 14
+const INPUT_MAX_LINES = 12
+const INPUT_MAX_HEIGHT = INPUT_MAX_LINES * INPUT_LINE_HEIGHT + INPUT_VPAD // 254px
 
 function StarIconSmall({ filled, color = '#888', size = 18 }: { filled?: boolean; color?: string; size?: number }) {
   return (
@@ -94,6 +103,7 @@ export function ChatPage() {
   const [moodPickerVisible, setMoodPickerVisible] = useState(false)
   const [nsfwGateVisible, setNsfwGateVisible] = useState(false)
   const messagesRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const messages: Message[] = character ? chats[character.id] || [] : []
   const isEmptyChat = messages.length === 0
@@ -135,6 +145,18 @@ export function ChatPage() {
     }, 50)
     return () => clearTimeout(t)
   }, [messages.length, isTyping])
+
+  // Авто-рост поля ввода: пересчитываем высоту под контент (до 12 строк,
+  // дальше — внутренний скролл). useLayoutEffect — чтобы измерить и выставить
+  // высоту до отрисовки, без мигания. Срабатывает и на очистку после отправки.
+  useLayoutEffect(() => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    const next = Math.min(el.scrollHeight, INPUT_MAX_HEIGHT)
+    el.style.height = `${next}px`
+    el.style.overflowY = el.scrollHeight > INPUT_MAX_HEIGHT ? 'auto' : 'hidden'
+  }, [inputText])
 
   // ── Send message ──────────────────────────────────────────────────
   const sendMessageToChar = useCallback(async () => {
@@ -433,6 +455,7 @@ export function ChatPage() {
         ) : (
           <div className={styles.inputRow}>
             <textarea
+              ref={inputRef}
               className={styles.textInput}
               placeholder={`Написать ${character.name.split(' ')[0]}...`}
               value={inputText}

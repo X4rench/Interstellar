@@ -119,9 +119,12 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 0 32px;
+  padding: 16px 32px;
   text-align: center;
   z-index: 2;
+  /* На шаге-форме контент выше — разрешаем скролл на маленьких экранах,
+     чтобы поля не обрезались. */
+  overflow-y: auto;
 }
 
 .iconWrap {
@@ -241,4 +244,90 @@
 
 .nextBtn:hover .arrowIcon {
   transform: translateX(2px);
+}
+
+/* ─── Шаг «О тебе»: компактная иконка + форма (пол + возраст) ───────────── */
+
+/* На шаге-форме уменьшаем иконку, чтобы поместились поля. */
+.iconWrapCompact {
+  width: 92px;
+  height: 92px;
+  border-radius: 26px;
+  margin-bottom: 20px;
+}
+
+.selfInfoForm {
+  width: 100%;
+  max-width: 320px;
+  margin-top: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  text-align: left;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fieldLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: #8a82a8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.genderRow {
+  display: flex;
+  gap: 10px;
+}
+
+.genderBtn {
+  flex: 1;
+  padding: 13px 4px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(124, 92, 255, 0.25);
+  background: rgba(255, 255, 255, 0.04);
+  color: #c8c0e0;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform 0.1s ease, background 0.18s ease, border-color 0.18s ease;
+}
+
+.genderBtn:active {
+  transform: scale(0.97);
+}
+
+.genderBtnActive {
+  background: linear-gradient(135deg, #7c5cff, #ff5cdb);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(124, 92, 255, 0.35);
+}
+
+.ageInput {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 13px 14px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(124, 92, 255, 0.25);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  font-size: 15px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.18s ease;
+}
+
+.ageInput::placeholder {
+  color: #6a6488;
+}
+
+.ageInput:focus {
+  border-color: rgba(124, 92, 255, 0.6);
 }

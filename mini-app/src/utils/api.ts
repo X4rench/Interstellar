@@ -126,7 +126,7 @@ export interface ChatMessage {
  * пользы — модель не должна звать юзера по имени слишком часто.
  */
 export interface ChatUserInfo {
-  gender?: 'male' | 'female' | 'other'
+  gender?: 'male' | 'female'
   age?: number
 }
 

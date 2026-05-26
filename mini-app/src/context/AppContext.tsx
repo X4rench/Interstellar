@@ -82,7 +82,7 @@ export type UserRole = 'admin' | 'partner' | 'regular'
  * и адекватную тональность.
  */
 export interface UserProfile {
-  gender?: 'male' | 'female' | 'other'
+  gender?: 'male' | 'female'
   age?: number
 }
 
@@ -238,10 +238,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const raw = loadJSON<'all' | 'mine' | 'favorites'>(LS_LIBRARY_FILTER, 'all')
     return raw === 'mine' || raw === 'favorites' ? raw : 'all'
   })
-  // Self-info юзера. По умолчанию пустой объект — юзер сам заполнит в Профиле.
-  const [userProfile, setUserProfileState] = useState<UserProfile>(() =>
-    loadJSON<UserProfile>(LS_USER_PROFILE, {}),
-  )
+  // Self-info юзера. По умолчанию пустой объект — юзер сам заполнит в Профиле
+  // или в онбординге. Миграция: вариант пола 'other' убран из выбора, поэтому
+  // старое значение чистим, чтобы тип оставался честным.
+  const [userProfile, setUserProfileState] = useState<UserProfile>(() => {
+    const p = loadJSON<UserProfile>(LS_USER_PROFILE, {})
+    if (p.gender !== 'male' && p.gender !== 'female') delete p.gender
+    return p
+  })
   const [legalDocId, setLegalDocId] = useState<LegalDocId | null>(null)
 
   // Premium state — приходит с бэка.

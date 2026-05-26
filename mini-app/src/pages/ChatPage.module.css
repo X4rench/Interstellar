@@ -340,7 +340,9 @@
 
 .inputRow {
   display: flex;
-  align-items: center;
+  /* flex-end — кнопка «Отправить» прижата к низу, когда поле растёт на
+     несколько строк (как в обычных мессенджерах). */
+  align-items: flex-end;
   gap: 8px;
   background: #161616;
   border: 1px solid #242424;
@@ -358,9 +360,15 @@
   line-height: 20px;
   font-family: inherit;
   resize: none;
-  min-height: 22px;
-  max-height: 80px;
-  padding: 0;
+  /* box-sizing: border-box — чтобы выставляемая из JS height (=scrollHeight)
+     совпадала с реальной высотой с учётом вертикальных паддингов. */
+  box-sizing: border-box;
+  /* min-height = высота кнопки (34px) для ровного вида при одной строке;
+     max-height = 12 строк (12*20) + паддинги (14) = 254px, дальше — скролл. */
+  min-height: 34px;
+  max-height: 254px;
+  padding: 7px 0;
+  overflow-y: hidden;
 }
 
 .textInput::placeholder {

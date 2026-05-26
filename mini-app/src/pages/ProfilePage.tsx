@@ -11,6 +11,57 @@ import invertLogo from '../icons/invertLogo.png'
 
 import styles from './ProfilePage.module.css'
 
+// ─── Иконки карточек профиля (line-art в общем стиле приложения) ─────────────
+// Заменяют эмодзи на стильные SVG: билет (Day Pass), подарок (реферал),
+// «поделиться» (share). Белые, наследуют stroke/fill от <svg>.
+
+function TicketIcon({ size = 20, color = '#fff' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />
+      <path d="M13 5v2" />
+      <path d="M13 11v2" />
+      <path d="M13 17v2" />
+    </svg>
+  )
+}
+
+function GiftIcon({ size = 18, color = '#fff' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 12v10H4V12" />
+      <path d="M2 7h20v5H2z" />
+      <path d="M12 22V7" />
+      <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
+      <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
+    </svg>
+  )
+}
+
+function ShareIcon({ size = 16, color = '#fff' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="18" cy="5" r="3" />
+      <circle cx="6" cy="12" r="3" />
+      <circle cx="18" cy="19" r="3" />
+      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+    </svg>
+  )
+}
+
+function StarBadgeIcon({ size = 18, color = '#fff' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 18 18" fill="none">
+      <path d="M9 1l2 6h6L12 11l2 6-5-3.5L4 17l2-6L1 7h6z"
+        stroke={color} strokeWidth={1.4} strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 // AutoRenewToggle убран по бизнес-решению: продление управляется иначе
 // (либо всегда вкл по умолчанию через save_payment_method=true при покупке,
 // либо юзер не управляет этим из приложения). Если в будущем понадобится —
@@ -91,10 +142,9 @@ function PartnerBannerBlock({ bloggerSlug, sharePercent }: { bloggerSlug: string
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
-            fontSize: 16,
           }}
         >
-          🌟
+          <StarBadgeIcon size={18} color="#fff" />
         </span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -253,10 +303,9 @@ function ReferralBlock() {
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
-            fontSize: 17,
           }}
         >
-          🎁
+          <GiftIcon size={18} color="#fff" />
         </span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#fff' }}>
@@ -339,9 +388,14 @@ function ReferralBlock() {
                 cursor: 'pointer',
                 fontFamily: 'inherit',
                 boxShadow: '0 3px 12px rgba(124, 92, 255, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
               }}
             >
-              📤 Поделиться в Telegram
+              <ShareIcon size={16} color="#fff" />
+              Поделиться в Telegram
             </button>
 
             {/* Статистика */}
@@ -440,7 +494,6 @@ function UserSelfInfoSection({
             {([
               { val: 'male' as const, lbl: 'Мужской' },
               { val: 'female' as const, lbl: 'Женский' },
-              { val: 'other' as const, lbl: 'Другой' },
             ]).map((opt) => {
               const active = profile.gender === opt.val
               return (
@@ -609,7 +662,7 @@ export function ProfilePage() {
                 className={`${styles.tierPill} ${styles.tierPillDayPass}`}
                 style={{ marginLeft: tierLabel ? 6 : 0 }}
               >
-                <span className={styles.tierPillIcon}>🎟</span>
+                <span className={styles.tierPillIcon}><TicketIcon size={11} color="#ff9ee6" /></span>
                 <span className={styles.tierPillText}>Day Pass</span>
               </span>
             )}
@@ -856,10 +909,9 @@ export function ProfilePage() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
-                fontSize: 16,
               }}
             >
-              🎟
+              <TicketIcon size={20} color="#fff" />
             </span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: '#fff' }}>
@@ -897,10 +949,9 @@ export function ProfilePage() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
-                fontSize: 16,
               }}
             >
-              🎟
+              <TicketIcon size={20} color="#fff" />
             </span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#fff' }}>
