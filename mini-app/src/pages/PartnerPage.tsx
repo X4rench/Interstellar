@@ -384,6 +384,7 @@ function PiiModal({
   const [bik, setBik] = useState(profile.bank_details?.bik || '')
   const [bankName, setBankName] = useState(profile.bank_details?.bank_name || '')
   const [consent, setConsent] = useState(profile.pii_provided) // если уже заполнен — считаем что согласие есть
+  const [offerAccepted, setOfferAccepted] = useState(profile.pii_provided) // согласие с договором-офертой
 
   const [busy, setBusy] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -399,6 +400,7 @@ function PiiModal({
     if (!/^\d{9}$/.test(bik.replace(/\s/g, ''))) e.bik = 'БИК: 9 цифр'
     if (bankName.trim().length < 3) e.bank_name = 'Название банка'
     if (!consent) e.consent = 'Нужно согласие на обработку ПД'
+    if (!offerAccepted) e.offerAccepted = 'Нужно принять условия партнёрской оферты'
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -550,6 +552,39 @@ function PiiModal({
             </span>
           </label>
           {errors.consent && <p className={`${styles.fieldHint} ${styles.fieldHintError}`}>{errors.consent}</p>}
+        </div>
+
+        <div className={styles.consentBlock}>
+          <label className={styles.consentLabel}>
+            <span
+              className={`${styles.checkbox} ${offerAccepted ? styles.checkboxOn : ''}`}
+              onClick={(e) => {
+                e.preventDefault()
+                setOfferAccepted((v) => !v)
+              }}
+            >
+              {offerAccepted && (
+                <svg width={12} height={12} viewBox="0 0 14 14" fill="none">
+                  <path d="M3 7l3 3 5-7" stroke="#fff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+            </span>
+            <span>
+              Я ознакомлен(а) и принимаю условия{' '}
+              <a
+                href="#/legal/partner_offer"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: '#c9b8ff', textDecoration: 'underline' }}
+              >
+                Партнёрской оферты
+              </a>
+              {' '}— в том числе обязанность маркировать рекламу erid-токеном, запрет на размещение
+              на платформах Meta (Instagram/Facebook) от имени Заказчика, выставление чека в «Мой налог»
+              перед выплатой по ставке 4%.
+            </span>
+          </label>
+          {errors.offerAccepted && <p className={`${styles.fieldHint} ${styles.fieldHintError}`}>{errors.offerAccepted}</p>}
         </div>
 
         {generalError && <div className={styles.errorBox}>{generalError}</div>}

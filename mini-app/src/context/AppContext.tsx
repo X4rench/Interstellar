@@ -75,13 +75,13 @@ export type UserRole = 'admin' | 'partner' | 'regular'
  * Self-info юзера. Все поля опциональны — юзер сам решает что заполнить.
  * Используется только для контекста LLM при чате (передаётся в /chat).
  *
- * Не путать с TG-профилем (first_name/username из initData) — это
- * информация которую юзер вручную ввёл «о себе» (например другое имя
- * по которому хочет чтобы его называли, пол для правильных склонений,
- * возраст для адекватной тональности).
+ * Имя НЕ запрашиваем — для имени уже есть first_name из TG initData,
+ * а явное «как ко мне обращаться» добавляло поверхностный layer без
+ * заметного UX-выигрыша (LLM не должна часто называть юзера по имени).
+ * Пол и возраст — главное: дают модели правильные склонения, обращения
+ * и адекватную тональность.
  */
 export interface UserProfile {
-  name?: string
   gender?: 'male' | 'female' | 'other'
   age?: number
 }
@@ -458,8 +458,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setUserProfile = useCallback((p: UserProfile) => {
     setUserProfileState((prev) => {
       const next: UserProfile = { ...prev, ...p }
-      // Очищаем undefined-поля чтобы сериализация была чистой.
-      if (next.name === '') delete next.name
+      // Очищаем неинвалидные значения чтобы сериализация была чистой.
       if (next.age === undefined || (typeof next.age === 'number' && next.age < 1)) delete next.age
       saveJSON(LS_USER_PROFILE, next)
       return next

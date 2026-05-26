@@ -12,7 +12,7 @@ import { sendMessage } from './bot-api.js';
  * (через roleLoader → req.partner). Никакого cross-partner-доступа.
  */
 
-const MIN_PAYOUT_RUB = 500; // 500₽ минимальная сумма для вывода
+const MIN_PAYOUT_RUB = 2000; // 2000₽ минимальная сумма для вывода
 
 // ─── Summary ─────────────────────────────────────────────────────────────
 

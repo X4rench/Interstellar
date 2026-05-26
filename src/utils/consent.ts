@@ -24,9 +24,9 @@ export type ConsentDocId =
  * пользователь увидит запрос повторного согласия.
  */
 export const LEGAL_VERSIONS: Record<ConsentDocId, string> = {
-  privacy_policy:   '2026.04',
-  terms_of_service: '2026.04',
-  personal_data:    '2026.04',
+  privacy_policy:   '2026.05',
+  terms_of_service: '2026.05',
+  personal_data:    '2026.05',
   age_18:           '2026.04',
 };
 

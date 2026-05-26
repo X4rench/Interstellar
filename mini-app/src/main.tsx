@@ -168,7 +168,7 @@ function renderLandingPage(): string {
           color: #aaa; font-size: 13px; line-height: 1.7; margin-bottom: 32px;
         ">
           <div>Telegram: <a href="https://t.me/InterstellarAiBot" style="color: #c9b8ff; text-decoration: none;">@InterstellarAiBot</a></div>
-          <div>Email: <a href="mailto:killkriomi@mail.ru" style="color: #c9b8ff; text-decoration: none;">killkriomi@mail.ru</a></div>
+          <div>Email: <a href="mailto:apppartners@mail.ru" style="color: #c9b8ff; text-decoration: none;">apppartners@mail.ru</a></div>
           <div>Поддержка по платежам: команда <code style="background:#1a1a1a;padding:1px 5px;border-radius:3px;font-size:12px;">/paysupport</code> в боте</div>
         </div>
 

@@ -389,10 +389,11 @@ function ReferralBlock() {
 import type { UserProfile } from '../context/AppContext'
 
 /**
- * Блок «О тебе» — юзер вводит имя/пол/возраст, эти данные шлются с каждым
- * chat-запросом и LLM учитывает их при общении.
+ * Блок «О тебе» — юзер выбирает пол и возраст. Эти данные шлются с каждым
+ * chat-запросом и LLM учитывает их при общении (правильные склонения,
+ * адекватная тональность).
  *
- * Поля опциональны. Сохранение по onBlur (текстовые) или сразу (пол).
+ * Имя не запрашиваем — для обращения у нас уже есть first_name из TG.
  */
 function UserSelfInfoSection({
   profile,
@@ -401,15 +402,10 @@ function UserSelfInfoSection({
   profile: UserProfile
   onChange: (p: UserProfile) => void
 }) {
-  // Локальные state'ы — чтобы не дёргать onChange (а значит localStorage)
-  // на каждое нажатие клавиши. Сохраняем по blur и при смене пола.
-  const [name, setName] = useState(profile.name ?? '')
+  // Локальный state для возраста — чтобы не дёргать localStorage на
+  // каждое нажатие клавиши. Сохраняем по blur. Пол — сразу при клике.
   const [age, setAge] = useState<string>(profile.age ? String(profile.age) : '')
 
-  const persistName = () => {
-    const trimmed = name.trim().slice(0, 40)
-    if (trimmed !== (profile.name ?? '')) onChange({ name: trimmed || undefined })
-  }
   const persistAge = () => {
     const n = parseInt(age, 10)
     const valid = Number.isFinite(n) && n >= 1 && n <= 120 ? n : undefined
@@ -420,7 +416,7 @@ function UserSelfInfoSection({
     <div className={styles.section}>
       <h3 className={styles.sectionTitle}>О тебе</h3>
       <p style={{ margin: '0 20px 12px', fontSize: 12, color: '#888', lineHeight: 1.4 }}>
-        Эти данные помогут персонажам общаться естественнее — они будут учитывать твой пол, возраст и иногда обращаться по имени. Всё опционально.
+        Эти данные помогут персонажам общаться естественнее — они будут учитывать пол и возраст в репликах. Всё опционально.
       </p>
 
       <div
@@ -435,32 +431,6 @@ function UserSelfInfoSection({
           gap: 14,
         }}
       >
-        {/* Имя */}
-        <div>
-          <label style={{ display: 'block', fontSize: 11, color: '#888', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 }}>
-            Имя
-          </label>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onBlur={persistName}
-            placeholder="Как к тебе обращаться"
-            maxLength={40}
-            style={{
-              width: '100%',
-              padding: '10px 12px',
-              background: '#0c0c0c',
-              border: '1px solid #2a2a2a',
-              borderRadius: 10,
-              color: '#fff',
-              fontSize: 14,
-              fontFamily: 'inherit',
-              outline: 'none',
-              boxSizing: 'border-box',
-            }}
-          />
-        </div>
-
         {/* Пол */}
         <div>
           <label style={{ display: 'block', fontSize: 11, color: '#888', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 }}>

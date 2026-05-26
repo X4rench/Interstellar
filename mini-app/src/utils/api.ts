@@ -117,12 +117,15 @@ export interface ChatMessage {
 }
 
 /**
- * Self-info юзера для контекста LLM (имя/пол/возраст).
+ * Self-info юзера для контекста LLM (пол + возраст).
  * Хранится локально в browser, шлётся с каждым chat-запросом.
  * Все поля опциональные — юзер сам решает что заполнить.
+ *
+ * Имя НЕ хранится: для обращения LLM может использовать first_name из
+ * TG initData (бэк уже имеет доступ), а явное self-name не даёт заметной
+ * пользы — модель не должна звать юзера по имени слишком часто.
  */
 export interface ChatUserInfo {
-  name?: string
   gender?: 'male' | 'female' | 'other'
   age?: number
 }
@@ -132,9 +135,9 @@ export interface ChatUserInfo {
  * + rate-limit. На клиенте история живёт локально, каждый запрос шлёт
  * всю переписку целиком (stateless backend).
  *
- * user_info — опциональная self-info юзера для immersion (бэк подмешает её
- * в system-prompt). LLM будет иногда называть юзера по имени, понимать пол
- * и возраст. Без user_info — старое поведение (LLM не знает кто юзер).
+ * user_info — опциональная self-info юзера (пол/возраст) для immersion.
+ * Бэк подмешает её в system-prompt чтобы LLM использовала правильные
+ * склонения и адекватную тональность. Без user_info — старое поведение.
  *
  * При 429 (rate limit) — ApiError кидается, UI показывает «слишком часто».
  */
@@ -145,7 +148,7 @@ export async function sendMessage(
 ): Promise<string> {
   type ChatResponse = { ok: true; response: string }
   const body: Record<string, unknown> = { persona, messages }
-  if (userInfo && (userInfo.name || userInfo.gender || userInfo.age)) {
+  if (userInfo && (userInfo.gender || userInfo.age)) {
     body.user_info = userInfo
   }
   const data = await fetchAuthed<ChatResponse>('/chat', {
