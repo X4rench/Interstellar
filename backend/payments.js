@@ -60,7 +60,7 @@ function getPlanConfig(plan) {
     },
     day_pass: {
       title: 'Day Pass',
-      description: '24 часа без лимита в текущем тарифе',
+      description: '+100 сообщений к дневному лимиту на 24 часа',
       stars: Number(process.env.STAR_PRICE_DAY_PASS) || 50,
       recurring: false,
       subscription_period_sec: 0,

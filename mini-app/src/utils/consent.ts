@@ -32,7 +32,7 @@ export type ConsentDocId =
  */
 export const LEGAL_VERSIONS: Record<ConsentDocId, string> = {
   privacy_policy:   '2026.05',
-  terms_of_service: '2026.05b',
+  terms_of_service: '2026.05c',
   personal_data:    '2026.05',
   age_18:           '2026.05',
 };

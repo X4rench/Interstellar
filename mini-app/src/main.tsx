@@ -138,7 +138,7 @@ function renderLandingPage(): string {
               <span style="font-size: 16px; font-weight: 700;">Day Pass</span>
               <span style="font-size: 16px; font-weight: 700;">75 ₽</span>
             </div>
-            <p style="margin: 0; font-size: 13px; color: #888;">24 часа без лимита сообщений (разовая покупка)</p>
+            <p style="margin: 0; font-size: 13px; color: #888;">+100 сообщений сверх дневного лимита на 24 часа (только при активной подписке)</p>
           </div>
         </div>
 

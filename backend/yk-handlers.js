@@ -46,7 +46,7 @@ const PLAN_DURATION_MS = {
 const PLAN_DESCRIPTION = {
   basic_month:   'Интерстеллар Basic — подписка на 30 дней',
   premium_month: 'Интерстеллар Premium — подписка на 30 дней',
-  day_pass:      'Интерстеллар Day Pass — 24 часа без лимита',
+  day_pass:      'Интерстеллар Day Pass — +100 сообщений на 24 часа',
 };
 
 /**
