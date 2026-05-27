@@ -792,9 +792,16 @@ export function grantSubscription({
 }
 
 /**
- * Отбирание подписки админом. Закрывает активные subscriptions (cancelled_at=now)
- * и истечает активные day_passes (expires_at=now). После этого юзер сразу
- * становится free-tier до новой покупки/grant.
+ * Отбирание подписки админом. Истечает активные subscriptions И day_passes
+ * (expires_at=now). После этого юзер сразу становится free-tier до новой
+ * покупки/grant.
+ *
+ * ВАЖНО: активность подписки определяется по expires_at > now
+ * (getActiveSubscription в db.js), а НЕ по cancelled_at — cancelled_at лишь
+ * помечает «автопродление выключено», доступ при этом сохраняется до конца
+ * оплаченного периода. Поэтому чтобы реально отобрать доступ, надо двигать
+ * expires_at, а не только ставить cancelled_at (это был баг: revoke помечал
+ * cancelled_at, но юзер оставался premium до естественного истечения).
  */
 export function revokeSubscription({
   db,
@@ -815,11 +822,18 @@ export function revokeSubscription({
   let dpExpired = 0;
 
   const tx = db.transaction(() => {
+    // Закрываем ВСЕ активные подписки (expires_at > now) — включая те, где
+    // автопродление уже выключено (cancelled_at IS NOT NULL), но доступ ещё
+    // действует. Ставим expires_at = now (именно по нему определяется
+    // активность), auto_renew = 0 (чтобы cron не продлил), а cancelled_at
+    // выставляем только если ещё не стоял (сохраняем исходную дату отмены).
     const subRes = db.prepare(`
       UPDATE subscriptions
-      SET cancelled_at = ?
-      WHERE telegram_user_id = ? AND expires_at > ? AND cancelled_at IS NULL
-    `).run(now, targetUserId, now);
+      SET expires_at = ?,
+          auto_renew = 0,
+          cancelled_at = COALESCE(cancelled_at, ?)
+      WHERE telegram_user_id = ? AND expires_at > ?
+    `).run(now, now, targetUserId, now);
     subsCancelled = subRes.changes;
 
     const dpRes = db.prepare(`
