@@ -7,6 +7,7 @@ import { composePersona, getMoodLabel } from '../utils/moods'
 import { isConsentValid } from '../utils/consent'
 import { getCharacterGradient } from '../utils/gradients'
 import { getMockResponse } from '../utils/mockAI'
+import { resizeImageToBlob } from '../utils/avatarStorage'
 
 import {
   BackIcon,
@@ -64,6 +65,20 @@ function ClockIcon({ color = '#888' }: { color?: string }) {
   )
 }
 
+function CameraIcon({ color = '#fff', size = 14 }: { color?: string; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path
+        d="M3 8.5A1.5 1.5 0 0 1 4.5 7h2l1.2-1.8a1 1 0 0 1 .83-.45h6.94a1 1 0 0 1 .83.45L17.5 7h2A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"
+        stroke={color}
+        strokeWidth={1.7}
+        strokeLinejoin="round"
+      />
+      <circle cx={12} cy={13} r={3.2} stroke={color} strokeWidth={1.7} />
+    </svg>
+  )
+}
+
 function formatTime() {
   const now = new Date()
   return now.getHours() + ':' + String(now.getMinutes()).padStart(2, '0')
@@ -79,6 +94,8 @@ export function ChatPage() {
     addMessage,
     clearChat,
     deleteCharacter,
+    updateCharacterAvatar,
+    removeCharacterAvatar,
     userAvatarLetter,
     favorites,
     toggleFavorite,
@@ -104,6 +121,8 @@ export function ChatPage() {
   const [nsfwGateVisible, setNsfwGateVisible] = useState(false)
   const messagesRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const photoInputRef = useRef<HTMLInputElement>(null)
+  const [photoBusy, setPhotoBusy] = useState(false)
 
   const messages: Message[] = character ? chats[character.id] || [] : []
   const isEmptyChat = messages.length === 0
@@ -299,6 +318,39 @@ export function ChatPage() {
     }
   }, [character, deleteCharacter, nav])
 
+  // ── Смена фото персонажа (только для кастомных) ─────────────────────
+  const handlePickPhoto = useCallback(() => {
+    photoInputRef.current?.click()
+  }, [])
+
+  const handlePhotoSelected = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+      e.target.value = '' // позволяем выбрать тот же файл повторно
+      if (!file || !character) return
+      setPhotoBusy(true)
+      try {
+        const blob = await resizeImageToBlob(file, 256, 0.8)
+        await updateCharacterAvatar(character.id, blob)
+      } catch {
+        /* фото просто не сменится — без отдельной модалки об ошибке */
+      } finally {
+        setPhotoBusy(false)
+      }
+    },
+    [character, updateCharacterAvatar],
+  )
+
+  const handleRemovePhoto = useCallback(async () => {
+    if (!character) return
+    setPhotoBusy(true)
+    try {
+      await removeCharacterAvatar(character.id)
+    } finally {
+      setPhotoBusy(false)
+    }
+  }, [character, removeCharacterAvatar])
+
   // ── Early return ──────────────────────────────────────────────────
   if (!character) return null
 
@@ -315,7 +367,11 @@ export function ChatPage() {
           <BackIcon />
         </button>
 
-        <button className={styles.charInfo}>
+        <button
+          className={styles.charInfo}
+          onClick={() => setStatsVisible(true)}
+          aria-label="Профиль персонажа"
+        >
           <span className={styles.charAvatar} style={gradStyle}>
             <CharacterIcon iconType={character.iconType} size={20} avatarUri={character.avatarUri} />
           </span>
@@ -535,14 +591,50 @@ export function ChatPage() {
         }}
       />
 
-      {/* Stats modal */}
+      {/* Stats / profile modal */}
       {statsVisible && (
         <div className={styles.statsOverlay} onClick={() => setStatsVisible(false)}>
           <div className={styles.statsCard} onClick={(e) => e.stopPropagation()}>
-            <span className={styles.statsAvatar} style={gradStyle}>
-              <CharacterIcon iconType={character.iconType} size={28} avatarUri={character.avatarUri} />
-            </span>
+            {character.userCreated ? (
+              <button
+                type="button"
+                className={styles.statsAvatarWrap}
+                onClick={handlePickPhoto}
+                disabled={photoBusy}
+                aria-label="Изменить фото персонажа"
+                title="Нажми, чтобы сменить фото"
+              >
+                <span className={styles.statsAvatar} style={gradStyle}>
+                  <CharacterIcon iconType={character.iconType} size={28} avatarUri={character.avatarUri} />
+                </span>
+                <span className={styles.avatarCamBadge}>
+                  <CameraIcon size={12} color="#fff" />
+                </span>
+              </button>
+            ) : (
+              <span className={styles.statsAvatar} style={gradStyle}>
+                <CharacterIcon iconType={character.iconType} size={28} avatarUri={character.avatarUri} />
+              </span>
+            )}
             <h2 className={styles.statsName}>{character.name}</h2>
+
+            {character.userCreated && (
+              <div className={styles.photoActions}>
+                <button className={styles.photoBtn} onClick={handlePickPhoto} disabled={photoBusy}>
+                  {photoBusy ? 'Загрузка…' : character.avatarUri ? 'Изменить фото' : 'Добавить фото'}
+                </button>
+                {character.avatarUri && (
+                  <button
+                    className={styles.photoBtnGhost}
+                    onClick={handleRemovePhoto}
+                    disabled={photoBusy}
+                  >
+                    Убрать фото
+                  </button>
+                )}
+              </div>
+            )}
+
             <div className={styles.statsRow}>
               <div className={styles.statItem}>
                 <span className={styles.statVal}>{userMsgCount}</span>
@@ -565,6 +657,15 @@ export function ChatPage() {
           </div>
         </div>
       )}
+
+      {/* Скрытый input для выбора фото персонажа (из профиля выше). */}
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handlePhotoSelected}
+        style={{ display: 'none' }}
+      />
     </div>
   )
 }

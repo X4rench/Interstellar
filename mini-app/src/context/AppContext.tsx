@@ -13,7 +13,7 @@ import { useSignal, initData } from '@telegram-apps/sdk-react'
 import { BUILT_IN_CHARACTERS, type Character } from '../data/characters'
 import { getMe, publicGetCharacters, getBackendRoot, type MeSubscription, type Tier, ApiError } from '../utils/api'
 import { logSecurityEvent } from '../utils/securityLog'
-import { deleteAvatar, wipeAllAvatars } from '../utils/avatarStorage'
+import { saveAvatar, getAvatarUrl, deleteAvatar, wipeAllAvatars } from '../utils/avatarStorage'
 import {
   cloudSyncAvailable,
   cloudPullCharacters,
@@ -123,6 +123,10 @@ interface AppContextValue {
   characters: Character[]
   addCharacter: (c: Character) => void
   deleteCharacter: (id: string) => void
+  /** Сменить фото кастомного персонажа (сохраняет blob в IndexedDB). */
+  updateCharacterAvatar: (id: string, blob: Blob) => Promise<void>
+  /** Убрать фото кастомного персонажа (вернуться к SVG-иконке). */
+  removeCharacterAvatar: (id: string) => Promise<void>
   customCharsCount: number
 
   // Чаты.
@@ -475,6 +479,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })
   }, [tgUser])
 
+  // ─── Аватары кастомных персонажей: rehydrate из IndexedDB ───────────
+  // avatarUri хранится как blob:-URL, а blob:-URL живёт только в рамках
+  // текущей сессии страницы. После перезагрузки старый URL невалиден —
+  // картинка не отрисуется (CharacterIcon упадёт на iconType). Поэтому на
+  // старте пере-резолвим blob:-URL из IndexedDB по character.id для всех
+  // кастомных персонажей, у которых было фото. Это же чинит «фото
+  // пропадает после перезапуска» из старого create-флоу.
+  useEffect(() => {
+    void (async () => {
+      const local = loadJSON<Character[]>(LS_CUSTOM_CHARS, [])
+      const withPhoto = local.filter((c) => typeof c.avatarUri === 'string')
+      if (withPhoto.length === 0) return
+      const resolved = await Promise.all(
+        withPhoto.map(async (c) => ({
+          id: c.id,
+          url: await getAvatarUrl(c.id).catch(() => null),
+        })),
+      )
+      const urlById = new Map(resolved.map((r) => [r.id, r.url]))
+      setCharacters((prev) => {
+        let changed = false
+        const next = prev.map((c) => {
+          if (!urlById.has(c.id)) return c
+          const url = urlById.get(c.id) ?? undefined
+          if (c.avatarUri === url) return c
+          changed = true
+          return { ...c, avatarUri: url }
+        })
+        if (!changed) return prev
+        saveJSON(LS_CUSTOM_CHARS, next.filter((c) => c.userCreated))
+        return next
+      })
+    })()
+  }, [])
+
   // ─── Characters ─────────────────────────────────────────────────────
   const addCharacter = useCallback((c: Character) => {
     setCharacters((prev) => {
@@ -504,6 +543,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })
     // Убираем из облака, чтобы не «воскрес» при следующем синке.
     cloudRemoveCharacter(id)
+  }, [])
+
+  // Сменить фото персонажа: сжатый blob → IndexedDB → свежий blob:-URL в state.
+  // Фото device-local (в CloudStorage не уходит — см. cloudSync.ts), поэтому
+  // синкать тут нечего.
+  const updateCharacterAvatar = useCallback(async (id: string, blob: Blob) => {
+    await saveAvatar(id, blob)
+    const url = await getAvatarUrl(id)
+    setCharacters((prev) => {
+      const next = prev.map((c) => (c.id === id ? { ...c, avatarUri: url ?? undefined } : c))
+      saveJSON(LS_CUSTOM_CHARS, next.filter((c) => c.userCreated))
+      return next
+    })
+  }, [])
+
+  // Убрать фото: чистим IndexedDB и сбрасываем avatarUri (вернёмся к iconType).
+  const removeCharacterAvatar = useCallback(async (id: string) => {
+    await deleteAvatar(id)
+    setCharacters((prev) => {
+      const next = prev.map((c) => (c.id === id ? { ...c, avatarUri: undefined } : c))
+      saveJSON(LS_CUSTOM_CHARS, next.filter((c) => c.userCreated))
+      return next
+    })
   }, [])
 
   // ─── Chats ──────────────────────────────────────────────────────────
@@ -693,6 +755,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     characters,
     addCharacter,
     deleteCharacter,
+    updateCharacterAvatar,
+    removeCharacterAvatar,
     customCharsCount,
 
     chats,

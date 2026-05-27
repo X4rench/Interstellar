@@ -559,3 +559,82 @@
   cursor: pointer;
   font-family: inherit;
 }
+
+/* ─── Смена фото персонажа (профиль кастомного персонажа) ─────────── */
+.statsAvatarWrap {
+  position: relative;
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 20px;
+  cursor: pointer;
+}
+
+.statsAvatarWrap:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+/* Круглый «значок камеры» в углу аватара — affordance что фото меняется. */
+.avatarCamBadge {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #7c5cff, #ff5cdb);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #161616; /* совпадает с фоном .statsCard — эффект «вырезки» */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.photoActions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.photoBtn {
+  background: linear-gradient(135deg, #7c5cff 0%, #b455e8 50%, #ff5cdb 100%);
+  color: #fff;
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 22px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+}
+
+.photoBtn:active {
+  transform: scale(0.98);
+}
+
+.photoBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.photoBtnGhost {
+  background: transparent;
+  color: #888;
+  border: 0;
+  border-radius: 12px;
+  padding: 6px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.photoBtnGhost:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
