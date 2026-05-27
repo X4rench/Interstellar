@@ -24,6 +24,7 @@ import {
   loadRole,
   isAdmin,
   getAdminCount,
+  getAdminIds,
   requireRole,
   requireConfirmAction,
   requireFreshAuth,
@@ -305,6 +306,14 @@ app.post('/api/v1/auth/validate-init-data', requireAuth, (req, res) => {
   });
 });
 
+// Служебное уведомление всем админам (трекинг переходов по реф-ссылкам).
+// Fire-and-forget: ошибки глотает sendMessage, основной flow не блокируем.
+function notifyAdminsReferral(text) {
+  for (const adminId of getAdminIds()) {
+    sendMessage({ chatId: adminId, text });
+  }
+}
+
 // ─── users: profile + subscription + role + tier ─────────────────────────
 app.get('/api/v1/users/me', requireAuth, roleLoader, (req, res) => {
   // Без try/catch было: любой throw из upsertUser/getActiveSubscription/etc
@@ -315,11 +324,41 @@ app.get('/api/v1/users/me', requireAuth, roleLoader, (req, res) => {
     const u = req.tgUser;
 
     // Upsert юзера + регистрация атрибуции (если start_param впервые).
-    const { newPartnerReferral } = upsertUser(db, u);
+    const { newPartnerReferral, newUserReferral } = upsertUser(db, u);
+
+    // Имя пришедшего юзера — для всех уведомлений ниже.
+    const arrivedName = u.username
+      ? `@${escapeHtml(u.username)}`
+      : escapeHtml(u.first_name || 'пользователь');
+
+    // Партнёрская ссылка (slug блогера): уведомляем партнёра + админов (трекинг).
     if (newPartnerReferral) {
-      const { partnerUserId, firstName, username } = newPartnerReferral;
-      const displayName = username ? `@${escapeHtml(username)}` : escapeHtml(firstName || 'пользователь');
-      sendMessage({ chatId: partnerUserId, text: `👤 У вас новый реферал: ${displayName}` });
+      const { partnerUserId, firstName, username, slug } = newPartnerReferral;
+      const partnerName = username ? `@${escapeHtml(username)}` : escapeHtml(firstName || 'партнёр');
+      sendMessage({ chatId: partnerUserId, text: `👤 У вас новый реферал: ${arrivedName}` });
+      notifyAdminsReferral(
+        `🔗 <b>Переход по партнёрской ссылке</b>\n` +
+          `Партнёр: ${partnerName} (slug: <code>${escapeHtml(slug)}</code>)\n` +
+          `Пришёл: ${arrivedName} · id <code>${u.telegram_user_id}</code>`,
+      );
+    }
+
+    // Пользовательская реф-ссылка (ref_XXXX): уведомляем реферера (раньше
+    // уведомления не было вовсе) + админов (трекинг).
+    if (newUserReferral) {
+      const { referrerUserId, referrerFirstName, referrerUsername } = newUserReferral;
+      const referrerName = referrerUsername
+        ? `@${escapeHtml(referrerUsername)}`
+        : escapeHtml(referrerFirstName || `id ${referrerUserId}`);
+      sendMessage({
+        chatId: referrerUserId,
+        text: `🎉 По твоей реферальной ссылке пришёл ${arrivedName}! Спасибо, что советуешь Interstellar 🚀`,
+      });
+      notifyAdminsReferral(
+        `🔗 <b>Переход по реферальной ссылке пользователя</b>\n` +
+          `Реферер: ${referrerName} · id <code>${referrerUserId}</code>\n` +
+          `Пришёл: ${arrivedName} · id <code>${u.telegram_user_id}</code>`,
+      );
     }
 
     const subscription = getActiveSubscription(db, u.telegram_user_id);

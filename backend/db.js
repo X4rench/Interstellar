@@ -138,12 +138,23 @@ export function upsertUser(db, tgUser) {
       const code = tgUser.start_param.slice(4)
       if (code) {
         const referrer = db
-          .prepare('SELECT telegram_user_id FROM users WHERE referral_code = ?')
+          .prepare('SELECT telegram_user_id, first_name, username FROM users WHERE referral_code = ?')
           .get(code)
         if (referrer && referrer.telegram_user_id !== tgUser.telegram_user_id) {
-          db.prepare(
+          const upd = db.prepare(
             'UPDATE users SET referred_by_user_id = ? WHERE telegram_user_id = ? AND referred_by_user_id IS NULL',
           ).run(referrer.telegram_user_id, tgUser.telegram_user_id)
+          // changes === 1 → это ПЕРВИЧНая привязка (а не повторный /users/me).
+          // Возвращаем данные реферера, чтобы server.js уведомил его и админов.
+          if (upd.changes === 1) {
+            return {
+              newUserReferral: {
+                referrerUserId: referrer.telegram_user_id,
+                referrerFirstName: referrer.first_name,
+                referrerUsername: referrer.username,
+              },
+            }
+          }
         }
       }
     } else if (attrResult.changes === 1) {
@@ -166,6 +177,7 @@ export function upsertUser(db, tgUser) {
             partnerUserId: partner.telegram_user_id,
             firstName: partner.first_name,
             username: partner.username,
+            slug: tgUser.start_param,
           },
         }
       }

@@ -41,6 +41,15 @@ export function getAdminCount() {
 }
 
 /**
+ * Список telegram_user_id всех админов (из ADMIN_TELEGRAM_IDS).
+ * Нужен для служебных рассылок — например, трекинг-уведомлений о переходах
+ * по реферальным ссылкам.
+ */
+export function getAdminIds() {
+  return Array.from(parseAdminIds());
+}
+
+/**
  * Middleware: после requireAuth. Резолвит роль и кладёт в req.role +
  * req.partner (если применимо). НЕ доверяет ничему кроме env и БД.
  *
