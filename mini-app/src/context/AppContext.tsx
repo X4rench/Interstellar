@@ -5,6 +5,7 @@ import {
   useEffect,
   useCallback,
   useMemo,
+  useRef,
   type ReactNode,
 } from 'react'
 import { useSignal, initData } from '@telegram-apps/sdk-react'
@@ -13,6 +14,18 @@ import { BUILT_IN_CHARACTERS, type Character } from '../data/characters'
 import { getMe, publicGetCharacters, getBackendRoot, type MeSubscription, type Tier, ApiError } from '../utils/api'
 import { logSecurityEvent } from '../utils/securityLog'
 import { deleteAvatar, wipeAllAvatars } from '../utils/avatarStorage'
+import {
+  cloudSyncAvailable,
+  cloudPullCharacters,
+  cloudPushCharacter,
+  cloudRemoveCharacter,
+  cloudPullKV,
+  cloudPushKV,
+  cloudWipeAll,
+  CK_FAVORITES,
+  CK_MOODS,
+  CK_PROFILE,
+} from '../utils/cloudSync'
 import type { LegalDocId } from '../utils/consent'
 
 // ─── типы ────────────────────────────────────────────────────────────────
@@ -380,6 +393,88 @@ export function AppProvider({ children }: { children: ReactNode }) {
       })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ─── Cross-device sync (Telegram CloudStorage) ──────────────────────
+  // Один раз при появлении tgUser подтягиваем кастомных персонажей,
+  // избранное, настроения и профиль из облака Telegram и сливаем с
+  // локальными. Также «поднимаем» в облако то, что было создано локально
+  // до появления синка. Дальше каждое изменение пушится в облако в своих
+  // сеттерах (addCharacter / toggleFavorite / ...). История чатов и фото
+  // НЕ синкаются (см. cloudSync.ts).
+  const cloudSyncedRef = useRef(false)
+  useEffect(() => {
+    if (cloudSyncedRef.current) return
+    if (!tgUser) return
+    if (!cloudSyncAvailable()) return
+    cloudSyncedRef.current = true
+
+    void (async () => {
+      // 1) Персонажи: cloud → state (добавляем недостающие), local → cloud (миграция).
+      const cloudChars = await cloudPullCharacters()
+      const cloudIds = new Set(cloudChars.map((c) => c.id))
+      const localCustom = loadJSON<Character[]>(LS_CUSTOM_CHARS, [])
+
+      if (cloudChars.length > 0) {
+        setCharacters((prev) => {
+          const present = new Set(prev.map((c) => c.id))
+          const toAdd = cloudChars.filter((c) => !present.has(c.id))
+          if (toAdd.length === 0) return prev
+          const merged = [...prev, ...toAdd]
+          saveJSON(LS_CUSTOM_CHARS, merged.filter((c) => c.userCreated))
+          return merged
+        })
+      }
+      // Локальные персонажи, которых нет в облаке — заливаем наверх.
+      for (const c of localCustom) {
+        if (!cloudIds.has(c.id)) await cloudPushCharacter(c)
+      }
+
+      // 2) Избранное — объединяем (union), чтобы ничего не потерять.
+      const cloudFavs = await cloudPullKV<string[]>(CK_FAVORITES)
+      if (cloudFavs && cloudFavs.length > 0) {
+        setFavorites((prev) => {
+          const union = Array.from(new Set([...prev, ...cloudFavs]))
+          saveJSON(LS_FAVORITES, union)
+          cloudPushKV(CK_FAVORITES, union)
+          return union
+        })
+      } else {
+        const local = loadJSON<string[]>(LS_FAVORITES, [])
+        if (local.length > 0) cloudPushKV(CK_FAVORITES, local)
+      }
+
+      // 3) Настроения — мердж объектов (cloud перекрывает при конфликте ключа).
+      const cloudMoods = await cloudPullKV<Record<string, string>>(CK_MOODS)
+      if (cloudMoods && Object.keys(cloudMoods).length > 0) {
+        setCharacterMoodsState((prev) => {
+          const merged = { ...prev, ...cloudMoods }
+          saveJSON(LS_MOODS, merged)
+          cloudPushKV(CK_MOODS, merged)
+          return merged
+        })
+      } else {
+        const local = loadJSON<Record<string, string>>(LS_MOODS, {})
+        if (Object.keys(local).length > 0) cloudPushKV(CK_MOODS, local)
+      }
+
+      // 4) Профиль (пол/возраст) — мердж (cloud перекрывает).
+      const cloudProfile = await cloudPullKV<UserProfile>(CK_PROFILE)
+      if (cloudProfile && Object.keys(cloudProfile).length > 0) {
+        setUserProfileState((prev) => {
+          const merged: UserProfile = { ...prev, ...cloudProfile }
+          if (merged.gender !== 'male' && merged.gender !== 'female') delete merged.gender
+          saveJSON(LS_USER_PROFILE, merged)
+          cloudPushKV(CK_PROFILE, merged)
+          return merged
+        })
+      } else {
+        const local = loadJSON<UserProfile>(LS_USER_PROFILE, {})
+        if (Object.keys(local).length > 0) cloudPushKV(CK_PROFILE, local)
+      }
+    })().catch(() => {
+      /* синк не критичен — приложение работает на localStorage */
+    })
+  }, [tgUser])
+
   // ─── Characters ─────────────────────────────────────────────────────
   const addCharacter = useCallback((c: Character) => {
     setCharacters((prev) => {
@@ -387,6 +482,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       saveJSON(LS_CUSTOM_CHARS, updated.filter((x) => x.userCreated))
       return updated
     })
+    // Синк в Telegram CloudStorage (между устройствами). Fire-and-forget.
+    cloudPushCharacter(c)
   }, [])
 
   const deleteCharacter = useCallback((id: string) => {
@@ -405,6 +502,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     deleteAvatar(id).catch(() => {
       /* swallow — основная логика уже сработала */
     })
+    // Убираем из облака, чтобы не «воскрес» при следующем синке.
+    cloudRemoveCharacter(id)
   }, [])
 
   // ─── Chats ──────────────────────────────────────────────────────────
@@ -438,6 +537,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setFavorites((prev) => {
       const updated = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
       saveJSON(LS_FAVORITES, updated)
+      cloudPushKV(CK_FAVORITES, updated)
       return updated
     })
   }, [])
@@ -448,6 +548,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (moodId === null) delete updated[characterId]
       else updated[characterId] = moodId
       saveJSON(LS_MOODS, updated)
+      cloudPushKV(CK_MOODS, updated)
       return updated
     })
   }, [])
@@ -465,6 +566,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // Очищаем неинвалидные значения чтобы сериализация была чистой.
       if (next.age === undefined || (typeof next.age === 'number' && next.age < 1)) delete next.age
       saveJSON(LS_USER_PROFILE, next)
+      cloudPushKV(CK_PROFILE, next)
       return next
     })
   }, [])
@@ -563,6 +665,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // Аватары — отдельно из IndexedDB.
     await wipeAllAvatars().catch(() => {
       /* ignore — основной wipe уже сработал */
+    })
+    // Облако Telegram (персонажи/избранное/настроения/профиль) — тоже стираем.
+    await cloudWipeAll().catch(() => {
+      /* ignore */
     })
     // Сброс in-memory state.
     setCharacters(BUILT_IN_CHARACTERS)
